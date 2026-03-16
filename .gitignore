@@ -77,7 +77,6 @@ dist
 
 # Gatsby files
 .cache/
-public
 
 # Storybook build outputs
 .out
@@ -160,3 +159,11 @@ logs/
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Rust/Cargo
+contracts/target/
+Cargo.lock
+
+# Soroban
+*.wasm
+soroban/

@@ -7,6 +7,8 @@ const helmet = require('helmet');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const { v4: uuidv4 } = require('uuid');
+const { Server, Keypair, TransactionBuilder, Networks, BASE_FEE, Asset } = require('stellar-sdk');
+const { StellarSealedBidAuction } = require('./contracts/StellarSealedBidAuction');
 
 const app = express();
 const server = http.createServer(app);
