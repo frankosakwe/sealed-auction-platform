@@ -11,49 +11,59 @@ const validationRules = {
         minLength: 3,
         maxLength: 20,
         pattern: /^[a-zA-Z0-9_]+$/,
-        message: 'Username must be 3-20 characters, alphanumeric and underscore only'
+        message: 'Username must be 3-20 characters, alphanumeric and underscore only',
+        realTime: true
     },
     password: {
         required: true,
         minLength: 6,
         maxLength: 50,
-        message: 'Password must be at least 6 characters long'
+        pattern: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
+        message: 'Password must be at least 6 characters with uppercase, lowercase, and number',
+        realTime: true
     },
     auctionTitle: {
         required: true,
         minLength: 3,
         maxLength: 100,
-        message: 'Title must be 3-100 characters long'
+        pattern: /^[\w\s\-.,!?()[\]{}]+$/,
+        message: 'Title must be 3-100 characters long',
+        realTime: true
     },
     auctionDescription: {
         required: true,
         minLength: 10,
         maxLength: 1000,
-        message: 'Description must be 10-1000 characters long'
+        message: 'Description must be 10-1000 characters long',
+        realTime: true
     },
     startingBid: {
         required: true,
         min: 0.01,
         max: 1000000,
-        message: 'Starting bid must be between $0.01 and $1,000,000'
+        message: 'Starting bid must be between $0.01 and $1,000,000',
+        realTime: true
     },
     endTime: {
         required: true,
         futureOnly: true,
-        message: 'End time must be at least 1 hour in the future'
+        message: 'End time must be at least 1 hour in the future',
+        realTime: true
     },
     bidAmount: {
         required: true,
         min: 0.01,
         max: 1000000,
-        message: 'Bid amount must be between $0.01 and $1,000,000'
+        message: 'Bid amount must be between $0.01 and $1,000,000',
+        realTime: true
     },
     secretKey: {
         required: true,
         minLength: 8,
         maxLength: 100,
         pattern: /^[a-zA-Z0-9!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+$/,
-        message: 'Secret key must be 8-100 characters long'
+        message: 'Secret key must be 8-100 characters long',
+        realTime: true
     }
 };
 
@@ -98,6 +108,30 @@ function setupEventListeners() {
     const now = new Date();
     now.setMinutes(now.getMinutes() + 1);
     document.getElementById('endTime').min = now.toISOString().slice(0, 16);
+    
+    // Add form field clearing on modal close
+    setupModalValidation();
+}
+
+// Modal validation setup
+function setupModalValidation() {
+    // Clear validation when auth modal is closed
+    const authModal = document.getElementById('authModal');
+    const authCloseBtn = authModal?.querySelector('[onclick="closeAuthModal()"]');
+    if (authCloseBtn) {
+        authCloseBtn.addEventListener('click', () => {
+            clearFieldErrors(['username', 'password']);
+        });
+    }
+    
+    // Clear validation when bid modal is closed
+    const bidModal = document.getElementById('bidModal');
+    const bidCloseBtn = bidModal?.querySelector('[onclick="closeBidModal()"]');
+    if (bidCloseBtn) {
+        bidCloseBtn.addEventListener('click', () => {
+            clearFieldErrors(['bidAmount', 'secretKey']);
+        });
+    }
 }
 
 // Authentication functions
@@ -138,13 +172,22 @@ async function handleAuth(e) {
     // Clear previous errors
     clearFieldErrors(['username', 'password']);
     
-    // Validate fields
-    const usernameValid = validateField('username', username.value);
-    const passwordValid = validateField('password', password.value);
+    // Validate fields with success feedback
+    const usernameValid = validateField('username', username.value, true);
+    const passwordValid = validateField('password', password.value, true);
     
     if (!usernameValid || !passwordValid) {
+        // Focus on first invalid field
+        const firstInvalid = document.querySelector('[aria-invalid="true"]');
+        if (firstInvalid) firstInvalid.focus();
         return;
     }
+    
+    // Disable submit button to prevent double submission
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Processing...';
     
     const endpoint = isLoginMode ? '/api/users/login' : '/api/users/register';
     
@@ -168,7 +211,11 @@ async function handleAuth(e) {
             showNotification(data.error || 'Authentication failed', 'error');
         }
     } catch (error) {
-        showNotification('Network error', 'error');
+        showNotification('Network error. Please check your connection.', 'error');
+    } finally {
+        // Re-enable submit button
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
     }
 }
 
@@ -314,15 +361,24 @@ async function handleCreateAuction(e) {
     // Clear previous errors
     clearFieldErrors(['auctionTitle', 'auctionDescription', 'startingBid', 'endTime']);
     
-    // Validate fields
-    const titleValid = validateField('auctionTitle', title.value);
-    const descriptionValid = validateField('auctionDescription', description.value);
-    const startingBidValid = validateField('startingBid', parseFloat(startingBid.value));
-    const endTimeValid = validateField('endTime', endTime.value);
+    // Validate fields with success feedback
+    const titleValid = validateField('auctionTitle', title.value, true);
+    const descriptionValid = validateField('auctionDescription', description.value, true);
+    const startingBidValid = validateField('startingBid', parseFloat(startingBid.value), true);
+    const endTimeValid = validateField('endTime', endTime.value, true);
     
     if (!titleValid || !descriptionValid || !startingBidValid || !endTimeValid) {
+        // Focus on first invalid field
+        const firstInvalid = document.querySelector('[aria-invalid="true"]');
+        if (firstInvalid) firstInvalid.focus();
         return;
     }
+    
+    // Disable submit button to prevent double submission
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Creating...';
     
     try {
         const response = await fetch('/api/auctions', {
@@ -344,12 +400,17 @@ async function handleCreateAuction(e) {
         if (response.ok) {
             showNotification('Auction created successfully!', 'success');
             document.getElementById('createAuctionForm').reset();
+            clearFieldErrors(['auctionTitle', 'auctionDescription', 'startingBid', 'endTime']);
             showTab('auctions');
         } else {
             showNotification(data.error || 'Failed to create auction', 'error');
         }
     } catch (error) {
-        showNotification('Network error', 'error');
+        showNotification('Network error. Please check your connection.', 'error');
+    } finally {
+        // Re-enable submit button
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
     }
 }
 
@@ -380,13 +441,22 @@ async function handlePlaceBid(e) {
     // Clear previous errors
     clearFieldErrors(['bidAmount', 'secretKey']);
     
-    // Validate fields
-    const amountValid = validateField('bidAmount', parseFloat(amount.value));
-    const secretKeyValid = validateField('secretKey', secretKey.value);
+    // Validate fields with success feedback
+    const amountValid = validateField('bidAmount', parseFloat(amount.value), true);
+    const secretKeyValid = validateField('secretKey', secretKey.value, true);
     
     if (!amountValid || !secretKeyValid) {
+        // Focus on first invalid field
+        const firstInvalid = document.querySelector('[aria-invalid="true"]');
+        if (firstInvalid) firstInvalid.focus();
         return;
     }
+    
+    // Disable submit button to prevent double submission
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Placing Bid...';
     
     try {
         const response = await fetch('/api/bids', {
@@ -412,7 +482,11 @@ async function handlePlaceBid(e) {
             showNotification(data.error || 'Failed to place bid', 'error');
         }
     } catch (error) {
-        showNotification('Network error', 'error');
+        showNotification('Network error. Please check your connection.', 'error');
+    } finally {
+        // Re-enable submit button
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
     }
 }
 
@@ -440,7 +514,7 @@ async function loadMyBids() {
 }
 
 // Form validation functions
-function validateField(fieldName, value) {
+function validateField(fieldName, value, showSuccess = false) {
     const rule = validationRules[fieldName];
     if (!rule) return true;
     
@@ -452,6 +526,7 @@ function validateField(fieldName, value) {
     
     // Skip other validations if field is empty and not required
     if (!value || value.toString().trim() === '') {
+        clearFieldError(fieldName);
         return true;
     }
     
@@ -499,28 +574,56 @@ function validateField(fieldName, value) {
         }
     }
     
+    // Clear error and show success if validation passes
+    clearFieldError(fieldName);
+    if (showSuccess) {
+        showFieldSuccess(fieldName);
+    }
+    
     return true;
+}
+
+// Success state functions
+function showFieldSuccess(fieldName) {
+    const field = document.getElementById(fieldName);
+    if (!field) return;
+    
+    // Remove existing error and success states
+    clearFieldError(fieldName);
+    
+    // Add success styling to field
+    field.classList.add('border-green-500', 'bg-green-500', 'bg-opacity-20', 'focus:ring-green-400');
+    field.classList.remove('border-white', 'border-opacity-30', 'border-red-500', 'bg-red-500', 'bg-opacity-20', 'focus:ring-red-400');
+    
+    // Add aria-valid for accessibility
+    field.setAttribute('aria-invalid', 'false');
 }
 
 function showFieldError(fieldName, message) {
     const field = document.getElementById(fieldName);
     if (!field) return;
     
-    // Remove existing error
+    // Remove existing error and success states
     clearFieldError(fieldName);
     
     // Add error styling to field
-    field.classList.add('border-red-500', 'bg-red-500', 'bg-opacity-20');
-    field.classList.remove('border-white', 'border-opacity-30');
+    field.classList.add('border-red-500', 'bg-red-500', 'bg-opacity-20', 'focus:ring-red-400');
+    field.classList.remove('border-white', 'border-opacity-30', 'border-green-500', 'bg-green-500', 'bg-opacity-20', 'focus:ring-green-400');
+    
+    // Add aria-invalid for accessibility
+    field.setAttribute('aria-invalid', 'true');
     
     // Create error message element
     const errorElement = document.createElement('div');
     errorElement.id = fieldName + 'Error';
-    errorElement.className = 'text-red-400 text-sm mt-1 flex items-center';
+    errorElement.className = 'text-red-400 text-sm mt-1 flex items-center animate-fade-in';
     errorElement.innerHTML = `<i class="fas fa-exclamation-circle mr-1"></i>${message}`;
     
     // Insert error message after the field
     field.parentNode.insertBefore(errorElement, field.nextSibling);
+    
+    // Focus on the field for better UX
+    field.focus();
 }
 
 function clearFieldError(fieldName) {
@@ -528,8 +631,9 @@ function clearFieldError(fieldName) {
     const errorElement = document.getElementById(fieldName + 'Error');
     
     if (field) {
-        field.classList.remove('border-red-500', 'bg-red-500', 'bg-opacity-20');
+        field.classList.remove('border-red-500', 'bg-red-500', 'bg-opacity-20', 'focus:ring-red-400', 'border-green-500', 'bg-green-500', 'bg-opacity-20', 'focus:ring-green-400');
         field.classList.add('border-white', 'border-opacity-30');
+        field.removeAttribute('aria-invalid');
     }
     
     if (errorElement) {
@@ -547,20 +651,24 @@ function setupRealtimeValidation() {
     const username = document.getElementById('username');
     const password = document.getElementById('password');
     
-    if (username) {
-        username.addEventListener('blur', () => validateField('username', username.value));
+    if (username && validationRules.username.realTime) {
+        username.addEventListener('blur', () => validateField('username', username.value, true));
         username.addEventListener('input', () => {
             if (username.value.length >= validationRules.username.minLength) {
-                validateField('username', username.value);
+                validateField('username', username.value, true);
+            } else if (username.value.length > 0) {
+                clearFieldError('username');
             }
         });
     }
     
-    if (password) {
-        password.addEventListener('blur', () => validateField('password', password.value));
+    if (password && validationRules.password.realTime) {
+        password.addEventListener('blur', () => validateField('password', password.value, true));
         password.addEventListener('input', () => {
             if (password.value.length >= validationRules.password.minLength) {
-                validateField('password', password.value);
+                validateField('password', password.value, true);
+            } else if (password.value.length > 0) {
+                clearFieldError('password');
             }
         });
     }
@@ -571,56 +679,66 @@ function setupRealtimeValidation() {
     const startingBid = document.getElementById('startingBid');
     const endTime = document.getElementById('endTime');
     
-    if (auctionTitle) {
-        auctionTitle.addEventListener('blur', () => validateField('auctionTitle', auctionTitle.value));
+    if (auctionTitle && validationRules.auctionTitle.realTime) {
+        auctionTitle.addEventListener('blur', () => validateField('auctionTitle', auctionTitle.value, true));
         auctionTitle.addEventListener('input', () => {
             if (auctionTitle.value.length >= validationRules.auctionTitle.minLength) {
-                validateField('auctionTitle', auctionTitle.value);
+                validateField('auctionTitle', auctionTitle.value, true);
+            } else if (auctionTitle.value.length > 0) {
+                clearFieldError('auctionTitle');
             }
         });
     }
     
-    if (auctionDescription) {
-        auctionDescription.addEventListener('blur', () => validateField('auctionDescription', auctionDescription.value));
+    if (auctionDescription && validationRules.auctionDescription.realTime) {
+        auctionDescription.addEventListener('blur', () => validateField('auctionDescription', auctionDescription.value, true));
         auctionDescription.addEventListener('input', () => {
             if (auctionDescription.value.length >= validationRules.auctionDescription.minLength) {
-                validateField('auctionDescription', auctionDescription.value);
+                validateField('auctionDescription', auctionDescription.value, true);
+            } else if (auctionDescription.value.length > 0) {
+                clearFieldError('auctionDescription');
             }
         });
     }
     
-    if (startingBid) {
-        startingBid.addEventListener('blur', () => validateField('startingBid', parseFloat(startingBid.value)));
+    if (startingBid && validationRules.startingBid.realTime) {
+        startingBid.addEventListener('blur', () => validateField('startingBid', parseFloat(startingBid.value), true));
         startingBid.addEventListener('input', () => {
             if (startingBid.value) {
-                validateField('startingBid', parseFloat(startingBid.value));
+                validateField('startingBid', parseFloat(startingBid.value), true);
+            } else {
+                clearFieldError('startingBid');
             }
         });
     }
     
-    if (endTime) {
-        endTime.addEventListener('blur', () => validateField('endTime', endTime.value));
-        endTime.addEventListener('change', () => validateField('endTime', endTime.value));
+    if (endTime && validationRules.endTime.realTime) {
+        endTime.addEventListener('blur', () => validateField('endTime', endTime.value, true));
+        endTime.addEventListener('change', () => validateField('endTime', endTime.value, true));
     }
     
     // Bid form fields
     const bidAmount = document.getElementById('bidAmount');
     const secretKey = document.getElementById('secretKey');
     
-    if (bidAmount) {
-        bidAmount.addEventListener('blur', () => validateField('bidAmount', parseFloat(bidAmount.value)));
+    if (bidAmount && validationRules.bidAmount.realTime) {
+        bidAmount.addEventListener('blur', () => validateField('bidAmount', parseFloat(bidAmount.value), true));
         bidAmount.addEventListener('input', () => {
             if (bidAmount.value) {
-                validateField('bidAmount', parseFloat(bidAmount.value));
+                validateField('bidAmount', parseFloat(bidAmount.value), true);
+            } else {
+                clearFieldError('bidAmount');
             }
         });
     }
     
-    if (secretKey) {
-        secretKey.addEventListener('blur', () => validateField('secretKey', secretKey.value));
+    if (secretKey && validationRules.secretKey.realTime) {
+        secretKey.addEventListener('blur', () => validateField('secretKey', secretKey.value, true));
         secretKey.addEventListener('input', () => {
             if (secretKey.value.length >= validationRules.secretKey.minLength) {
-                validateField('secretKey', secretKey.value);
+                validateField('secretKey', secretKey.value, true);
+            } else if (secretKey.value.length > 0) {
+                clearFieldError('secretKey');
             }
         });
     }
