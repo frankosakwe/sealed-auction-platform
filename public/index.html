@@ -345,30 +345,32 @@
             0% { transform: translateY(-50%) rotate(0deg); }
             100% { transform: translateY(-50%) rotate(360deg); }
         }
+        .line-clamp-3 {
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        @media (max-width: 640px) {
+            .truncate-mobile {
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+        }
     </style>
 </head>
 <body class="stellar-gradient min-h-screen" style="color: var(--text-primary);">
     <!-- Header -->
     <header class="glass-effect shadow-lg">
         <div class="container mx-auto px-4 py-4">
-            <div class="flex justify-between items-center">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-3 sm:space-y-0">
                 <div class="flex items-center space-x-3">
-                    <i class="fas fa-gavel text-2xl"></i>
-                    <h1 class="text-2xl font-bold">Stellar Sealed-Bid Auction</h1>
-                    <span class="bg-purple-600 px-2 py-1 rounded text-xs">Blockchain</span>
+                    <i class="fas fa-gavel text-xl sm:text-2xl"></i>
+                    <h1 class="text-lg sm:text-2xl font-bold">Stellar Sealed-Bid Auction</h1>
+                    <span class="bg-purple-600 px-2 py-1 rounded text-xs hidden sm:inline">Blockchain</span>
                 </div>
-                <div class="flex items-center space-x-4">
-                    <div class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
-                        <div class="theme-toggle-slider">
-                            <i class="fas fa-sun" id="themeIcon"></i>
-                        </div>
-                    </div>
-                    <div id="stellarWalletInfo" class="hidden">
-                        <span id="walletAddress" class="text-sm text-secondary"></span>
-                        <span id="walletBalance" class="text-sm font-semibold ml-2"></span>
-                    </div>
-                    <button id="stellarWalletBtn" onclick="toggleStellarWallet()" class="px-4 py-2 rounded-lg transition btn-primary">
-                        <i class="fas fa-wallet mr-2"></i>Connect Wallet
+
                     </button>
                 </div>
             </div>
@@ -378,28 +380,17 @@
     <!-- Main Content -->
     <main class="container mx-auto px-4 py-8">
         <!-- Auth Modal -->
-        <div id="authModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
-            <div class="glass-effect rounded-xl p-8 max-w-md w-full">
-                <h2 id="authTitle" class="text-2xl font-bold mb-6">Login</h2>
+        <div id="authModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+            <div class="glass-effect rounded-xl p-6 sm:p-8 max-w-md w-full max-h-[90vh] overflow-y-auto">
+                <h2 id="authTitle" class="text-xl sm:text-2xl font-bold mb-6">Login</h2>
                 <form id="authForm" class="space-y-4">
                     <div>
-                        <label class="block text-sm font-medium mb-2 text-primary">Username</label>
-                        <input type="text" id="username" class="w-full px-4 py-2 rounded-lg border form-input focus:outline-none focus:ring-2" required>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium mb-2 text-primary">Password</label>
-                        <input type="password" id="password" class="w-full px-4 py-2 rounded-lg border form-input focus:outline-none focus:ring-2" required>
-                    </div>
-                    <div class="flex space-x-4">
-                        <button type="submit" class="flex-1 py-2 rounded-lg transition btn-primary">
-                            <span id="authSubmitText">Login</span>
-                        </button>
-                        <button type="button" onclick="toggleAuthMode()" class="flex-1 py-2 rounded-lg transition btn-secondary">
+
                             <span id="authModeText">Register</span>
                         </button>
                     </div>
                 </form>
-                <button onclick="closeAuthModal()" class="mt-4 transition text-secondary">
+
                     <i class="fas fa-times mr-2"></i>Close
                 </button>
             </div>
@@ -407,50 +398,29 @@
 
         <!-- Navigation Tabs -->
         <div class="glass-effect rounded-xl p-1 mb-8">
-            <div class="flex space-x-1">
-                <button onclick="showTab('auctions')" id="auctionsTab" class="flex-1 py-3 px-4 rounded-lg transition btn-primary">
-                    <i class="fas fa-list mr-2"></i>Auctions
-                </button>
-                <button onclick="showTab('create')" id="createTab" class="flex-1 py-3 px-4 rounded-lg transition btn-secondary">
-                    <i class="fas fa-plus mr-2"></i>Create Auction
-                </button>
-                <button onclick="showTab('myBids')" id="myBidsTab" class="flex-1 py-3 px-4 rounded-lg transition btn-secondary">
-                    <i class="fas fa-coins mr-2"></i>My Bids
+<
                 </button>
             </div>
         </div>
 
         <!-- Auctions Tab -->
         <div id="auctionsContent" class="tab-content">
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="auctionsGrid">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6" id="auctionsGrid">
                 <!-- Auctions will be dynamically loaded here -->
             </div>
         </div>
 
         <!-- Create Auction Tab -->
         <div id="createContent" class="tab-content hidden">
-            <div class="glass-effect rounded-xl p-8 max-w-2xl mx-auto">
-                <h2 class="text-2xl font-bold mb-6">Create New Auction</h2>
-                <form id="createAuctionForm" class="space-y-6">
+            <div class="glass-effect rounded-xl p-4 sm:p-6 lg:p-8 max-w-2xl mx-auto">
+                <h2 class="text-xl sm:text-2xl font-bold mb-6">Create New Auction</h2>
+                <form id="createAuctionForm" class="space-y-4 sm:space-y-6">
                     <div>
-                        <label class="block text-sm font-medium mb-2 text-primary">Title</label>
-                        <input type="text" id="auctionTitle" class="w-full px-4 py-2 rounded-lg border form-input focus:outline-none focus:ring-2" required>
+
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium mb-2 text-primary">Description</label>
-                        <textarea id="auctionDescription" rows="4" class="w-full px-4 py-2 rounded-lg border form-input focus:outline-none focus:ring-2" required></textarea>
-                    </div>
-                    <div class="grid grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm font-medium mb-2 text-primary">Starting Bid ($)</label>
-                            <input type="number" id="startingBid" min="0" step="0.01" class="w-full px-4 py-2 rounded-lg border form-input focus:outline-none focus:ring-2" required>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-2 text-primary">End Time</label>
-                            <input type="datetime-local" id="endTime" class="w-full px-4 py-2 rounded-lg border form-input focus:outline-none focus:ring-2" required>
-                        </div>
-                    </div>
-                    <button type="submit" class="w-full py-3 rounded-lg transition font-semibold btn-primary">
+
                         <i class="fas fa-gavel mr-2"></i>Create Auction
                     </button>
                 </form>
@@ -459,33 +429,19 @@
 
         <!-- My Bids Tab -->
         <div id="myBidsContent" class="tab-content hidden">
-            <div class="glass-effect rounded-xl p-8">
-                <h2 class="text-2xl font-bold mb-6 text-primary">Your Bids</h2>
-                <div id="myBidsList" class="space-y-4">
+
                     <!-- User's bids will be displayed here -->
                 </div>
             </div>
         </div>
 
         <!-- Bid Modal -->
-        <div id="bidModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
-            <div class="glass-effect rounded-xl p-8 max-w-md w-full">
-                <h2 class="text-2xl font-bold mb-6">Place Sealed Bid</h2>
+        <div id="bidModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+            <div class="glass-effect rounded-xl p-6 sm:p-8 max-w-md w-full max-h-[90vh] overflow-y-auto">
+                <h2 class="text-xl sm:text-2xl font-bold mb-6">Place Sealed Bid</h2>
                 <form id="bidForm" class="space-y-4">
                     <div>
-                        <label class="block text-sm font-medium mb-2 text-primary">Bid Amount ($)</label>
-                        <input type="number" id="bidAmount" min="0" step="0.01" class="w-full px-4 py-2 rounded-lg border form-input focus:outline-none focus:ring-2" required>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium mb-2 text-primary">Secret Key</label>
-                        <input type="password" id="secretKey" class="w-full px-4 py-2 rounded-lg border form-input focus:outline-none focus:ring-2" required>
-                        <p class="text-xs mt-1 text-secondary">Save this key securely. You'll need it to verify your bid later.</p>
-                    </div>
-                    <div class="flex space-x-4">
-                        <button type="submit" class="flex-1 py-2 rounded-lg transition btn-primary">
-                            <i class="fas fa-lock mr-2"></i>Place Bid
-                        </button>
-                        <button type="button" onclick="closeBidModal()" class="flex-1 py-2 rounded-lg transition btn-secondary">
+
                             Cancel
                         </button>
                     </div>
