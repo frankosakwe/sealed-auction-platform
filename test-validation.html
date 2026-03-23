@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Form Validation Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .animate-pulse-slow {
+            animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        .stellar-gradient {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+        }
+    </style>
+</head>
+<body class="stellar-gradient min-h-screen text-white">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold mb-8 text-center">Form Validation Test</h1>
+        
+        <!-- Test Forms -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <!-- Auth Form Test -->
+            <div class="glass-effect rounded-xl p-6">
+                <h2 class="text-xl font-bold mb-4">Authentication Form</h2>
+                <form id="authForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Username</label>
+                        <input type="text" id="username" class="w-full px-4 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 focus:outline-none focus:ring-2 focus:ring-purple-400" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Password</label>
+                        <input type="password" id="password" class="w-full px-4 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 focus:outline-none focus:ring-2 focus:ring-purple-400" required>
+                    </div>
+                    <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 py-2 rounded-lg transition">
+                        Test Auth
+                    </button>
+                </form>
+            </div>
+
+            <!-- Auction Form Test -->
+            <div class="glass-effect rounded-xl p-6">
+                <h2 class="text-xl font-bold mb-4">Create Auction Form</h2>
+                <form id="createAuctionForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Title</label>
+                        <input type="text" id="auctionTitle" class="w-full px-4 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 focus:outline-none focus:ring-2 focus:ring-purple-400" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Description</label>
+                        <textarea id="auctionDescription" rows="3" class="w-full px-4 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 focus:outline-none focus:ring-2 focus:ring-purple-400" required></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Starting Bid ($)</label>
+                        <input type="number" id="startingBid" min="0" step="0.01" class="w-full px-4 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 focus:outline-none focus:ring-2 focus:ring-purple-400" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">End Time</label>
+                        <input type="datetime-local" id="endTime" class="w-full px-4 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 focus:outline-none focus:ring-2 focus:ring-purple-400" required>
+                    </div>
+                    <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 py-2 rounded-lg transition">
+                        Test Auction
+                    </button>
+                </form>
+            </div>
+
+            <!-- Bid Form Test -->
+            <div class="glass-effect rounded-xl p-6">
+                <h2 class="text-xl font-bold mb-4">Place Bid Form</h2>
+                <form id="bidForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Bid Amount ($)</label>
+                        <input type="number" id="bidAmount" min="0" step="0.01" class="w-full px-4 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 focus:outline-none focus:ring-2 focus:ring-purple-400" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Secret Key</label>
+                        <input type="password" id="secretKey" class="w-full px-4 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 focus:outline-none focus:ring-2 focus:ring-purple-400" required>
+                        <p class="text-xs text-gray-300 mt-1">Save this key securely. You'll need it to verify your bid later.</p>
+                    </div>
+                    <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 py-2 rounded-lg transition">
+                        Test Bid
+                    </button>
+                </form>
+            </div>
+
+            <!-- Test Results -->
+            <div class="glass-effect rounded-xl p-6">
+                <h2 class="text-xl font-bold mb-4">Validation Test Results</h2>
+                <div id="testResults" class="space-y-2">
+                    <p class="text-gray-300">Test results will appear here...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        // Mock functions for testing
+        function showNotification(message, type) {
+            const results = document.getElementById('testResults');
+            const result = document.createElement('div');
+            result.className = `p-2 rounded ${type === 'success' ? 'bg-green-500 bg-opacity-20' : type === 'error' ? 'bg-red-500 bg-opacity-20' : 'bg-blue-500 bg-opacity-20'}`;
+            result.innerHTML = `<i class="fas fa-${type === 'success' ? 'check' : type === 'error' ? 'times' : 'info'}-circle mr-2"></i>${message}`;
+            results.appendChild(result);
+        }
+
+        // Override form handlers for testing
+        document.getElementById('authForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            showNotification('Auth form validation test completed', 'success');
+        });
+
+        document.getElementById('createAuctionForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            showNotification('Auction form validation test completed', 'success');
+        });
+
+        document.getElementById('bidForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            showNotification('Bid form validation test completed', 'success');
+        });
+
+        // Set minimum end time
+        const now = new Date();
+        now.setMinutes(now.getMinutes() + 60);
+        document.getElementById('endTime').min = now.toISOString().slice(0, 16);
+    </script>
+</body>
+</html>
