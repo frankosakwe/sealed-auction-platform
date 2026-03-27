@@ -11,9 +11,7 @@ const rateLimit = require('express-rate-limit');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const { Server, Keypair, TransactionBuilder, Networks, BASE_FEE, Asset } = require('stellar-sdk');
-const AuctionDatabase = require('./database');
-const { validateRequest, validator } = require('./utils/validation');
-require('dotenv').config();
+
 
 const app = express();
 const server = http.createServer(app);
@@ -77,6 +75,18 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.static('public'));
 
+// Session middleware for OAuth
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'your-session-secret-change-in-production',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: process.env.NODE_ENV === 'production' }
+}));
+
+// Initialize Passport
+app.use(passport.initialize());
+app.use(passport.session());
+
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -113,6 +123,70 @@ let users = new Map();
 
 // JWT Secret Key (in production, use environment variable)
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+
+// OAuth Configuration
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID;
+const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
+
+// Passport serialize/deserialize functions
+passport.serializeUser((user, done) => {
+  done(null, user.id);
+});
+
+passport.deserializeUser((id, done) => {
+  const user = users.get(id);
+  done(null, user);
+});
+
+// Google OAuth Strategy
+if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET) {
+  passport.use(new GoogleStrategy({
+    clientID: GOOGLE_CLIENT_ID,
+    clientSecret: GOOGLE_CLIENT_SECRET,
+    callbackURL: "/auth/google/callback"
+  },
+  (accessToken, refreshToken, profile, done) => {
+    try {
+      let user = Array.from(users.values()).find(u => u.provider === 'google' && u.providerId === profile.id);
+      
+      if (!user) {
+        const userId = uuidv4();
+        user = new User(userId, profile.displayName, null, profile.emails[0].value, 'google', profile.id);
+        users.set(userId, user);
+      }
+      
+      return done(null, user);
+    } catch (error) {
+      return done(error, null);
+    }
+  }));
+}
+
+// GitHub OAuth Strategy
+if (GITHUB_CLIENT_ID && GITHUB_CLIENT_SECRET) {
+  passport.use(new GitHubStrategy({
+    clientID: GITHUB_CLIENT_ID,
+    clientSecret: GITHUB_CLIENT_SECRET,
+    callbackURL: "/auth/github/callback"
+  },
+  (accessToken, refreshToken, profile, done) => {
+    try {
+      let user = Array.from(users.values()).find(u => u.provider === 'github' && u.providerId === profile.id);
+      
+      if (!user) {
+        const userId = uuidv4();
+        user = new User(userId, profile.username, null, profile.emails ? profile.emails[0].value : null, 'github', profile.id);
+        users.set(userId, user);
+      }
+      
+      return done(null, user);
+    } catch (error) {
+      return done(error, null);
+    }
+  }));
+}
 
 // JWT Token blacklist for logout functionality
 const tokenBlacklist = new Set();
@@ -168,10 +242,13 @@ class Bid {
 
 // User class
 class User {
-  constructor(id, username, hashedPassword) {
+  constructor(id, username, hashedPassword, email = null, provider = null, providerId = null) {
     this.id = id;
     this.username = username;
     this.hashedPassword = hashedPassword;
+    this.email = email;
+    this.provider = provider;
+    this.providerId = providerId;
     this.createdAt = new Date();
   }
 }
@@ -547,6 +624,35 @@ app.get('/api/users/verify', authenticateToken, (req, res) => {
       userId: req.user.userId, 
       username: req.user.username 
     } 
+  });
+});
+
+// OAuth Routes
+app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+
+app.get('/auth/google/callback', 
+  passport.authenticate('google', { failureRedirect: '/login' }),
+  (req, res) => {
+    const token = generateToken(req.user);
+    res.redirect(`/?token=${token}&username=${req.user.username}`);
+  }
+);
+
+app.get('/auth/github', passport.authenticate('github', { scope: ['user:email'] }));
+
+app.get('/auth/github/callback',
+  passport.authenticate('github', { failureRedirect: '/login' }),
+  (req, res) => {
+    const token = generateToken(req.user);
+    res.redirect(`/?token=${token}&username=${req.user.username}`);
+  }
+);
+
+// OAuth status endpoint
+app.get('/api/auth/status', (req, res) => {
+  res.json({
+    google: !!GOOGLE_CLIENT_ID,
+    github: !!GITHUB_CLIENT_ID
   });
 });
 
