@@ -1,6 +1,8 @@
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
+const fs = require('fs');
+const path = require('path');
 const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const helmet = require('helmet');
@@ -9,11 +11,7 @@ const rateLimit = require('express-rate-limit');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const { Server, Keypair, TransactionBuilder, Networks, BASE_FEE, Asset } = require('stellar-sdk');
-const { StellarSealedBidAuction } = require('./contracts/StellarSealedBidAuction');
-const passport = require('passport');
-const GoogleStrategy = require('passport-google-oauth20').Strategy;
-const GitHubStrategy = require('passport-github2').Strategy;
-const session = require('express-session');
+
 
 const app = express();
 const server = http.createServer(app);
@@ -26,7 +24,54 @@ const io = socketIo(server, {
 
 // Security middleware
 app.use(helmet());
-app.use(cors());
+
+// Security monitoring endpoint (admin only)
+app.get('/api/security/stats', (req, res) => {
+  try {
+    // In production, add admin authentication here
+    const stats = db.getSecurityStats();
+    res.json(stats);
+  } catch (error) {
+    console.error('Error getting security stats:', error);
+    res.status(500).json({ error: 'Failed to get security stats' });
+  }
+});
+
+app.get('/api/security/logs', (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 100;
+    // In production, add admin authentication here
+    const logs = db.getQueryLog(limit);
+    res.json(logs);
+  } catch (error) {
+    console.error('Error getting query logs:', error);
+    res.status(500).json({ error: 'Failed to get query logs' });
+  }
+});
+
+// Restrictive CORS configuration
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',')
+  : ['http://localhost:3000', 'http://localhost:3001'];
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  credentials: true,
+  maxAge: 86400 // 24 hours
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.static('public'));
 
@@ -49,10 +94,32 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
+// Stricter rate limits for sensitive endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // limit each IP to 5 attempts per windowMs
+  message: { error: 'Too many authentication attempts, please try again later' }
+});
+
+const bidLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 10, // limit each IP to 10 bids per minute
+  message: { error: 'Too many bid attempts, please slow down' }
+});
+
+const auctionCreateLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 5, // limit each IP to 5 auction creations per minute
+  message: { error: 'Too many auction creation attempts, please slow down' }
+});
+
+// Backup directory
+const backupDir = path.join(__dirname, 'backups');
+
 // In-memory storage (in production, use a proper database)
-const auctions = new Map();
-const bids = new Map();
-const users = new Map();
+let auctions = new Map();
+let bids = new Map();
+let users = new Map();
 
 // JWT Secret Key (in production, use environment variable)
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
@@ -249,162 +316,271 @@ function decryptBid(encryptedData, secretKey) {
   return parseFloat(decrypted);
 }
 
+// --- Backup and Restore ---
+async function backupData() {
+  try {
+    if (!fs.existsSync(backupDir)) {
+      fs.mkdirSync(backupDir, { recursive: true });
+    }
+
+    await Promise.all([
+      fs.promises.writeFile(path.join(backupDir, 'auctions.json'), JSON.stringify(Array.from(auctions.entries()), null, 2)),
+      fs.promises.writeFile(path.join(backupDir, 'bids.json'), JSON.stringify(Array.from(bids.entries()), null, 2)),
+      fs.promises.writeFile(path.join(backupDir, 'users.json'), JSON.stringify(Array.from(users.entries()), null, 2))
+    ]);
+
+    console.log(`[${new Date().toISOString()}] Data backup successful.`);
+  } catch (error) {
+    console.error('Data backup failed:', error);
+  }
+}
+
+function restoreData() {
+  try {
+    const auctionsPath = path.join(backupDir, 'auctions.json');
+    if (fs.existsSync(auctionsPath)) {
+      const data = JSON.parse(fs.readFileSync(auctionsPath));
+      const restoredAuctions = data.map(([id, plainAuction]) => {
+        const auction = Object.assign(new Auction(), plainAuction);
+        auction.endTime = new Date(auction.endTime);
+        auction.createdAt = new Date(auction.createdAt);
+        auction.bids = auction.bids.map(plainBid => Object.assign(new Bid(), plainBid));
+        return [id, auction];
+      });
+      auctions = new Map(restoredAuctions);
+      console.log(`Restored ${auctions.size} auctions from backup.`);
+    }
+
+    const bidsPath = path.join(backupDir, 'bids.json');
+    if (fs.existsSync(bidsPath)) {
+      const data = JSON.parse(fs.readFileSync(bidsPath));
+      const restoredBids = data.map(([id, plainBid]) => {
+        const bid = Object.assign(new Bid(), plainBid);
+        bid.timestamp = new Date(bid.timestamp);
+        return [id, bid];
+      });
+      bids = new Map(restoredBids);
+      console.log(`Restored ${bids.size} bids from backup.`);
+    }
+
+    const usersPath = path.join(backupDir, 'users.json');
+    if (fs.existsSync(usersPath)) {
+      const data = JSON.parse(fs.readFileSync(usersPath));
+      const restoredUsers = data.map(([id, plainUser]) => {
+        const user = Object.assign(new User(), plainUser);
+        user.createdAt = new Date(user.createdAt);
+        return [id, user];
+      });
+      users = new Map(restoredUsers);
+      console.log(`Restored ${users.size} users from backup.`);
+    }
+  } catch (error) {
+    console.error('Failed to restore data from backup. Starting with a clean state.', error);
+    auctions = new Map();
+    bids = new Map();
+    users = new Map();
+  }
+}
+
+// Restore data on startup
+restoreData();
+
 // Routes
-app.get('/api/auctions', (req, res) => {
-  const auctionList = Array.from(auctions.values()).map(auction => ({
-    id: auction.id,
-    title: auction.title,
-    description: auction.description,
-    startingBid: auction.startingBid,
-    currentHighestBid: auction.currentHighestBid,
-    endTime: auction.endTime,
-    status: auction.status,
-    bidCount: auction.bids.length,
-    creator: auction.creator
-  }));
-  res.json(auctionList);
+app.get('/api/auctions', 
+  validateRequest.query({
+    page: { type: 'number' },
+    limit: { type: 'number' },
+    status: { type: 'status' }
+  }),
+  (req, res) => {
+  try {
+    const { page = 1, limit = 10, status = null } = req.sanitizedQuery || {};
+    
+    // Additional validation for limit to prevent excessive data loading
+    const validatedLimit = Math.min(limit, 100);
+    
+    const result = db.getPaginatedAuctions(page, validatedLimit, status);
+    
+    const auctionList = result.auctions.map(auction => ({
+      id: auction.id,
+      title: auction.title,
+      description: auction.description,
+      startingBid: auction.starting_bid,
+      currentHighestBid: auction.current_highest_bid || auction.starting_bid,
+      endTime: auction.end_time,
+      status: auction.status,
+      bidCount: db.getBidCount(auction.id),
+      creator: auction.creator_id
+    }));
+    
+    res.json({
+      auctions: auctionList,
+      pagination: result.pagination
+    });
+  } catch (error) {
+    console.error('Error fetching auctions:', error);
+    res.status(500).json({ error: 'Failed to fetch auctions' });
+  }
 });
 
-app.post('/api/auctions', authenticateToken, async (req, res) => {
-  try {
-    const { title, description, startingBid, endTime } = req.body;
-    const userId = req.user.userId;
-    
-    if (!title || !description || !startingBid || !endTime) {
-      return res.status(400).json({ error: 'Missing required fields' });
+
     }
 
     const auctionId = generateAuctionId();
     const auction = new Auction(auctionId, title, description, startingBid, new Date(endTime), userId);
     
-    auctions.set(auctionId, auction);
-    
-    io.emit('auctionCreated', auction);
-    res.status(201).json(auction);
+    try {
+      auctions.set(auctionId, auction);
+      io.emit('auctionCreated', auction);
+      res.status(201).json(auction);
+    } catch (transactionError) {
+      auctions.delete(auctionId);
+      throw transactionError;
+    }
   } catch (error) {
+    console.error('Auction creation failed:', error);
     res.status(500).json({ error: 'Failed to create auction' });
   }
 });
 
-app.get('/api/auctions/:id', (req, res) => {
-  const auction = auctions.get(req.params.id);
-  if (!auction) {
-    return res.status(404).json({ error: 'Auction not found' });
-  }
-  res.json(auction);
-});
-
-app.post('/api/bids', authenticateToken, async (req, res) => {
-  try {
-    const { auctionId, amount, secretKey } = req.body;
-    const bidderId = req.user.userId;
+app.get('/api/auctions/:id', 
+  validateRequest.params({
+    id: { type: 'uuid', required: true }
+  }),
+  (req, res) => {
+    const auctionId = req.sanitizedParams.id;
     
-    if (!auctionId || amount === undefined || !secretKey) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-
     const auction = auctions.get(auctionId);
     if (!auction) {
       return res.status(404).json({ error: 'Auction not found' });
     }
+    
+    res.json(auction);
+});
 
-    if (auction.status !== 'active') {
+
+      return res.status(404).json({ error: 'Auction not found' });
+    }
+
+    if (auctionDb.status !== 'active') {
       return res.status(400).json({ error: 'Auction is not active' });
     }
 
-    if (amount <= auction.startingBid) {
-      return res.status(400).json({ error: 'Bid must be higher than starting bid' });
+    // Validate bid amount against current highest bid
+    const minimumBid = Math.max(auctionDb.starting_bid, auctionDb.current_highest_bid || auctionDb.starting_bid);
+    if (amount <= minimumBid) {
+      return res.status(400).json({ error: `Bid must be higher than ${minimumBid}` });
     }
 
     const encryptedBid = encryptBid(amount, secretKey);
     const bidId = uuidv4();
     const bid = new Bid(bidId, auctionId, bidderId, amount, encryptedBid);
     
-    bids.set(bidId, bid);
-    auction.addBid(bid);
-    
-    io.emit('bidPlaced', { auctionId, bidCount: auction.bids.length });
-    res.status(201).json({ message: 'Bid placed successfully', bidId });
+    // Transaction: Save state for potential rollback
+    const originalBidsLength = auction.bids.length;
+    const originalHighestBid = auction.currentHighestBid;
+
+    try {
+      bids.set(bidId, bid);
+      auction.addBid(bid);
+      
+      io.emit('bidPlaced', { auctionId, bidCount: auction.bids.length });
+      res.status(201).json({ message: 'Bid placed successfully', bidId });
+    } catch (transactionError) {
+      // Rollback on failure
+      bids.delete(bidId);
+      auction.bids.length = originalBidsLength;
+      auction.currentHighestBid = originalHighestBid;
+      throw transactionError;
+    }
   } catch (error) {
+    console.error('Bid placement failed:', error);
     res.status(500).json({ error: 'Failed to place bid' });
   }
 });
 
-app.post('/api/auctions/:id/close', authenticateToken, (req, res) => {
+
   try {
-    const auction = auctions.get(req.params.id);
-    if (!auction) {
+    const auctionId = req.sanitizedParams.id;
+    
+    const auctionDb = db.getAuction(auctionId);
+    if (!auctionDb) {
       return res.status(404).json({ error: 'Auction not found' });
     }
 
-    // Only the auction creator can close it
-    if (auction.creator !== req.user.userId) {
-      return res.status(403).json({ error: 'Only the auction creator can close it' });
-    }
 
-    if (auction.status !== 'active') {
       return res.status(400).json({ error: 'Auction is already closed' });
     }
 
-    auction.close();
-    io.emit('auctionClosed', auction);
-    res.json(auction);
+    // Get all bids and find winner
+    const allBids = db.getBidsForAuction(auctionId);
+    let winnerId = null;
+    let winningBidId = null;
+    
+    if (allBids.length > 0) {
+      const highestBid = allBids[0]; // Already ordered by amount DESC
+      winnerId = highestBid.bidder_id;
+      winningBidId = highestBid.id;
+    }
+    
+    // Update auction in database
+    db.closeAuction(auctionId, winnerId, winningBidId);
+    
+    // Update in-memory
+    const auction = auctions.get(auctionId);
+    if (auction) {
+      auction.close();
+    }
+    
+    io.emit('auctionClosed', { ...auctionDb, status: 'closed', winner: winnerId, winningBid: winningBidId });
+    res.json({ ...auctionDb, status: 'closed', winner: winnerId, winningBid: winningBidId });
   } catch (error) {
+    console.error('Error closing auction:', error);
     res.status(500).json({ error: 'Failed to close auction' });
   }
 });
 
-app.post('/api/users/register', async (req, res) => {
+app.post('/api/users/register', 
+  validateRequest.body({
+    username: { type: 'username', required: true },
+    password: { type: 'password', required: true }
+  }),
+  async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, password } = req.sanitizedBody;
     
-    if (!username || !password) {
-      return res.status(400).json({ error: 'Username and password required' });
-    }
 
-    if (password.length < 6) {
-      return res.status(400).json({ error: 'Password must be at least 6 characters long' });
-    }
-
-    const existingUser = Array.from(users.values()).find(u => u.username === username);
     if (existingUser) {
       return res.status(400).json({ error: 'Username already exists' });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
     const userId = uuidv4();
-    const user = new User(userId, username, hashedPassword);
+    // Create user in database
+    db.createUser(userId, username, password);
     
-    users.set(userId, user);
-    
-    // Generate JWT token
-    const token = generateToken(user);
-    
-    res.status(201).json({ 
-      userId: user.id, 
-      username: user.username,
-      token: token,
-      expiresIn: '24h'
-    });
+
   } catch (error) {
+    console.error('Error registering user:', error);
     res.status(500).json({ error: 'Failed to register user' });
   }
 });
 
-app.post('/api/users/login', async (req, res) => {
+app.post('/api/users/login', 
+  validateRequest.body({
+    username: { type: 'string', required: true },
+    password: { type: 'string', required: true }
+  }),
+  async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, password } = req.sanitizedBody;
     
-    if (!username || !password) {
-      return res.status(400).json({ error: 'Username and password required' });
-    }
-
-    const user = Array.from(users.values()).find(u => u.username === username);
+    // Get user from database
+    const user = db.getUserByUsername(username);
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const isValid = await bcrypt.compare(password, user.hashedPassword);
+    const isValid = await bcrypt.compare(password, user.hashed_password);
     if (!isValid) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -419,6 +595,7 @@ app.post('/api/users/login', async (req, res) => {
       expiresIn: '24h'
     });
   } catch (error) {
+    console.error('Error logging in user:', error);
     res.status(500).json({ error: 'Failed to login' });
   }
 });
@@ -495,15 +672,35 @@ io.on('connection', (socket) => {
 // Auto-close expired auctions
 setInterval(() => {
   const now = new Date();
-  for (const [id, auction] of auctions) {
-    if (auction.status === 'active' && new Date(auction.endTime) <= now) {
-      auction.close();
-      io.emit('auctionClosed', auction);
+  const activeAuctions = db.getActiveAuctions();
+  
+  for (const auction of activeAuctions) {
+    if (new Date(auction.end_time) <= now) {
+      // Get all bids and find winner
+      const allBids = db.getBidsForAuction(auction.id);
+      let winnerId = null;
+      let winningBidId = null;
+      
+      if (allBids.length > 0) {
+        const highestBid = allBids[0];
+        winnerId = highestBid.bidder_id;
+        winningBidId = highestBid.id;
+      }
+      
+      // Update auction in database
+      db.closeAuction(auction.id, winnerId, winningBidId);
+      
+      io.emit('auctionClosed', { ...auction, status: 'closed', winner: winnerId, winningBid: winningBidId });
     }
   }
 }, 60000); // Check every minute
 
-const PORT = process.env.PORT || 3000;
+// Schedule regular backups
+const BACKUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
+setInterval(backupData, BACKUP_INTERVAL);
+console.log(`Automated backup scheduled to run every ${BACKUP_INTERVAL / 60000} minutes.`);
+
+const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
   console.log(`Sealed-Bid Auction server running on port ${PORT}`);
 });

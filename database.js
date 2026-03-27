@@ -1,0 +1,388 @@
+const Database = require('better-sqlite3');
+const path = require('path');
+const bcrypt = require('bcrypt');
+const DatabaseSecurityLayer = require('./utils/database-security');
+
+class AuctionDatabase {
+  constructor(dbPath = './auctions.db') {
+    this.dbPath = path.resolve(__dirname, dbPath);
+    this.db = new Database(this.dbPath);
+    this.securityLayer = new DatabaseSecurityLayer(this.db);
+    this.initializeSchema();
+  }
+
+  initializeSchema() {
+    // Enable foreign keys
+    this.db.pragma('foreign_keys = ON');
+
+    // Create users table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        username TEXT UNIQUE NOT NULL,
+        hashed_password TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Create auctions table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS auctions (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        description TEXT,
+        starting_bid REAL NOT NULL,
+        current_highest_bid REAL DEFAULT 0,
+        end_time DATETIME NOT NULL,
+        creator_id TEXT NOT NULL,
+        status TEXT DEFAULT 'active' CHECK(status IN ('active', 'closed', 'cancelled')),
+        winner_id TEXT,
+        winning_bid_id TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (creator_id) REFERENCES users(id),
+        FOREIGN KEY (winner_id) REFERENCES users(id)
+      )
+    `);
+
+    // Create bids table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS bids (
+        id TEXT PRIMARY KEY,
+        auction_id TEXT NOT NULL,
+        bidder_id TEXT NOT NULL,
+        amount REAL NOT NULL,
+        encrypted_bid TEXT NOT NULL,
+        encrypted_iv TEXT NOT NULL,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+        revealed INTEGER DEFAULT 0,
+        FOREIGN KEY (auction_id) REFERENCES auctions(id) ON DELETE CASCADE,
+        FOREIGN KEY (bidder_id) REFERENCES users(id)
+      )
+    `);
+
+    // Create indexes for better performance
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_auctions_status ON auctions(status);
+      CREATE INDEX IF NOT EXISTS idx_auctions_end_time ON auctions(end_time);
+      CREATE INDEX IF NOT EXISTS idx_bids_auction_id ON bids(auction_id);
+      CREATE INDEX IF NOT EXISTS idx_bids_bidder_id ON bids(bidder_id);
+      CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+    `);
+  }
+
+  // User operations
+  createUser(id, username, password) {
+    // Validate inputs
+    const validation = this.securityLayer.validateInputs({ id, username, password });
+    if (!validation.valid) {
+      throw new Error(validation.errors.join(', '));
+    }
+    
+    const hashedPassword = bcrypt.hashSync(password, 10);
+    const stmt = this.securityLayer.prepare(`
+      INSERT INTO users (id, username, hashed_password)
+      VALUES (?, ?, ?)
+    `);
+    return stmt.run(id, username, hashedPassword);
+  }
+
+  getUserByUsername(username) {
+    const validation = this.securityLayer.validateInput(username);
+    if (!validation.valid) {
+      console.warn('[SECURITY] Invalid username format:', username);
+      return null;
+    }
+    
+    const stmt = this.securityLayer.prepare('SELECT * FROM users WHERE username = ?');
+    return stmt.get(validation.sanitized);
+  }
+
+  getUserById(id) {
+    const validation = this.securityLayer.validateInput(id);
+    if (!validation.valid) {
+      console.warn('[SECURITY] Invalid user ID format:', id);
+      return null;
+    }
+    
+    const stmt = this.securityLayer.prepare('SELECT * FROM users WHERE id = ?');
+    return stmt.get(validation.sanitized);
+  }
+
+  // Auction operations
+  createAuction(auction) {
+    // Validate auction data
+    const validation = this.securityLayer.validateInputs({
+      id: auction.id,
+      title: auction.title,
+      description: auction.description,
+      startingBid: auction.startingBid,
+      endTime: auction.endTime,
+      creator: auction.creator
+    });
+    
+    if (!validation.valid) {
+      throw new Error(validation.errors.join(', '));
+    }
+    
+    const stmt = this.securityLayer.prepare(`
+      INSERT INTO auctions (id, title, description, starting_bid, current_highest_bid, end_time, creator_id, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    return stmt.run(
+      validation.sanitized.id,
+      validation.sanitized.title,
+      validation.sanitized.description || null,
+      validation.sanitized.startingBid,
+      validation.sanitized.startingBid,
+      validation.sanitized.endTime,
+      validation.sanitized.creator,
+      auction.status
+    );
+  }
+
+  getAuction(id) {
+    const validation = this.securityLayer.validateInput(id);
+    if (!validation.valid) {
+      console.warn('[SECURITY] Invalid auction ID format:', id);
+      return null;
+    }
+    
+    const stmt = this.securityLayer.prepare('SELECT * FROM auctions WHERE id = ?');
+    return stmt.get(validation.sanitized);
+  }
+
+  getAllAuctions() {
+    const stmt = this.securityLayer.prepare('SELECT * FROM auctions ORDER BY created_at DESC');
+    return stmt.all();
+  }
+
+  getActiveAuctions() {
+    const stmt = this.securityLayer.prepare("SELECT * FROM auctions WHERE status = 'active' ORDER BY created_at DESC");
+    return stmt.all();
+  }
+
+  getPaginatedAuctions(page = 1, limit = 10, status = null) {
+    // Validate pagination parameters
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    
+    if (isNaN(pageNum) || pageNum < 1) {
+      throw new Error('Invalid page number');
+    }
+    
+    if (isNaN(limitNum) || limitNum < 1 || limitNum > 100) {
+      throw new Error('Limit must be between 1 and 100');
+    }
+    
+    const offset = (pageNum - 1) * limitNum;
+    let query = 'SELECT * FROM auctions';
+    let countQuery = 'SELECT COUNT(*) as total FROM auctions';
+    
+    if (status) {
+      const statusValidation = this.securityLayer.validateInput(status);
+      if (!statusValidation.valid) {
+        throw new Error('Invalid status value');
+      }
+      query += " WHERE status = ?";
+      countQuery += " WHERE status = ?";
+    }
+    
+    query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+    
+    const countStmt = this.securityLayer.prepare(countQuery);
+    const auctionsStmt = this.securityLayer.prepare(query);
+    
+    const totalResult = status 
+      ? countStmt.get(status) 
+      : countStmt.get();
+    
+    const auctions = status 
+      ? auctionsStmt.all(status, limitNum, offset) 
+      : auctionsStmt.all(limitNum, offset);
+    
+    return {
+      auctions,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total: totalResult.total,
+        totalPages: Math.ceil(totalResult.total / limitNum),
+        hasMore: offset + auctions.length < totalResult.total
+      }
+    };
+  }
+
+  updateAuction(id, updates) {
+    // Validate ID
+    const idValidation = this.securityLayer.validateInput(id);
+    if (!idValidation.valid) {
+      throw new Error('Invalid auction ID');
+    }
+    
+    // Validate update fields
+    const validatedUpdates = {};
+    const allowedFields = ['title', 'description', 'starting_bid', 'current_highest_bid', 'end_time', 'status'];
+    
+    for (const [key, value] of Object.entries(updates)) {
+      if (!allowedFields.includes(key)) {
+        console.warn(`[SECURITY] Attempted to update disallowed field: ${key}`);
+        continue;
+      }
+      
+      const validation = this.securityLayer.validateInput(value);
+      if (!validation.valid) {
+        throw new Error(`Invalid value for field ${key}`);
+      }
+      validatedUpdates[key] = validation.sanitized;
+    }
+    
+    if (Object.keys(validatedUpdates).length === 0) {
+      throw new Error('No valid fields to update');
+    }
+    
+    const fields = [];
+    const values = [];
+    
+    Object.keys(validatedUpdates).forEach(key => {
+      fields.push(`${key} = ?`);
+      values.push(validatedUpdates[key]);
+    });
+    
+    values.push(idValidation.sanitized);
+    
+    const stmt = this.securityLayer.prepare(`
+      UPDATE auctions SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+    `);
+    return stmt.run(...values);
+  }
+
+  closeAuction(id, winnerId, winningBidId) {
+    // Validate all IDs
+    const validations = this.securityLayer.validateInputs({
+      id,
+      winnerId: winnerId || null,
+      winningBidId: winningBidId || null
+    });
+    
+    if (!validations.valid) {
+      throw new Error(validations.errors.join(', '));
+    }
+    
+    const stmt = this.securityLayer.prepare(`
+      UPDATE auctions 
+      SET status = 'closed', winner_id = ?, winning_bid_id = ?, updated_at = CURRENT_TIMESTAMP 
+      WHERE id = ?
+    `);
+    return stmt.run(
+      validations.sanitized.winnerId,
+      validations.sanitized.winningBidId,
+      validations.sanitized.id
+    );
+  }
+
+  // Bid operations
+  createBid(bid) {
+    // Validate bid data
+    const validation = this.securityLayer.validateInputs({
+      id: bid.id,
+      auctionId: bid.auctionId,
+      bidderId: bid.bidderId,
+      amount: bid.amount
+    });
+    
+    if (!validation.valid) {
+      throw new Error(validation.errors.join(', '));
+    }
+    
+    const stmt = this.securityLayer.prepare(`
+      INSERT INTO bids (id, auction_id, bidder_id, amount, encrypted_bid, encrypted_iv)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+    return stmt.run(
+      validation.sanitized.id,
+      validation.sanitized.auctionId,
+      validation.sanitized.bidderId,
+      validation.sanitized.amount,
+      bid.encryptedBid.encrypted,
+      bid.encryptedBid.iv
+    );
+  }
+
+  getBidsForAuction(auctionId) {
+    const validation = this.securityLayer.validateInput(auctionId);
+    if (!validation.valid) {
+      console.warn('[SECURITY] Invalid auction ID format:', auctionId);
+      return [];
+    }
+    
+    const stmt = this.securityLayer.prepare('SELECT * FROM bids WHERE auction_id = ? ORDER BY amount DESC');
+    return stmt.all(validation.sanitized);
+  }
+
+  getBidCount(auctionId) {
+    const validation = this.securityLayer.validateInput(auctionId);
+    if (!validation.valid) {
+      console.warn('[SECURITY] Invalid auction ID format:', auctionId);
+      return 0;
+    }
+    
+    const stmt = this.securityLayer.prepare('SELECT COUNT(*) as count FROM bids WHERE auction_id = ?');
+    const result = stmt.get(validation.sanitized);
+    return result.count;
+  }
+
+  getHighestBid(auctionId) {
+    const validation = this.securityLayer.validateInput(auctionId);
+    if (!validation.valid) {
+      console.warn('[SECURITY] Invalid auction ID format:', auctionId);
+      return null;
+    }
+    
+    const stmt = this.securityLayer.prepare('SELECT MAX(amount) as highest FROM bids WHERE auction_id = ?');
+    const result = stmt.get(validation.sanitized);
+    return result.highest;
+  }
+
+  // Utility methods
+  close() {
+    this.db.close();
+  }
+
+  // Security monitoring
+  getSecurityStats() {
+    return this.securityLayer.getSecurityStats();
+  }
+
+  getQueryLog(limit = 100) {
+    return this.securityLayer.getQueryLog(limit);
+  }
+
+  clearQueryLog() {
+    this.securityLayer.clearQueryLog();
+  }
+
+  // Export for in-memory compatibility (temporary)
+  toMap() {
+    const auctions = new Map();
+    const bids = new Map();
+    const users = new Map();
+
+    this.getAllAuctions().forEach(auction => {
+      auctions.set(auction.id, auction);
+    });
+
+    this.db.prepare('SELECT * FROM bids').all().forEach(bid => {
+      bids.set(bid.id, bid);
+    });
+
+    this.db.prepare('SELECT * FROM users').all().forEach(user => {
+      users.set(user.id, user);
+    });
+
+    return { auctions, bids, users };
+  }
+}
+
+module.exports = AuctionDatabase;
