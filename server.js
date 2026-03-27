@@ -6,6 +6,7 @@ const bcrypt = require('bcrypt');
 const helmet = require('helmet');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
+const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const { Server, Keypair, TransactionBuilder, Networks, BASE_FEE, Asset } = require('stellar-sdk');
 const { StellarSealedBidAuction } = require('./contracts/StellarSealedBidAuction');
@@ -36,6 +37,12 @@ app.use(limiter);
 const auctions = new Map();
 const bids = new Map();
 const users = new Map();
+
+// JWT Secret Key (in production, use environment variable)
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+
+// JWT Token blacklist for logout functionality
+const tokenBlacklist = new Set();
 
 // Auction class
 class Auction {
@@ -101,6 +108,37 @@ function generateAuctionId() {
   return uuidv4();
 }
 
+// JWT Authentication Middleware
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Access token required' });
+  }
+
+  if (tokenBlacklist.has(token)) {
+    return res.status(401).json({ error: 'Token has been revoked' });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({ error: 'Invalid or expired token' });
+    }
+    req.user = user;
+    next();
+  });
+}
+
+// Generate JWT Token
+function generateToken(user) {
+  return jwt.sign(
+    { userId: user.id, username: user.username },
+    JWT_SECRET,
+    { expiresIn: '24h' }
+  );
+}
+
 function encryptBid(bidAmount, secretKey) {
   const algorithm = 'aes-256-cbc';
   const key = crypto.scryptSync(secretKey, 'salt', 32);
@@ -144,11 +182,12 @@ app.get('/api/auctions', (req, res) => {
   res.json(auctionList);
 });
 
-app.post('/api/auctions', async (req, res) => {
+app.post('/api/auctions', authenticateToken, async (req, res) => {
   try {
-    const { title, description, startingBid, endTime, userId } = req.body;
+    const { title, description, startingBid, endTime } = req.body;
+    const userId = req.user.userId;
     
-    if (!title || !description || !startingBid || !endTime || !userId) {
+    if (!title || !description || !startingBid || !endTime) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
@@ -172,11 +211,12 @@ app.get('/api/auctions/:id', (req, res) => {
   res.json(auction);
 });
 
-app.post('/api/bids', async (req, res) => {
+app.post('/api/bids', authenticateToken, async (req, res) => {
   try {
-    const { auctionId, bidderId, amount, secretKey } = req.body;
+    const { auctionId, amount, secretKey } = req.body;
+    const bidderId = req.user.userId;
     
-    if (!auctionId || !bidderId || amount === undefined || !secretKey) {
+    if (!auctionId || amount === undefined || !secretKey) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
@@ -207,11 +247,16 @@ app.post('/api/bids', async (req, res) => {
   }
 });
 
-app.post('/api/auctions/:id/close', (req, res) => {
+app.post('/api/auctions/:id/close', authenticateToken, (req, res) => {
   try {
     const auction = auctions.get(req.params.id);
     if (!auction) {
       return res.status(404).json({ error: 'Auction not found' });
+    }
+
+    // Only the auction creator can close it
+    if (auction.creator !== req.user.userId) {
+      return res.status(403).json({ error: 'Only the auction creator can close it' });
     }
 
     if (auction.status !== 'active') {
@@ -234,6 +279,10 @@ app.post('/api/users/register', async (req, res) => {
       return res.status(400).json({ error: 'Username and password required' });
     }
 
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters long' });
+    }
+
     const existingUser = Array.from(users.values()).find(u => u.username === username);
     if (existingUser) {
       return res.status(400).json({ error: 'Username already exists' });
@@ -244,7 +293,16 @@ app.post('/api/users/register', async (req, res) => {
     const user = new User(userId, username, hashedPassword);
     
     users.set(userId, user);
-    res.status(201).json({ userId, username });
+    
+    // Generate JWT token
+    const token = generateToken(user);
+    
+    res.status(201).json({ 
+      userId: user.id, 
+      username: user.username,
+      token: token,
+      expiresIn: '24h'
+    });
   } catch (error) {
     res.status(500).json({ error: 'Failed to register user' });
   }
@@ -268,10 +326,45 @@ app.post('/api/users/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    res.json({ userId: user.id, username: user.username });
+    // Generate JWT token
+    const token = generateToken(user);
+    
+    res.json({ 
+      userId: user.id, 
+      username: user.username,
+      token: token,
+      expiresIn: '24h'
+    });
   } catch (error) {
     res.status(500).json({ error: 'Failed to login' });
   }
+});
+
+// New logout endpoint
+app.post('/api/users/logout', authenticateToken, (req, res) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    
+    if (token) {
+      tokenBlacklist.add(token);
+    }
+    
+    res.json({ message: 'Logged out successfully' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to logout' });
+  }
+});
+
+// New token validation endpoint
+app.get('/api/users/verify', authenticateToken, (req, res) => {
+  res.json({ 
+    valid: true, 
+    user: { 
+      userId: req.user.userId, 
+      username: req.user.username 
+    } 
+  });
 });
 
 // Socket.io connections
