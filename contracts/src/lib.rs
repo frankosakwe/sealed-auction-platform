@@ -1,6 +1,6 @@
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String, Vec, Symbol, symbol_short, map};
+use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String, Vec, Symbol, symbol_short, map, xdr::ToXdr};
 
 // Maximum bid amount to prevent overflow (in stroops)
 const MAX_BID_AMOUNT: u64 = u64::MAX / 2; // Use half of u64::MAX for safety
@@ -50,7 +50,7 @@ pub struct Bid {
     pub bid_id: u64,
     pub auction_id: u64,
     pub bidder: Address,
-    pub commitment: String,
+    pub commitment: soroban_sdk::BytesN<32>,
     pub bid_amount: u64,
     pub secret: String,
     pub nonce: u64,
@@ -167,18 +167,27 @@ impl SealedBidAuction {
         env.storage().instance().set(&BID_DATA, &bids);
     }
 
-    // Improved commitment scheme with nonce and timestamp
-    fn generate_commitment(env: &Env, bid_amount: u64, secret: &String, _nonce: u64, _timestamp: u64) -> String {
-        // Use a simple approach that works with Soroban SDK
-        // The security improvement comes from storing nonce and timestamp in the bid struct
-        // and validating them during reveal process
-        // For now, use a simple hash placeholder since format! is not available in no_std
-        String::from_str(env, "hash_placeholder")
+    // Improved commitment scheme with actual SHA-256 hashing
+    fn generate_commitment(env: &Env, bid_amount: u64, secret: &String, nonce: u64, timestamp: u64) -> soroban_sdk::BytesN<32> {
+        let mut data = soroban_sdk::Bytes::new(env);
+        
+        // Add bid amount
+        data.extend_from_array(&bid_amount.to_be_bytes());
+        
+        // Add secret string bytes using XDR serialization
+        data.append(&secret.clone().to_xdr(env));
+        
+        // Add nonce and timestamp for salt/entropy
+        data.extend_from_array(&nonce.to_be_bytes());
+        data.extend_from_array(&timestamp.to_be_bytes());
+        
+        env.crypto().sha256(&data)
     }
 
     /// Create a new auction
     pub fn create_auction(
         env: Env,
+        creator: Address,
         title: String,
         description: String,
         starting_bid: u64,
@@ -188,7 +197,7 @@ impl SealedBidAuction {
         Self::require_not_locked(&env);
         Self::set_lock(&env);
 
-        let creator = env.current_contract_address();
+        creator.require_auth();
         
         // Validate inputs
         if starting_bid == 0 || duration == 0 {
@@ -267,15 +276,16 @@ impl SealedBidAuction {
     /// Commit a sealed bid
     pub fn commit_bid(
         env: Env,
+        bidder: Address,
         auction_id: u64,
-        commitment: String,
+        commitment: soroban_sdk::BytesN<32>,
         bid_amount: u64,
         nonce: u64,
     ) -> u64 {
         Self::require_not_locked(&env);
         Self::set_lock(&env);
 
-        let bidder = env.current_contract_address();
+        bidder.require_auth();
         
         // Get auction using optimized method
         let auction = Self::get_auction_optimized(&env, auction_id)
@@ -377,9 +387,10 @@ impl SealedBidAuction {
             .unwrap_or_else(|| panic!("Bid not found"));
         
         // Validate bid
-        if bid.bidder != env.current_contract_address() || bid.status != BidStatus::Committed {
+        bid.bidder.require_auth();
+        if bid.status != BidStatus::Committed {
             Self::remove_lock(&env);
-            panic!("Invalid bid state or not owner");
+            panic!("Invalid bid state");
         }
         
         // Get auction using optimized method
@@ -439,6 +450,9 @@ impl SealedBidAuction {
         let mut auction = Self::get_auction_optimized(&env, auction_id)
             .unwrap_or_else(|| panic!("Auction not found"));
         
+        // Ensure only the creator or admin can end the auction
+        auction.creator.require_auth();
+        
         // Validate auction
         if auction.status != AuctionStatus::Active || env.ledger().timestamp() < auction.reveal_deadline {
             Self::remove_lock(&env);
@@ -470,9 +484,10 @@ impl SealedBidAuction {
             .unwrap_or_else(|| panic!("Auction not found"));
         
         // Validate auction and creator
-        if auction.creator != env.current_contract_address() || auction.status != AuctionStatus::Active {
+        auction.creator.require_auth();
+        if auction.status != AuctionStatus::Active {
             Self::remove_lock(&env);
-            panic!("Not auction creator or auction not active");
+            panic!("Auction not active");
         }
         
         // Cancel auction
@@ -526,12 +541,12 @@ impl SealedBidAuction {
     }
     
     /// Generate commitment hash for bid with improved security
-    pub fn get_commitment(env: Env, bid_amount: u64, secret: String, nonce: u64, timestamp: u64) -> String {
+    pub fn get_commitment(env: Env, bid_amount: u64, secret: String, nonce: u64, timestamp: u64) -> soroban_sdk::BytesN<32> {
         Self::generate_commitment(&env, bid_amount, &secret, nonce, timestamp)
     }
     
     /// Generate secure commitment for client-side use
-    pub fn generate_secure_commitment(env: Env, bid_amount: u64, secret: String) -> (String, u64, u64) {
+    pub fn generate_secure_commitment(env: Env, bid_amount: u64, secret: String) -> (soroban_sdk::BytesN<32>, u64, u64) {
         let nonce = env.ledger().timestamp(); // Use timestamp as nonce since seq() is not available
         let timestamp = env.ledger().timestamp();
         let commitment = Self::generate_commitment(&env, bid_amount, &secret, nonce, timestamp);
