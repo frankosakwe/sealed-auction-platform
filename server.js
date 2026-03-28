@@ -473,12 +473,20 @@ app.get('/api/auctions',
       endTime: auction.end_time,
       status: auction.status,
       bidCount: db.getBidCount(auction.id),
-      creator: auction.creator_id
+      creator: auction.creator_id,
+      _links: {
+        self: { href: `/api/auctions/${auction.id}` },
+        bids: { href: `/api/auctions/${auction.id}/bids` },
+        close: { href: `/api/auctions/${auction.id}`, method: 'PATCH' }
+      }
     }));
     
     res.sendData({
       auctions: auctionList,
-      pagination: result.pagination
+      pagination: result.pagination,
+      _links: {
+        self: { href: `/api/auctions?page=${page}&limit=${validatedLimit}` + (status ? `&status=${status}` : '') }
+      }
     }, 'auctionsResponse');
   } catch (error) {
     console.error('Error fetching auctions:', error);
@@ -525,8 +533,17 @@ app.post('/api/auctions',
     const auction = new Auction(auctionId, title, description, startingBid, new Date(endTime), userId);
     auctions.set(auctionId, auction);
     
+    const responseData = {
+      ...auction,
+      _links: {
+        self: { href: `/api/auctions/${auctionId}` },
+        bids: { href: `/api/auctions/${auctionId}/bids` },
+        close: { href: `/api/auctions/${auctionId}`, method: 'PATCH' }
+      }
+    };
+    
     io.emit('auctionCreated', auction);
-    res.status(201).sendData(auction, 'auctionCreated');
+    res.status(201).sendData(responseData, 'auctionCreated');
   } catch (error) {
     console.error('Auction creation failed:', error);
     res.status(500).sendData({ error: 'Failed to create auction' });
@@ -557,7 +574,12 @@ app.get('/api/auctions/:id',
       endTime: auctionDb.end_time,
       status: auctionDb.status,
       bidCount: db.getBidCount(auctionId),
-      creator: auctionDb.creator_id
+      creator: auctionDb.creator_id,
+      _links: {
+        self: { href: `/api/auctions/${auctionDb.id}` },
+        bids: { href: `/api/auctions/${auctionDb.id}/bids` },
+        close: { href: `/api/auctions/${auctionDb.id}`, method: 'PATCH' }
+      }
     }, 'auctionDetails');
   } catch (error) {
     console.error('Error fetching auction:', error);
@@ -621,7 +643,14 @@ app.post('/api/auctions/:id/bids',
     }
     
     io.emit('bidPlaced', { auctionId, bidCount: auction ? auction.bids.length : 1 });
-    res.status(201).sendData({ message: 'Bid placed successfully', bidId }, 'bidPlaced');
+    res.status(201).sendData({ 
+      message: 'Bid placed successfully', 
+      bidId,
+      _links: {
+        self: { href: `/api/auctions/${auctionId}/bids` },
+        auction: { href: `/api/auctions/${auctionId}` }
+      }
+    }, 'bidPlaced');
   } catch (error) {
     console.error('Bid placement failed:', error);
     res.status(500).sendData({ error: 'Failed to place bid' });
@@ -679,7 +708,16 @@ app.patch('/api/auctions/:id',
       auction.close();
     }
     
-    const responseData = { ...auctionDb, status: 'closed', winner: winnerId, winningBid: winningBidId };
+    const responseData = { 
+      ...auctionDb, 
+      status: 'closed', 
+      winner: winnerId, 
+      winningBid: winningBidId,
+      _links: {
+        self: { href: `/api/auctions/${auctionId}` },
+        bids: { href: `/api/auctions/${auctionId}/bids` }
+      }
+    };
     io.emit('auctionClosed', responseData);
     res.sendData(responseData, 'auctionClosed');
   } catch (error) {
@@ -713,7 +751,10 @@ app.post('/api/users',
     res.status(201).sendData({ 
       userId, 
       username,
-      message: 'User registered successfully'
+      message: 'User registered successfully',
+      _links: {
+        login: { href: '/api/auth/login', method: 'POST' }
+      }
     }, 'userRegistered');
   } catch (error) {
     console.error('Error registering user:', error);
@@ -771,7 +812,11 @@ app.post('/api/auth/login',
       userId: user.id, 
       username: user.username,
       token: token,
-      expiresIn: '24h'
+      expiresIn: '24h',
+      _links: {
+        verify: { href: '/api/auth/verify', method: 'GET' },
+        auctions: { href: '/api/auctions', method: 'GET' }
+      }
     }, 'loginResponse');
   } catch (error) {
     console.error('Error logging in user:', error);
@@ -789,7 +834,12 @@ app.post('/api/auth/logout', authenticateToken, (req, res) => {
       tokenBlacklist.add(token);
     }
     
-    res.sendData({ message: 'Logged out successfully' }, 'logoutResponse');
+    res.sendData({ 
+      message: 'Logged out successfully',
+      _links: {
+        login: { href: '/api/auth/login', method: 'POST' }
+      }
+    }, 'logoutResponse');
   } catch (error) {
     res.status(500).sendData({ error: 'Failed to logout' });
   }
@@ -802,7 +852,11 @@ app.get('/api/auth/verify', authenticateToken, (req, res) => {
     user: { 
       userId: req.user.userId, 
       username: req.user.username 
-    } 
+    },
+    _links: {
+      self: { href: '/api/auth/verify', method: 'GET' },
+      logout: { href: '/api/auth/logout', method: 'POST' }
+    }
   }, 'verifyResponse');
 });
 
@@ -828,7 +882,10 @@ app.get('/api/users/lockout-status',
       isLocked,
       failedLoginAttempts: user.failed_login_attempts || 0,
       lastFailedLogin: user.last_failed_login,
-      lockedUntil: user.locked_until
+      lockedUntil: user.locked_until,
+      _links: {
+        self: { href: `/api/users/lockout-status?username=${username}` }
+      }
     });
   } catch (error) {
     console.error('Error checking lockout status:', error);
@@ -861,7 +918,11 @@ app.get('/auth/github/callback',
 app.get('/api/auth/status', (req, res) => {
   res.json({
     google: !!process.env.GOOGLE_CLIENT_ID,
-    github: !!process.env.GITHUB_CLIENT_ID
+    github: !!process.env.GITHUB_CLIENT_ID,
+    _links: {
+      self: { href: '/api/auth/status' },
+      login: { href: '/api/auth/login', method: 'POST' }
+    }
   });
 });
 
