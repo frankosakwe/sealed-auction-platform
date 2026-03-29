@@ -39,6 +39,30 @@ npm run dev
 
 3. Open your browser and navigate to `http://localhost:3000`
 
+## Environment Configuration
+
+Create a `.env` file for local development (optional, but recommended):
+
+```bash
+NODE_ENV=development
+PORT=3001
+JWT_SECRET=change-me
+SESSION_SECRET=change-me
+
+# Error tracking (Sentry)
+SENTRY_DSN=
+SENTRY_ENVIRONMENT=development
+SENTRY_RELEASE=
+SENTRY_TRACES_SAMPLE_RATE=0.1
+```
+
+## Error Tracking & Alerting
+
+- The server now supports centralized error tracking via Sentry.
+- To enable it, set `SENTRY_DSN` in your environment.
+- Captured errors include API handler failures, global Express errors, unhandled promise rejections, and uncaught exceptions.
+- Configure alert rules in Sentry (for example: `issue created`, `regression`, or `spike in errors`) to receive notifications in Slack/email/PagerDuty.
+
 ## Usage
 
 ### Creating an Account

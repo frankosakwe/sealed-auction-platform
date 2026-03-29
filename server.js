@@ -9,6 +9,7 @@ const apm = require('elastic-apm-node').start({
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
+const Sentry = require('@sentry/node');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -35,6 +36,43 @@ const io = socketIo(server, {
   }
 });
 
+const sentryDsn = process.env.SENTRY_DSN;
+const sentryEnabled = Boolean(sentryDsn);
+
+if (sentryEnabled) {
+  Sentry.init({
+    dsn: sentryDsn,
+    environment: process.env.SENTRY_ENVIRONMENT || process.env.NODE_ENV || 'development',
+    release: process.env.SENTRY_RELEASE,
+    tracesSampleRate: Number(process.env.SENTRY_TRACES_SAMPLE_RATE || 0.1)
+  });
+
+  app.use(Sentry.Handlers.requestHandler());
+  console.log('Sentry error tracking enabled.');
+} else {
+  console.log('Sentry disabled (set SENTRY_DSN to enable error tracking).');
+}
+
+function trackError(error, context = {}) {
+  if (sentryEnabled) {
+    Sentry.withScope((scope) => {
+      Object.entries(context).forEach(([key, value]) => {
+        scope.setExtra(key, value);
+      });
+      Sentry.captureException(error);
+    });
+  }
+
+  if (apm && typeof apm.captureError === 'function') {
+    apm.captureError(error, { custom: context });
+  }
+}
+
+function logError(message, error, context = {}) {
+  console.error(message, error);
+  trackError(error, { message, ...context });
+}
+
 // Security middleware
 app.use(helmet());
 
@@ -45,7 +83,7 @@ app.get('/api/security/stats', (req, res) => {
     const stats = db.getSecurityStats();
     res.json(stats);
   } catch (error) {
-    console.error('Error getting security stats:', error);
+    logError('Error getting security stats:', error, { endpoint: '/api/security/stats' });
     res.status(500).json({ error: 'Failed to get security stats' });
   }
 });
@@ -57,7 +95,7 @@ app.get('/api/security/logs', (req, res) => {
     const logs = db.getQueryLog(limit);
     res.json(logs);
   } catch (error) {
-    console.error('Error getting query logs:', error);
+    logError('Error getting query logs:', error, { endpoint: '/api/security/logs' });
     res.status(500).json({ error: 'Failed to get query logs' });
   }
 });
@@ -392,7 +430,7 @@ function backupData() {
     fs.writeFileSync(path.join(backupDir, 'users.json'), JSON.stringify(Array.from(users.entries()), null, 2));
     console.log(`[${new Date().toISOString()}] Data backup successful.`);
   } catch (error) {
-    console.error('Data backup failed:', error);
+    logError('Data backup failed:', error, { operation: 'backupData' });
   }
 }
 
@@ -436,7 +474,7 @@ function restoreData() {
       console.log(`Restored ${users.size} users from backup.`);
     }
   } catch (error) {
-    console.error('Failed to restore data from backup. Starting with a clean state.', error);
+    logError('Failed to restore data from backup. Starting with a clean state.', error, { operation: 'restoreData' });
     auctions = new Map();
     bids = new Map();
     users = new Map();
@@ -489,7 +527,7 @@ app.get('/api/auctions',
       }
     }, 'auctionsResponse');
   } catch (error) {
-    console.error('Error fetching auctions:', error);
+    logError('Error fetching auctions:', error, { endpoint: '/api/auctions', method: 'GET' });
     res.status(500).sendData({ error: 'Failed to fetch auctions' });
   }
 });
@@ -545,7 +583,7 @@ app.post('/api/auctions',
     io.emit('auctionCreated', auction);
     res.status(201).sendData(responseData, 'auctionCreated');
   } catch (error) {
-    console.error('Auction creation failed:', error);
+    logError('Auction creation failed:', error, { endpoint: '/api/auctions', method: 'POST' });
     res.status(500).sendData({ error: 'Failed to create auction' });
   }
 });
@@ -582,7 +620,7 @@ app.get('/api/auctions/:id',
       }
     }, 'auctionDetails');
   } catch (error) {
-    console.error('Error fetching auction:', error);
+    logError('Error fetching auction:', error, { endpoint: '/api/auctions/:id', method: 'GET' });
     res.status(500).sendData({ error: 'Failed to fetch auction' });
   }
 });
@@ -652,7 +690,7 @@ app.post('/api/auctions/:id/bids',
       }
     }, 'bidPlaced');
   } catch (error) {
-    console.error('Bid placement failed:', error);
+    logError('Bid placement failed:', error, { endpoint: '/api/auctions/:id/bids', method: 'POST' });
     res.status(500).sendData({ error: 'Failed to place bid' });
   }
 });
@@ -721,7 +759,7 @@ app.patch('/api/auctions/:id',
     io.emit('auctionClosed', responseData);
     res.sendData(responseData, 'auctionClosed');
   } catch (error) {
-    console.error('Error closing auction:', error);
+    logError('Error closing auction:', error, { endpoint: '/api/auctions/:id', method: 'PATCH' });
     res.status(500).sendData({ error: 'Failed to close auction' });
   }
 });
@@ -757,7 +795,7 @@ app.post('/api/users',
       }
     }, 'userRegistered');
   } catch (error) {
-    console.error('Error registering user:', error);
+    logError('Error registering user:', error, { endpoint: '/api/users', method: 'POST' });
     res.status(500).sendData({ error: 'Failed to register user' });
   }
 });
@@ -819,7 +857,7 @@ app.post('/api/auth/login',
       }
     }, 'loginResponse');
   } catch (error) {
-    console.error('Error logging in user:', error);
+    logError('Error logging in user:', error, { endpoint: '/api/auth/login', method: 'POST' });
     res.status(500).sendData({ error: 'Failed to login' });
   }
 });
@@ -888,7 +926,7 @@ app.get('/api/users/lockout-status',
       }
     });
   } catch (error) {
-    console.error('Error checking lockout status:', error);
+    logError('Error checking lockout status:', error, { endpoint: '/api/users/lockout-status', method: 'GET' });
     res.status(500).json({ error: 'Failed to check lockout status' });
   }
 });
@@ -971,7 +1009,7 @@ setInterval(() => {
     db.resetExpiredLockouts();
     console.log(`[${new Date().toISOString()}] Expired account lockouts reset.`);
   } catch (error) {
-    console.error('Error resetting expired lockouts:', error);
+    logError('Error resetting expired lockouts:', error, { operation: 'resetExpiredLockouts' });
   }
 }, 5 * 60 * 1000); // Check every 5 minutes
 
@@ -979,6 +1017,36 @@ setInterval(() => {
 const BACKUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
 setInterval(backupData, BACKUP_INTERVAL);
 console.log(`Automated backup scheduled to run every ${BACKUP_INTERVAL / 60000} minutes.`);
+
+if (sentryEnabled) {
+  app.use(Sentry.Handlers.errorHandler());
+}
+
+app.use((err, req, res, next) => {
+  logError('Unhandled request error:', err, {
+    endpoint: req.originalUrl,
+    method: req.method,
+    statusCode: err.status || err.statusCode || 500
+  });
+
+  if (res.headersSent) {
+    return next(err);
+  }
+
+  res.status(err.status || err.statusCode || 500).sendData({
+    error: 'An unexpected server error occurred'
+  });
+});
+
+process.on('unhandledRejection', (reason) => {
+  const rejectionError = reason instanceof Error ? reason : new Error(String(reason));
+  logError('Unhandled Promise Rejection:', rejectionError);
+});
+
+process.on('uncaughtException', (error) => {
+  logError('Uncaught Exception:', error, { fatal: true });
+  setTimeout(() => process.exit(1), 200);
+});
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
