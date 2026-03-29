@@ -98,6 +98,12 @@ NODE_ENV=production
 SESSION_SECRET=your-secret-key
 RATE_LIMIT_WINDOW_MS=900000
 RATE_LIMIT_MAX_REQUESTS=100
+
+# Error tracking (Sentry)
+SENTRY_DSN=https://<key>@sentry.io/<project-id>
+SENTRY_ENVIRONMENT=production
+SENTRY_RELEASE=sealed-auction-platform@1.0.0
+SENTRY_TRACES_SAMPLE_RATE=0.1
 ```
 
 ## 📊 Production Considerations
