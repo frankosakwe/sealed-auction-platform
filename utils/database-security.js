@@ -14,11 +14,7 @@ class DatabaseSecurityLayer {
       /--/,                           // SQL comment
       /\/\*.*\*\//,                   // Multi-line comment
       /\bUNION\b/i,                   // UNION injection
-      /\bSELECT\b.*\bFROM\b/i,        // SELECT in wrong context
       /\bDROP\b/i,                    // DROP table
-      /\bDELETE\b/i,                  // DELETE without WHERE
-      /\bINSERT\b.*\bINTO\b/i,        // INSERT in wrong context
-      /\bUPDATE\b.*\bSET\b/i,         // UPDATE in wrong context
       /;\s*\b(DROP|DELETE|UPDATE|INSERT)\b/i, // Stacked queries
       /\bEXEC\b|\bEXECUTE\b/i,        // Execute commands
       /xp_/i,                         // Extended stored procedures

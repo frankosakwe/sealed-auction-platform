@@ -199,7 +199,7 @@ const validator = {
       return { valid: false, value: null, message: 'Date must be in the future' };
     }
     
-    return { valid: true, value: date };
+    return { valid: true, value: date.toISOString() };
   },
 
   /**
