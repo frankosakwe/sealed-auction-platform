@@ -197,6 +197,9 @@ function loadAuctions(reset = false) {
         hasMoreAuctions = pagination.hasMore;
         isLoading = false;
         
+        // Expose auctions globally for AI recommendations
+        window._allAuctions = auctions;
+        
         renderAuctions();
         hideLoadingIndicator();
     })
@@ -324,6 +327,9 @@ function createAuctionCard(auction) {
                 <button onclick="viewAuctionDetails('${auction.id}')" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-3 py-2 rounded-lg text-sm transition-colors">
                     <i class="fas fa-eye mr-1"></i>View Details
                 </button>
+                <button onclick="openARPreview(${auction.id})" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm transition-colors" title="AR Preview">
+                    <i class="fas fa-camera"></i>
+                </button>
             </div>
         </div>
     `;
@@ -405,9 +411,26 @@ function openBidModal(auctionId) {
         return;
     }
     
+    // Track bid intent for AI recommendations
+    if (typeof AIRecommendations !== 'undefined') {
+        AIRecommendations.trackBid(String(auctionId));
+    }
+    
     if (bidModal) {
         bidModal.dataset.auctionId = auctionId;
         bidModal.classList.remove("hidden");
+    }
+}
+
+function openARPreview(auctionId) {
+    const auction = (window._allAuctions || auctions).find(a => String(a.id) === String(auctionId));
+    if (!auction) { showNotification('Auction not found', 'error'); return; }
+    // Track view for AI recommendations
+    if (typeof AIRecommendations !== 'undefined') {
+        AIRecommendations.trackView(String(auctionId), auction);
+    }
+    if (typeof ARPreview !== 'undefined') {
+        ARPreview.open(auction);
     }
 }
 
@@ -488,7 +511,7 @@ function switchTab(tabName) {
         selectedTab.classList.remove("hidden");
     }
     
-    // Update tab buttons
+    // Update tab buttons (data-tab buttons)
     document.querySelectorAll("[data-tab]").forEach(button => {
         button.classList.remove("bg-purple-600", "text-white");
         button.classList.add("bg-transparent", "text-gray-600");
@@ -498,6 +521,18 @@ function switchTab(tabName) {
     if (selectedButton) {
         selectedButton.classList.remove("bg-transparent", "text-gray-600");
         selectedButton.classList.add("bg-purple-600", "text-white");
+    }
+
+    // Update dynamically-added tab-btn buttons
+    document.querySelectorAll(".tab-btn").forEach(btn => {
+        btn.classList.remove("bg-purple-600", "text-white");
+    });
+    const dynBtn = document.getElementById(`${tabName}Tab`);
+    if (dynBtn) dynBtn.classList.add("bg-purple-600", "text-white");
+
+    // Refresh AI recommendations when switching to that tab
+    if (tabName === 'ai' && typeof AIRecommendations !== 'undefined') {
+        AIRecommendations.refresh(window._allAuctions || auctions);
     }
     
     currentTab = tabName;
