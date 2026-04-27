@@ -27,6 +27,7 @@ const { ApplicationMetrics, createMetricsMiddleware } = require('./utils/metrics
 const NetworkMonitor = require('./utils/network-monitor');
 const { TransactionQueue, PRIORITY, STATUS } = require('./utils/transaction-queue');
 const { WalletManager, SECURITY_LEVELS, WALLET_TYPES } = require('./utils/wallet-manager');
+const { BlockchainAnalytics, AGGREGATION_INTERVALS, METRIC_TYPES } = require('./utils/blockchain-analytics');
 
 // Initialize database
 const db = new AuctionDatabase();
@@ -51,6 +52,13 @@ const walletManager = new WalletManager({
   autoLockTimeout: 300000,
   autoBackup: true,
   backupInterval: 86400000
+});
+
+// Initialize blockchain analytics
+const blockchainAnalytics = new BlockchainAnalytics({
+  cacheTimeout: 300000,
+  batchSize: 1000,
+  maxCacheSize: 10000
 });
 
 const app = express();
@@ -3721,6 +3729,291 @@ io.on('connection', (socket) => {
   
   socket.on('disconnect', () => {
     console.log('Client disconnected from wallet management updates');
+  });
+});
+
+// ==================== BLOCKCHAIN ANALYTICS API ENDPOINTS ====================
+
+// Get transaction analytics
+app.get('/api/analytics/transactions', authenticateToken, async (req, res) => {
+  try {
+    const options = {
+      timeRange: req.query.timeRange || '24h',
+      interval: req.query.interval || AGGREGATION_INTERVALS.HOUR,
+      filters: req.query.filters ? JSON.parse(req.query.filters) : {},
+      groupBy: req.query.groupBy ? JSON.parse(req.query.groupBy) : []
+    };
+    
+    const analytics = await blockchainAnalytics.getTransactionAnalytics(options);
+    res.json(analytics);
+  } catch (error) {
+    logError('Error fetching transaction analytics:', error, { endpoint: '/api/analytics/transactions', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to fetch transaction analytics' });
+  }
+});
+
+// Get network statistics
+app.get('/api/analytics/network', authenticateToken, async (req, res) => {
+  try {
+    const options = {
+      timeRange: req.query.timeRange || '24h',
+      metrics: req.query.metrics ? JSON.parse(req.query.metrics) : ['all']
+    };
+    
+    const statistics = await blockchainAnalytics.getNetworkStatistics(options);
+    res.json(statistics);
+  } catch (error) {
+    logError('Error fetching network statistics:', error, { endpoint: '/api/analytics/network', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to fetch network statistics' });
+  }
+});
+
+// Get performance metrics
+app.get('/api/analytics/performance', authenticateToken, async (req, res) => {
+  try {
+    const options = {
+      timeRange: req.query.timeRange || '24h',
+      interval: req.query.interval || AGGREGATION_INTERVALS.HOUR,
+      component: req.query.component || 'all'
+    };
+    
+    const metrics = await blockchainAnalytics.getPerformanceMetrics(options);
+    res.json(metrics);
+  } catch (error) {
+    logError('Error fetching performance metrics:', error, { endpoint: '/api/analytics/performance', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to fetch performance metrics' });
+  }
+});
+
+// Get cost analysis
+app.get('/api/analytics/costs', authenticateToken, async (req, res) => {
+  try {
+    const options = {
+      timeRange: req.query.timeRange || '30d',
+      interval: req.query.interval || AGGREGATION_INTERVALS.DAY,
+      category: req.query.category || 'all'
+    };
+    
+    const analysis = await blockchainAnalytics.getCostAnalysis(options);
+    res.json(analysis);
+  } catch (error) {
+    logError('Error fetching cost analysis:', error, { endpoint: '/api/analytics/costs', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to fetch cost analysis' });
+  }
+});
+
+// Get trend visualization data
+app.get('/api/analytics/trends', authenticateToken, async (req, res) => {
+  try {
+    const options = {
+      timeRange: req.query.timeRange || '7d',
+      metrics: req.query.metrics ? JSON.parse(req.query.metrics) : ['transactions', 'costs', 'performance'],
+      chartType: req.query.chartType || 'line'
+    };
+    
+    const visualization = await blockchainAnalytics.getTrendVisualization(options);
+    res.json(visualization);
+  } catch (error) {
+    logError('Error fetching trend visualization:', error, { endpoint: '/api/analytics/trends', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to fetch trend visualization' });
+  }
+});
+
+// Export analytics data
+app.get('/api/analytics/export', authenticateToken, async (req, res) => {
+  try {
+    const options = {
+      format: req.query.format || 'json',
+      timeRange: req.query.timeRange || '30d',
+      metrics: req.query.metrics ? JSON.parse(req.query.metrics) : ['all'],
+      includeRaw: req.query.includeRaw === 'true'
+    };
+    
+    const exportData = await blockchainAnalytics.exportAnalytics(options);
+    
+    // Set appropriate headers for download
+    const filename = `analytics-${new Date().toISOString().split('T')[0]}.${options.format}`;
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    
+    switch (options.format.toLowerCase()) {
+      case 'csv':
+        res.setHeader('Content-Type', 'text/csv');
+        break;
+      case 'xlsx':
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        break;
+      case 'pdf':
+        res.setHeader('Content-Type', 'application/pdf');
+        break;
+      default:
+        res.setHeader('Content-Type', 'application/json');
+    }
+    
+    res.send(exportData);
+  } catch (error) {
+    logError('Error exporting analytics:', error, { endpoint: '/api/analytics/export', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to export analytics' });
+  }
+});
+
+// Get mobile-optimized analytics
+app.get('/api/analytics/mobile', authenticateToken, async (req, res) => {
+  try {
+    const options = {
+      timeRange: req.query.timeRange || '24h',
+      limit: parseInt(req.query.limit) || 50
+    };
+    
+    const analytics = await blockchainAnalytics.getMobileAnalytics(options);
+    res.json(analytics);
+  } catch (error) {
+    logError('Error fetching mobile analytics:', error, { endpoint: '/api/analytics/mobile', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to fetch mobile analytics' });
+  }
+});
+
+// Get analytics dashboard overview
+app.get('/api/analytics/dashboard', authenticateToken, async (req, res) => {
+  try {
+    const timeRange = req.query.timeRange || '24h';
+    
+    // Fetch multiple analytics types in parallel
+    const [
+      transactionAnalytics,
+      networkStatistics,
+      performanceMetrics,
+      costAnalysis
+    ] = await Promise.all([
+      blockchainAnalytics.getTransactionAnalytics({ timeRange }),
+      blockchainAnalytics.getNetworkStatistics({ timeRange }),
+      blockchainAnalytics.getPerformanceMetrics({ timeRange }),
+      blockchainAnalytics.getCostAnalysis({ timeRange: '30d' })
+    ]);
+    
+    const dashboard = {
+      overview: {
+        totalTransactions: transactionAnalytics.summary.totalTransactions,
+        successRate: transactionAnalytics.summary.successRate,
+        networkHealth: networkStatistics.overall.status,
+        averageResponseTime: performanceMetrics.responseTime[0]?.avg || 0,
+        totalCosts: costAnalysis.totalCosts.total,
+        uptime: performanceMetrics.availability.uptime
+      },
+      charts: {
+        transactionTrends: transactionAnalytics.trends,
+        networkThroughput: networkStatistics.throughput,
+        performanceOverview: performanceMetrics.responseTime,
+        costBreakdown: costAnalysis.costBreakdown
+      },
+      alerts: [
+        {
+          type: networkStatistics.overall.status === 'healthy' ? 'success' : 'warning',
+          message: `Network status: ${networkStatistics.overall.status}`,
+          timestamp: new Date().toISOString()
+        },
+        {
+          type: performanceMetrics.availability.uptime > 99 ? 'success' : 'warning',
+          message: `System uptime: ${performanceMetrics.availability.uptime}%`,
+          timestamp: new Date().toISOString()
+        }
+      ],
+      timeRange,
+      lastUpdated: new Date().toISOString()
+    };
+    
+    res.json(dashboard);
+  } catch (error) {
+    logError('Error fetching analytics dashboard:', error, { endpoint: '/api/analytics/dashboard', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to fetch analytics dashboard' });
+  }
+});
+
+// Get real-time analytics data
+app.get('/api/analytics/realtime', authenticateToken, async (req, res) => {
+  try {
+    const realTimeData = blockchainAnalytics.realTimeData.get('current');
+    
+    if (!realTimeData) {
+      return res.json({
+        timestamp: new Date().toISOString(),
+        activeUsers: 0,
+        currentTPS: 0,
+        avgLatency: 0,
+        status: 'no_data'
+      });
+    }
+    
+    res.json(realTimeData);
+  } catch (error) {
+    logError('Error fetching real-time analytics:', error, { endpoint: '/api/analytics/realtime', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to fetch real-time analytics' });
+  }
+});
+
+// Get analytics engine statistics (admin only)
+app.get('/api/admin/analytics/stats', authenticateAdmin, (req, res) => {
+  try {
+    const stats = blockchainAnalytics.getStats();
+    res.json(stats);
+  } catch (error) {
+    logError('Error fetching analytics stats:', error, { endpoint: '/api/admin/analytics/stats' });
+    res.status(500).json({ error: 'Failed to fetch analytics stats' });
+  }
+});
+
+// Clear analytics cache (admin only)
+app.post('/api/admin/analytics/cache/clear', authenticateAdmin, (req, res) => {
+  try {
+    blockchainAnalytics.clearCache();
+    res.json({ message: 'Analytics cache cleared successfully' });
+  } catch (error) {
+    logError('Error clearing analytics cache:', error, { endpoint: '/api/admin/analytics/cache/clear' });
+    res.status(500).json({ error: 'Failed to clear analytics cache' });
+  }
+});
+
+// Get supported analytics options
+app.get('/api/analytics/supported', (req, res) => {
+  try {
+    const supported = {
+      timeRanges: ['1h', '24h', '7d', '30d', '90d'],
+      intervals: Object.values(AGGREGATION_INTERVALS),
+      metricTypes: Object.values(METRIC_TYPES),
+      exportFormats: ['json', 'csv', 'xlsx', 'pdf'],
+      chartTypes: ['line', 'bar', 'area', 'pie', 'scatter']
+    };
+    
+    res.json(supported);
+  } catch (error) {
+    logError('Error fetching supported analytics options:', error, { endpoint: '/api/analytics/supported' });
+    res.status(500).json({ error: 'Failed to fetch supported analytics options' });
+  }
+});
+
+// WebSocket integration for real-time analytics updates
+io.on('connection', (socket) => {
+  console.log('Client connected to analytics updates');
+  
+  // Join user-specific room for their analytics
+  socket.on('joinUserAnalytics', (userId) => {
+    socket.join(`analytics_${userId}`);
+  });
+  
+  // Listen for analytics events
+  blockchainAnalytics.on('analyticsGenerated', (data) => {
+    io.emit('analyticsUpdate', data);
+  });
+  
+  blockchainAnalytics.on('realTimeData', (data) => {
+    io.emit('realTimeUpdate', data);
+  });
+  
+  blockchainAnalytics.on('error', (data) => {
+    io.emit('analyticsError', data);
+  });
+  
+  socket.on('disconnect', () => {
+    console.log('Client disconnected from analytics updates');
   });
 });
 
