@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Onboarding Wizard Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .wizard-overlay {
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
+        
+        .wizard-container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .step-indicator {
+            transition: all 0.3s ease;
+        }
+        
+        .step-indicator.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        .step-indicator.completed {
+            background: #48bb78;
+            color: white;
+        }
+        
+        .highlight-element {
+            position: relative;
+            z-index: 1001;
+            box-shadow: 0 0 0 4px #667eea, 0 0 20px rgba(102, 126, 234, 0.4);
+            border-radius: 8px;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+        
+        .tutorial-tooltip {
+            position: absolute;
+            z-index: 1002;
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            max-width: 300px;
+        }
+        
+        .progress-bar {
+            transition: width 0.5s ease;
+        }
+        
+        .reward-badge {
+            animation: bounceIn 0.6s ease;
+        }
+        
+        @keyframes bounceIn {
+            0% { transform: scale(0); opacity: 0; }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        @media (max-width: 768px) {
+            .wizard-container {
+                margin: 1rem;
+                max-width: calc(100vw - 2rem);
+                max-height: calc(100vh - 2rem);
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 p-8">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold text-gray-900 mb-6">Onboarding Wizard Test</h1>
+        
+        <div class="bg-white p-6 rounded-lg shadow mb-6">
+            <h2 class="text-xl font-semibold mb-4">Test Features</h2>
+            <div class="space-y-4">
+                <button onclick="startWizard()" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">
+                    <i class="fas fa-play mr-2"></i>Start Onboarding Wizard
+                </button>
+                <button onclick="testHighlight()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                    <i class="fas fa-highlighter mr-2"></i>Test Highlight Feature
+                </button>
+                <button onclick="clearStorage()" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">
+                    <i class="fas fa-trash mr-2"></i>Clear Local Storage
+                </button>
+            </div>
+        </div>
+        
+        <div class="bg-white p-6 rounded-lg shadow mb-6">
+            <h2 class="text-xl font-semibold mb-4">Test Elements</h2>
+            <div id="testElement" class="p-4 border-2 border-gray-300 rounded">
+                This is a test element for highlighting
+            </div>
+        </div>
+        
+        <div class="bg-white p-6 rounded-lg shadow">
+            <h2 class="text-xl font-semibold mb-4">Status</h2>
+            <div id="status" class="text-gray-600">
+                Ready to test onboarding wizard
+            </div>
+        </div>
+    </div>
+
+    <!-- Onboarding Wizard Components -->
+    <div id="wizardOverlay" class="wizard-overlay fixed inset-0 z-50 hidden">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="wizard-container w-full">
+                <div class="bg-gray-200 h-2 rounded-full overflow-hidden">
+                    <div id="progressBar" class="progress-bar bg-gradient-to-r from-purple-500 to-indigo-600 h-full rounded-full" style="width: 0%"></div>
+                </div>
+                
+                <div class="flex justify-between p-6 pb-0">
+                    <div class="step-indicator w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-sm font-semibold" data-step="1">1</div>
+                    <div class="step-indicator w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-sm font-semibold" data-step="2">2</div>
+                    <div class="step-indicator w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-sm font-semibold" data-step="3">3</div>
+                </div>
+                
+                <div class="p-6">
+                    <div class="flex justify-end mb-4">
+                        <button id="skipBtn" class="text-gray-500 hover:text-gray-700 text-sm flex items-center gap-2">
+                            <i class="fas fa-forward"></i>
+                            Skip Tutorial
+                        </button>
+                    </div>
+                    
+                    <div id="stepContent" class="min-h-[300px]">
+                        <p>Test content will appear here</p>
+                    </div>
+                    
+                    <div class="flex justify-between mt-6">
+                        <button id="prevBtn" class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                            <i class="fas fa-arrow-left mr-2"></i>
+                            Previous
+                        </button>
+                        <button id="nextBtn" class="px-6 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-lg hover:from-purple-600 hover:to-indigo-700 transition">
+                            Next
+                            <i class="fas fa-arrow-right ml-2"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="onboarding-wizard.js"></script>
+    <script>
+        function startWizard() {
+            if (window.onboardingWizard) {
+                window.onboardingWizard.start();
+                updateStatus('Onboarding wizard started');
+            } else {
+                updateStatus('Onboarding wizard not loaded');
+            }
+        }
+        
+        function testHighlight() {
+            const element = document.getElementById('testElement');
+            element.classList.add('highlight-element');
+            updateStatus('Highlight effect applied to test element');
+            setTimeout(() => {
+                element.classList.remove('highlight-element');
+                updateStatus('Highlight effect removed');
+            }, 3000);
+        }
+        
+        function clearStorage() {
+            localStorage.clear();
+            updateStatus('Local storage cleared');
+        }
+        
+        function updateStatus(message) {
+            document.getElementById('status').textContent = message;
+        }
+        
+        // Check if wizard is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.onboardingWizard) {
+                updateStatus('Onboarding wizard loaded successfully');
+            } else {
+                updateStatus('Waiting for onboarding wizard to load...');
+                setTimeout(() => {
+                    if (window.onboardingWizard) {
+                        updateStatus('Onboarding wizard loaded successfully');
+                    } else {
+                        updateStatus('Failed to load onboarding wizard');
+                    }
+                }, 2000);
+            }
+        });
+    </script>
+</body>
+</html>

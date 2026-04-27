@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Onboarding Wizard - Sealed Auction Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .wizard-overlay {
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
+        
+        .wizard-container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .step-indicator {
+            transition: all 0.3s ease;
+        }
+        
+        .step-indicator.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        .step-indicator.completed {
+            background: #48bb78;
+            color: white;
+        }
+        
+        .highlight-element {
+            position: relative;
+            z-index: 1001;
+            box-shadow: 0 0 0 4px #667eea, 0 0 20px rgba(102, 126, 234, 0.4);
+            border-radius: 8px;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+        
+        .tutorial-tooltip {
+            position: absolute;
+            z-index: 1002;
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            max-width: 300px;
+        }
+        
+        .progress-bar {
+            transition: width 0.5s ease;
+        }
+        
+        .reward-badge {
+            animation: bounceIn 0.6s ease;
+        }
+        
+        @keyframes bounceIn {
+            0% { transform: scale(0); opacity: 0; }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        .mobile-wizard-container {
+            margin: 1rem;
+            max-width: calc(100vw - 2rem);
+        }
+        
+        @media (max-width: 768px) {
+            .wizard-container {
+                margin: 1rem;
+                max-width: calc(100vw - 2rem);
+                max-height: calc(100vh - 2rem);
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Wizard Overlay -->
+    <div id="wizardOverlay" class="wizard-overlay fixed inset-0 z-50 hidden">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="wizard-container w-full">
+                <!-- Progress Bar -->
+                <div class="bg-gray-200 h-2 rounded-full overflow-hidden">
+                    <div id="progressBar" class="progress-bar bg-gradient-to-r from-purple-500 to-indigo-600 h-full rounded-full" style="width: 0%"></div>
+                </div>
+                
+                <!-- Step Indicators -->
+                <div class="flex justify-between p-6 pb-0">
+                    <div class="step-indicator w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-sm font-semibold" data-step="1">1</div>
+                    <div class="step-indicator w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-sm font-semibold" data-step="2">2</div>
+                    <div class="step-indicator w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-sm font-semibold" data-step="3">3</div>
+                    <div class="step-indicator w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-sm font-semibold" data-step="4">4</div>
+                    <div class="step-indicator w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-sm font-semibold" data-step="5">5</div>
+                    <div class="step-indicator w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-sm font-semibold" data-step="6">6</div>
+                </div>
+                
+                <!-- Main Content -->
+                <div class="p-6">
+                    <!-- Skip Button -->
+                    <div class="flex justify-end mb-4">
+                        <button id="skipBtn" class="text-gray-500 hover:text-gray-700 text-sm flex items-center gap-2">
+                            <i class="fas fa-forward"></i>
+                            Skip Tutorial
+                        </button>
+                    </div>
+                    
+                    <!-- Step Content -->
+                    <div id="stepContent" class="min-h-[300px]">
+                        <!-- Content will be dynamically loaded here -->
+                    </div>
+                    
+                    <!-- Navigation Buttons -->
+                    <div class="flex justify-between mt-6">
+                        <button id="prevBtn" class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                            <i class="fas fa-arrow-left mr-2"></i>
+                            Previous
+                        </button>
+                        <button id="nextBtn" class="px-6 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-lg hover:from-purple-600 hover:to-indigo-700 transition">
+                            Next
+                            <i class="fas fa-arrow-right ml-2"></i>
+                        </button>
+                    </div>
+                    
+                    <!-- Help Resources -->
+                    <div class="mt-6 p-4 bg-blue-50 rounded-lg">
+                        <h4 class="font-semibold text-blue-900 mb-2">
+                            <i class="fas fa-question-circle mr-2"></i>
+                            Need Help?
+                        </h4>
+                        <div class="space-y-2 text-sm">
+                            <a href="#" class="text-blue-600 hover:text-blue-800 block">
+                                <i class="fas fa-book mr-2"></i>
+                                Documentation
+                            </a>
+                            <a href="#" class="text-blue-600 hover:text-blue-800 block">
+                                <i class="fas fa-video mr-2"></i>
+                                Video Tutorial
+                            </a>
+                            <a href="#" class="text-blue-600 hover:text-blue-800 block">
+                                <i class="fas fa-comments mr-2"></i>
+                                Community Support
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Tutorial Tooltip (for interactive tutorials) -->
+    <div id="tutorialTooltip" class="tutorial-tooltip hidden">
+        <div class="flex items-start gap-3">
+            <div class="flex-shrink-0">
+                <i class="fas fa-lightbulb text-yellow-500 text-xl"></i>
+            </div>
+            <div>
+                <h4 id="tooltipTitle" class="font-semibold text-gray-900 mb-1"></h4>
+                <p id="tooltipContent" class="text-sm text-gray-600"></p>
+                <div class="mt-3 flex gap-2">
+                    <button id="tooltipAction" class="px-3 py-1 bg-purple-500 text-white text-sm rounded hover:bg-purple-600">
+                        Try it
+                    </button>
+                    <button id="tooltipNext" class="px-3 py-1 bg-gray-200 text-gray-700 text-sm rounded hover:bg-gray-300">
+                        Next
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Reward Modal -->
+    <div id="rewardModal" class="fixed inset-0 z-50 hidden bg-black bg-opacity-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl p-8 max-w-md w-full text-center reward-badge">
+            <div class="w-20 h-20 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fas fa-trophy text-white text-3xl"></i>
+            </div>
+            <h3 class="text-2xl font-bold text-gray-900 mb-2">Congratulations!</h3>
+            <p class="text-gray-600 mb-6">You've completed the onboarding tutorial!</p>
+            <div class="space-y-3 mb-6">
+                <div class="flex items-center justify-center gap-2 text-yellow-600">
+                    <i class="fas fa-star"></i>
+                    <span class="font-semibold">Tutorial Master</span>
+                </div>
+                <div class="flex items-center justify-center gap-2 text-blue-600">
+                    <i class="fas fa-award"></i>
+                    <span class="font-semibold">Platform Explorer</span>
+                </div>
+                <div class="flex items-center justify-center gap-2 text-green-600">
+                    <i class="fas fa-check-circle"></i>
+                    <span class="font-semibold">Ready to Bid!</span>
+                </div>
+            </div>
+            <button id="closeRewardBtn" class="px-8 py-3 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-lg hover:from-purple-600 hover:to-indigo-700 transition">
+                Start Using Platform
+            </button>
+        </div>
+    </div>
+
+    <script src="onboarding-wizard.js"></script>
+</body>
+</html>

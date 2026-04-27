@@ -1735,3 +1735,15 @@ document.addEventListener('DOMContentLoaded', () => {
         userStatusFilter.addEventListener('change', () => loadUsers(1));
     }
 });
+
+// Onboarding Wizard Integration
+function startOnboardingWizard() {
+    if (window.onboardingWizard) {
+        window.onboardingWizard.showHelp();
+    } else {
+        console.warn('Onboarding wizard not initialized');
+    }
+}
+
+// Make functions globally available
+window.startOnboardingWizard = startOnboardingWizard;
