@@ -1602,6 +1602,104 @@ const BACKUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
 setInterval(backupData, BACKUP_INTERVAL);
 console.log(`Automated backup scheduled to run every ${BACKUP_INTERVAL / 60000} minutes.`);
 
+// Bid History Analytics API Endpoints
+app.get('/api/bid-history', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const filters = {
+      limit: parseInt(req.query.limit) || 50,
+      offset: parseInt(req.query.offset) || 0,
+      status: req.query.status,
+      dateFrom: req.query.dateFrom,
+      dateTo: req.query.dateTo,
+      sortBy: req.query.sortBy || 'timestamp',
+      sortOrder: req.query.sortOrder || 'DESC'
+    };
+
+    const bidHistory = db.getUserBidHistory(userId, filters);
+    res.json(bidHistory);
+  } catch (error) {
+    logError('Error fetching bid history:', error, { endpoint: '/api/bid-history', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to fetch bid history' });
+  }
+});
+
+app.get('/api/bid-statistics', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const statistics = db.getUserBidStatistics(userId);
+    res.json(statistics);
+  } catch (error) {
+    logError('Error fetching bid statistics:', error, { endpoint: '/api/bid-statistics', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to fetch bid statistics' });
+  }
+});
+
+app.get('/api/spending-analytics', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const period = req.query.period || 'monthly';
+    const analytics = db.getSpendingAnalytics(userId, period);
+    res.json(analytics);
+  } catch (error) {
+    logError('Error fetching spending analytics:', error, { endpoint: '/api/spending-analytics', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to fetch spending analytics' });
+  }
+});
+
+app.get('/api/timeline-data', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const limit = parseInt(req.query.limit) || 100;
+    const timelineData = db.getTimelineData(userId, limit);
+    res.json(timelineData);
+  } catch (error) {
+    logError('Error fetching timeline data:', error, { endpoint: '/api/timeline-data', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to fetch timeline data' });
+  }
+});
+
+app.get('/api/competition-analysis', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const auctionId = req.query.auctionId || null;
+    const competitionData = db.getCompetitionAnalysis(userId, auctionId);
+    res.json(competitionData);
+  } catch (error) {
+    logError('Error fetching competition analysis:', error, { endpoint: '/api/competition-analysis', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to fetch competition analysis' });
+  }
+});
+
+app.get('/api/export-bid-history', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const format = req.query.format || 'json';
+    const filters = {
+      status: req.query.status,
+      dateFrom: req.query.dateFrom,
+      dateTo: req.query.dateTo,
+      sortBy: req.query.sortBy,
+      sortOrder: req.query.sortOrder
+    };
+
+    const exportData = db.exportBidHistory(userId, format, filters);
+    
+    if (format === 'csv') {
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="bid-history-${new Date().toISOString().split('T')[0]}.csv"`);
+    } else {
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="bid-history-${new Date().toISOString().split('T')[0]}.json"`);
+    }
+    
+    res.send(exportData);
+  } catch (error) {
+    logError('Error exporting bid history:', error, { endpoint: '/api/export-bid-history', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to export bid history' });
+  }
+});
+
 if (sentryEnabled) {
   app.use(Sentry.Handlers.errorHandler());
 }

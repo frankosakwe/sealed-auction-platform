@@ -1612,6 +1612,174 @@ class AuctionDatabase {
     this.securityLayer.clearQueryLog();
   }
 
+  // Bid History Analytics Methods
+  getUserBidHistory(userId, filters = {}) {
+    const { limit = 50, offset = 0, status, dateFrom, dateTo, sortBy = 'timestamp', sortOrder = 'DESC' } = filters;
+    
+    let query = `
+      SELECT b.*, a.title as auction_title, a.status as auction_status, a.end_time,
+             CASE WHEN a.winner_id = ? AND a.winning_bid_id = b.id THEN 1 ELSE 0 END as is_winning_bid
+      FROM bids b
+      JOIN auctions a ON b.auction_id = a.id
+      WHERE b.bidder_id = ?
+    `;
+    const params = [userId, userId];
+    
+    if (status) {
+      query += ` AND a.status = ?`;
+      params.push(status);
+    }
+    
+    if (dateFrom) {
+      query += ` AND b.timestamp >= ?`;
+      params.push(dateFrom);
+    }
+    
+    if (dateTo) {
+      query += ` AND b.timestamp <= ?`;
+      params.push(dateTo);
+    }
+    
+    // Validate sort column
+    const validSortColumns = ['timestamp', 'amount', 'auction_title', 'auction_status'];
+    const sortColumn = validSortColumns.includes(sortBy) ? sortBy : 'timestamp';
+    const sortDirection = sortOrder.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+    
+    query += ` ORDER BY b.${sortColumn} ${sortDirection} LIMIT ? OFFSET ?`;
+    params.push(limit, offset);
+    
+    const stmt = this.securityLayer.prepare(query);
+    return stmt.all(...params);
+  }
+  
+  getUserBidStatistics(userId) {
+    const stmt = this.securityLayer.prepare(`
+      SELECT 
+        COUNT(*) as total_bids,
+        COUNT(DISTINCT auction_id) as unique_auctions,
+        SUM(amount) as total_spent,
+        AVG(amount) as avg_bid_amount,
+        MAX(amount) as highest_bid,
+        MIN(amount) as lowest_bid,
+        COUNT(CASE WHEN a.winner_id = ? AND a.winning_bid_id = b.id THEN 1 END) as won_auctions,
+        COUNT(CASE WHEN a.status = 'closed' AND a.winner_id != ? AND a.winner_id IS NOT NULL THEN 1 END) as lost_auctions
+      FROM bids b
+      JOIN auctions a ON b.auction_id = a.id
+      WHERE b.bidder_id = ?
+    `);
+    return stmt.get(userId, userId, userId);
+  }
+  
+  getCompetitionAnalysis(userId, auctionId = null) {
+    let query = `
+      SELECT 
+        u.username,
+        COUNT(b.id) as bid_count,
+        AVG(b.amount) as avg_bid,
+        MAX(b.amount) as max_bid,
+        SUM(b.amount) as total_spent,
+        COUNT(CASE WHEN a.winner_id = u.id THEN 1 END) as auctions_won
+      FROM users u
+      JOIN bids b ON u.id = b.bidder_id
+      JOIN auctions a ON b.auction_id = a.id
+    `;
+    const params = [];
+    
+    if (auctionId) {
+      query += ` WHERE b.auction_id = ?`;
+      params.push(auctionId);
+    }
+    
+    query += ` GROUP BY u.id, u.username ORDER BY bid_count DESC LIMIT 20`;
+    
+    const stmt = this.securityLayer.prepare(query);
+    return stmt.all(...params);
+  }
+  
+  getSpendingAnalytics(userId, period = 'monthly') {
+    let dateFormat;
+    switch (period) {
+      case 'daily':
+        dateFormat = '%Y-%m-%d';
+        break;
+      case 'weekly':
+        dateFormat = '%Y-%W';
+        break;
+      case 'monthly':
+        dateFormat = '%Y-%m';
+        break;
+      default:
+        dateFormat = '%Y-%m';
+    }
+    
+    const stmt = this.securityLayer.prepare(`
+      SELECT 
+        strftime('${dateFormat}', b.timestamp) as period,
+        COUNT(*) as bid_count,
+        SUM(b.amount) as total_spent,
+        AVG(b.amount) as avg_bid_amount,
+        COUNT(CASE WHEN a.winner_id = ? THEN 1 END) as auctions_won
+      FROM bids b
+      JOIN auctions a ON b.auction_id = a.id
+      WHERE b.bidder_id = ?
+        AND b.timestamp >= date('now', '-12 months')
+      GROUP BY strftime('${dateFormat}', b.timestamp)
+      ORDER BY period DESC
+    `);
+    return stmt.all(userId, userId);
+  }
+  
+  getTimelineData(userId, limit = 100) {
+    const stmt = this.securityLayer.prepare(`
+      SELECT 
+        b.timestamp,
+        b.amount,
+        b.id as bid_id,
+        a.title as auction_title,
+        a.status as auction_status,
+        a.end_time,
+        CASE WHEN a.winner_id = ? AND a.winning_bid_id = b.id THEN 'won' 
+             WHEN a.status = 'closed' AND a.winner_id IS NOT NULL THEN 'lost'
+             ELSE 'pending' END as result
+      FROM bids b
+      JOIN auctions a ON b.auction_id = a.id
+      WHERE b.bidder_id = ?
+      ORDER BY b.timestamp DESC
+      LIMIT ?
+    `);
+    return stmt.all(userId, userId, limit);
+  }
+  
+  exportBidHistory(userId, format = 'json', filters = {}) {
+    const bids = this.getUserBidHistory(userId, { ...filters, limit: 10000 });
+    
+    switch (format.toLowerCase()) {
+      case 'csv':
+        return this.convertToCSV(bids);
+      case 'json':
+      default:
+        return JSON.stringify(bids, null, 2);
+    }
+  }
+  
+  convertToCSV(data) {
+    if (!data || data.length === 0) return '';
+    
+    const headers = Object.keys(data[0]);
+    const csvHeaders = headers.join(',');
+    
+    const csvRows = data.map(row => {
+      return headers.map(header => {
+        const value = row[header];
+        return typeof value === 'string' && value.includes(',') 
+          ? `"${value.replace(/"/g, '""')}"` 
+          : value;
+      }).join(',');
+    });
+    
+    return [csvHeaders, ...csvRows].join('\n');
+  }
+
   // Export for in-memory compatibility (temporary)
   toMap() {
     const auctions = new Map();
