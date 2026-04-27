@@ -2956,6 +2956,375 @@ app.get('/api/export-bid-history', authenticateToken, (req, res) => {
   }
 });
 
+// ==================== WATCHLIST API ENDPOINTS ====================
+
+// Add auction to watchlist
+app.post('/api/watchlist/add', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { auctionId, notificationPreferences, priceThreshold, notes } = req.body;
+    
+    // Validate auction exists
+    const auction = db.getAuction(auctionId);
+    if (!auction) {
+      return res.status(404).json({ error: 'Auction not found' });
+    }
+    
+    // Check if already in watchlist
+    const existing = db.getWatchlistItem(userId, auctionId);
+    if (existing) {
+      return res.status(409).json({ error: 'Auction already in watchlist' });
+    }
+    
+    const watchlistItem = {
+      id: uuidv4(),
+      userId,
+      auctionId,
+      notificationPreferences: notificationPreferences || {
+        price_change: true,
+        ending_soon: true,
+        new_bid: true
+      },
+      priceThreshold,
+      notes
+    };
+    
+    db.addToWatchlist(watchlistItem);
+    
+    // Emit real-time update
+    io.emit('watchlist_updated', {
+      userId,
+      action: 'added',
+      auctionId,
+      watchlistItem
+    });
+    
+    res.json({
+      success: true,
+      message: 'Auction added to watchlist',
+      watchlistItem
+    });
+  } catch (error) {
+    logError('Error adding to watchlist:', error, { endpoint: '/api/watchlist/add', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to add auction to watchlist' });
+  }
+});
+
+// Remove auction from watchlist
+app.delete('/api/watchlist/remove/:auctionId', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { auctionId } = req.params;
+    
+    const result = db.removeFromWatchlist(userId, auctionId);
+    
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'Auction not found in watchlist' });
+    }
+    
+    // Emit real-time update
+    io.emit('watchlist_updated', {
+      userId,
+      action: 'removed',
+      auctionId
+    });
+    
+    res.json({
+      success: true,
+      message: 'Auction removed from watchlist'
+    });
+  } catch (error) {
+    logError('Error removing from watchlist:', error, { endpoint: '/api/watchlist/remove', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to remove auction from watchlist' });
+  }
+});
+
+// Get user's watchlist
+app.get('/api/watchlist', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { status, sortBy, sortOrder, limit, offset } = req.query;
+    
+    const options = {
+      status,
+      sortBy,
+      sortOrder,
+      limit: limit ? parseInt(limit) : undefined,
+      offset: offset ? parseInt(offset) : undefined
+    };
+    
+    const watchlist = db.getWatchlist(userId, options);
+    
+    res.json({
+      success: true,
+      watchlist,
+      count: watchlist.length
+    });
+  } catch (error) {
+    logError('Error getting watchlist:', error, { endpoint: '/api/watchlist', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to get watchlist' });
+  }
+});
+
+// Get single watchlist item
+app.get('/api/watchlist/item/:auctionId', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { auctionId } = req.params;
+    
+    const watchlistItem = db.getWatchlistItem(userId, auctionId);
+    
+    if (!watchlistItem) {
+      return res.status(404).json({ error: 'Auction not found in watchlist' });
+    }
+    
+    res.json({
+      success: true,
+      watchlistItem
+    });
+  } catch (error) {
+    logError('Error getting watchlist item:', error, { endpoint: '/api/watchlist/item', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to get watchlist item' });
+  }
+});
+
+// Update watchlist item
+app.put('/api/watchlist/item/:auctionId', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { auctionId } = req.params;
+    const updates = req.body;
+    
+    const result = db.updateWatchlistItem(userId, auctionId, updates);
+    
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'Auction not found in watchlist' });
+    }
+    
+    // Get updated item
+    const updatedItem = db.getWatchlistItem(userId, auctionId);
+    
+    // Emit real-time update
+    io.emit('watchlist_updated', {
+      userId,
+      action: 'updated',
+      auctionId,
+      updates
+    });
+    
+    res.json({
+      success: true,
+      message: 'Watchlist item updated',
+      watchlistItem: updatedItem
+    });
+  } catch (error) {
+    logError('Error updating watchlist item:', error, { endpoint: '/api/watchlist/item', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to update watchlist item' });
+  }
+});
+
+// Bulk add to watchlist
+app.post('/api/watchlist/bulk-add', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { auctionIds } = req.body;
+    
+    if (!Array.isArray(auctionIds) || auctionIds.length === 0) {
+      return res.status(400).json({ error: 'Invalid auction IDs array' });
+    }
+    
+    const results = db.bulkAddToWatchlist(userId, auctionIds);
+    
+    // Emit real-time update
+    io.emit('watchlist_bulk_updated', {
+      userId,
+      action: 'bulk_added',
+      results
+    });
+    
+    res.json({
+      success: true,
+      message: `Added ${results.added} auctions to watchlist`,
+      results
+    });
+  } catch (error) {
+    logError('Error bulk adding to watchlist:', error, { endpoint: '/api/watchlist/bulk-add', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to bulk add to watchlist' });
+  }
+});
+
+// Bulk remove from watchlist
+app.post('/api/watchlist/bulk-remove', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { auctionIds } = req.body;
+    
+    if (!Array.isArray(auctionIds) || auctionIds.length === 0) {
+      return res.status(400).json({ error: 'Invalid auction IDs array' });
+    }
+    
+    const results = db.bulkRemoveFromWatchlist(userId, auctionIds);
+    
+    // Emit real-time update
+    io.emit('watchlist_bulk_updated', {
+      userId,
+      action: 'bulk_removed',
+      results
+    });
+    
+    res.json({
+      success: true,
+      message: `Removed ${results.removed} auctions from watchlist`,
+      results
+    });
+  } catch (error) {
+    logError('Error bulk removing from watchlist:', error, { endpoint: '/api/watchlist/bulk-remove', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to bulk remove from watchlist' });
+  }
+});
+
+// Create watchlist share
+app.post('/api/watchlist/share', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { isPublic, expiresInHours } = req.body;
+    
+    const shareOptions = {
+      isPublic,
+      expiresInHours,
+      baseUrl: `${req.protocol}://${req.get('host')}`
+    };
+    
+    const share = db.createWatchlistShare(userId, shareOptions);
+    
+    res.json({
+      success: true,
+      message: 'Watchlist share created',
+      share
+    });
+  } catch (error) {
+    logError('Error creating watchlist share:', error, { endpoint: '/api/watchlist/share', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to create watchlist share' });
+  }
+});
+
+// Get shared watchlist
+app.get('/api/watchlist/shared/:shareToken', (req, res) => {
+  try {
+    const { shareToken } = req.params;
+    
+    const sharedWatchlist = db.getSharedWatchlist(shareToken);
+    
+    res.json({
+      success: true,
+      sharedWatchlist
+    });
+  } catch (error) {
+    logError('Error getting shared watchlist:', error, { endpoint: '/api/watchlist/shared' });
+    res.status(404).json({ error: 'Shared watchlist not found or expired' });
+  }
+});
+
+// Get watchlist notifications
+app.get('/api/watchlist/notifications', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { unreadOnly, type, limit } = req.query;
+    
+    const options = {
+      unreadOnly: unreadOnly === 'true',
+      type,
+      limit: limit ? parseInt(limit) : undefined
+    };
+    
+    const notifications = db.getWatchlistNotifications(userId, options);
+    
+    res.json({
+      success: true,
+      notifications,
+      count: notifications.length
+    });
+  } catch (error) {
+    logError('Error getting watchlist notifications:', error, { endpoint: '/api/watchlist/notifications', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to get watchlist notifications' });
+  }
+});
+
+// Mark notification as read
+app.put('/api/watchlist/notifications/:notificationId/read', authenticateToken, (req, res) => {
+  try {
+    const { notificationId } = req.params;
+    
+    const result = db.markNotificationAsRead(notificationId);
+    
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'Notification not found' });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Notification marked as read'
+    });
+  } catch (error) {
+    logError('Error marking notification as read:', error, { endpoint: '/api/watchlist/notifications/read', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to mark notification as read' });
+  }
+});
+
+// Get watchlist activity
+app.get('/api/watchlist/activity', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { activityType, limit } = req.query;
+    
+    const options = {
+      activityType,
+      limit: limit ? parseInt(limit) : undefined
+    };
+    
+    const activity = db.getWatchlistActivity(userId, options);
+    
+    res.json({
+      success: true,
+      activity,
+      count: activity.length
+    });
+  } catch (error) {
+    logError('Error getting watchlist activity:', error, { endpoint: '/api/watchlist/activity', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to get watchlist activity' });
+  }
+});
+
+// Check watchlist alerts (for scheduled jobs)
+app.post('/api/watchlist/check-alerts', async (req, res) => {
+  try {
+    // This endpoint should be protected and only called by scheduled jobs
+    const alerts = await db.checkWatchlistAlerts();
+    
+    // Process alerts and create notifications
+    for (const alert of alerts) {
+      db.createWatchlistNotification(
+        alert.watchlistId,
+        alert.type,
+        alert.title,
+        alert.message
+      );
+      
+      // Emit real-time notification
+      io.emit('watchlist_alert', alert);
+    }
+    
+    res.json({
+      success: true,
+      alertsProcessed: alerts.length,
+      alerts
+    });
+  } catch (error) {
+    logError('Error checking watchlist alerts:', error, { endpoint: '/api/watchlist/check-alerts' });
+    res.status(500).json({ error: 'Failed to check watchlist alerts' });
+  }
+});
+
 if (sentryEnabled) {
   app.use(Sentry.Handlers.errorHandler());
 }

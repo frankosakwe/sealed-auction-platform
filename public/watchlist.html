@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Watchlist - Sealed Auction Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        .watchlist-item {
+            transition: all 0.3s ease;
+        }
+        .watchlist-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        }
+        .notification-badge {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .ending-soon {
+            border-left: 4px solid #ef4444;
+            animation: blink 1s infinite;
+        }
+        @keyframes blink {
+            0%, 50%, 100% { opacity: 1; }
+            25%, 75% { opacity: 0.7; }
+        }
+        .bulk-select-mode .watchlist-item {
+            border: 2px solid transparent;
+        }
+        .bulk-select-mode .watchlist-item.selected {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+        }
+        .share-link {
+            word-break: break-all;
+        }
+        .notification-item {
+            transition: all 0.3s ease;
+        }
+        .notification-item:hover {
+            background-color: #f9fafb;
+        }
+        .notification-item.unread {
+            border-left: 4px solid #3b82f6;
+            background-color: #eff6ff;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <a href="/" class="text-xl font-bold text-indigo-600">
+                        <i class="fas fa-gavel mr-2"></i>Auction Platform
+                    </a>
+                    <nav class="ml-10 flex space-x-8">
+                        <a href="/" class="text-gray-500 hover:text-gray-900">Auctions</a>
+                        <a href="/watchlist.html" class="text-indigo-600 font-medium">Watchlist</a>
+                        <a href="/dashboard.html" class="text-gray-500 hover:text-gray-900">Dashboard</a>
+                    </nav>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <!-- Notifications -->
+                    <div class="relative">
+                        <button id="notificationBtn" class="relative p-2 text-gray-600 hover:text-gray-900">
+                            <i class="fas fa-bell text-xl"></i>
+                            <span id="notificationCount" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center notification-badge hidden">0</span>
+                        </button>
+                    </div>
+                    <!-- User Menu -->
+                    <div id="userMenu" class="flex items-center space-x-3">
+                        <span id="username" class="text-gray-700"></span>
+                        <button id="logoutBtn" class="text-gray-500 hover:text-gray-900">
+                            <i class="fas fa-sign-out-alt"></i>
+                        </button>
+                    </div>
+                    <div id="authSection" class="hidden">
+                        <button id="loginBtn" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">
+                            Login
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Page Header -->
+        <div class="mb-8">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900">My Watchlist</h1>
+                    <p class="text-gray-600 mt-2">Track your favorite auctions and get notifications</p>
+                </div>
+                <div class="flex space-x-3">
+                    <!-- Bulk Actions -->
+                    <div id="bulkActions" class="hidden space-x-2">
+                        <button id="bulkRemoveBtn" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">
+                            <i class="fas fa-trash mr-2"></i>Remove Selected
+                        </button>
+                        <button id="bulkSelectCancel" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700">
+                            Cancel
+                        </button>
+                    </div>
+                    <!-- Regular Actions -->
+                    <div id="regularActions">
+                        <button id="bulkSelectBtn" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700">
+                            <i class="fas fa-check-square mr-2"></i>Select Multiple
+                        </button>
+                        <button id="shareWatchlistBtn" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">
+                            <i class="fas fa-share mr-2"></i>Share Watchlist
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filters and Sorting -->
+        <div class="bg-white rounded-lg shadow p-4 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select id="statusFilter" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                        <option value="">All Status</option>
+                        <option value="active">Active</option>
+                        <option value="closed">Closed</option>
+                        <option value="cancelled">Cancelled</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Sort By</label>
+                    <select id="sortBy" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                        <option value="created_at">Date Added</option>
+                        <option value="end_time">Ending Time</option>
+                        <option value="current_bid">Current Bid</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Order</label>
+                    <select id="sortOrder" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                        <option value="desc">Descending</option>
+                        <option value="asc">Ascending</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
+                    <input type="text" id="searchInput" placeholder="Search auctions..." class="w-full border border-gray-300 rounded-md px-3 py-2">
+                </div>
+            </div>
+        </div>
+
+        <!-- Watchlist Items -->
+        <div id="watchlistContainer" class="space-y-4">
+            <!-- Watchlist items will be loaded here -->
+        </div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="text-center py-12 hidden">
+            <i class="fas fa-eye-slash text-6xl text-gray-300 mb-4"></i>
+            <h3 class="text-xl font-semibold text-gray-900 mb-2">Your watchlist is empty</h3>
+            <p class="text-gray-600 mb-6">Start adding auctions to your watchlist to track them</p>
+            <a href="/" class="bg-indigo-600 text-white px-6 py-3 rounded-md hover:bg-indigo-700 inline-block">
+                Browse Auctions
+            </a>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="text-center py-12 hidden">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+            <p class="text-gray-600 mt-2">Loading watchlist...</p>
+        </div>
+    </main>
+
+    <!-- Notification Dropdown -->
+    <div id="notificationDropdown" class="absolute right-4 top-16 w-80 bg-white rounded-lg shadow-lg border hidden z-50">
+        <div class="p-4 border-b">
+            <div class="flex justify-between items-center">
+                <h3 class="font-semibold">Notifications</h3>
+                <button id="markAllReadBtn" class="text-sm text-indigo-600 hover:text-indigo-800">Mark all read</button>
+            </div>
+        </div>
+        <div id="notificationList" class="max-h-96 overflow-y-auto">
+            <!-- Notifications will be loaded here -->
+        </div>
+        <div class="p-4 border-t">
+            <a href="/watchlist.html" class="text-sm text-indigo-600 hover:text-indigo-800">View all notifications</a>
+        </div>
+    </div>
+
+    <!-- Share Modal -->
+    <div id="shareModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 class="text-lg font-semibold mb-4">Share Your Watchlist</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Share Options</label>
+                    <div class="space-y-2">
+                        <label class="flex items-center">
+                            <input type="checkbox" id="publicShare" class="mr-2">
+                            <span>Make watchlist public</span>
+                        </label>
+                        <label class="block text-sm font-medium text-gray-700">Expires in (hours)</label>
+                        <select id="expiresInHours" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                            <option value="">Never</option>
+                            <option value="24">24 hours</option>
+                            <option value="168">1 week</option>
+                            <option value="720">1 month</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex space-x-3">
+                    <button id="generateShareBtn" class="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">
+                        Generate Share Link
+                    </button>
+                    <button id="cancelShareBtn" class="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400">
+                        Cancel
+                    </button>
+                </div>
+                <div id="shareResult" class="hidden">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Share Link</label>
+                    <div class="flex space-x-2">
+                        <input type="text" id="shareLink" readonly class="flex-1 border border-gray-300 rounded-md px-3 py-2 share-link">
+                        <button id="copyShareBtn" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Watchlist Item Modal -->
+    <div id="watchlistItemModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 class="text-lg font-semibold mb-4">Watchlist Settings</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Notifications</label>
+                    <div class="space-y-2">
+                        <label class="flex items-center">
+                            <input type="checkbox" id="priceChangeNotif" class="mr-2">
+                            <span>Price change alerts</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" id="endingSoonNotif" class="mr-2">
+                            <span>Ending soon alerts</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" id="newBidNotif" class="mr-2">
+                            <span>New bid notifications</span>
+                        </label>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Price Threshold ($)</label>
+                    <input type="number" id="priceThreshold" placeholder="Alert when price reaches..." class="w-full border border-gray-300 rounded-md px-3 py-2">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                    <textarea id="watchlistNotes" rows="3" placeholder="Add your notes..." class="w-full border border-gray-300 rounded-md px-3 py-2"></textarea>
+                </div>
+                <div class="flex space-x-3">
+                    <button id="saveWatchlistSettings" class="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">
+                        Save Settings
+                    </button>
+                    <button id="cancelWatchlistSettings" class="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="watchlist.js"></script>
+</body>
+</html>

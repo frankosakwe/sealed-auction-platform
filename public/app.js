@@ -53,6 +53,7 @@ function initializeApp() {
         hideAuthModal();
         updateUserDisplay();
         checkAdminAccess();
+        loadUserWatchlist(); // Load user's watchlist
     }
     
     // Load notifications from localStorage
@@ -328,6 +329,9 @@ function createAuctionCard(auction) {
                 ` : ""}
                 <button onclick="viewAuctionDetails('${auction.id}')" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-3 py-2 rounded-lg text-sm transition-colors">
                     <i class="fas fa-eye mr-1"></i>View Details
+                </button>
+                <button onclick="toggleWatchlist('${auction.id}')" id="watchlist-btn-${auction.id}" class="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-2 rounded-lg text-sm transition-colors" title="Add to Watchlist">
+                    <i class="fas fa-eye"></i>
                 </button>
                 <button onclick="openShareModal('${auction.id}', '${auction.title.replace(/'/g, "\\'")}', '${auction.startingBid}')" class="bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-lg text-sm transition-colors" title="Share">
                     <i class="fas fa-share-alt"></i>
@@ -1754,3 +1758,110 @@ function startOnboardingWizard() {
 
 // Make functions globally available
 window.startOnboardingWizard = startOnboardingWizard;
+
+// ==================== WATCHLIST FUNCTIONS ====================
+
+// Global watchlist state
+let userWatchlist = [];
+
+// Load user's watchlist
+async function loadUserWatchlist() {
+    if (!currentUser) return;
+    
+    try {
+        const response = await fetch('/api/watchlist', {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            userWatchlist = data.watchlist;
+            updateWatchlistButtons();
+        }
+    } catch (error) {
+        console.error('Error loading watchlist:', error);
+    }
+}
+
+// Toggle auction in watchlist
+async function toggleWatchlist(auctionId) {
+    if (!currentUser) {
+        showNotification('Please login to add auctions to your watchlist', 'error');
+        showAuthModal();
+        return;
+    }
+    
+    const isInWatchlist = userWatchlist.some(item => item.auction_id === auctionId);
+    const btn = document.getElementById(`watchlist-btn-${auctionId}`);
+    
+    try {
+        if (isInWatchlist) {
+            // Remove from watchlist
+            const response = await fetch(`/api/watchlist/remove/${auctionId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+            
+            if (response.ok) {
+                userWatchlist = userWatchlist.filter(item => item.auction_id !== auctionId);
+                updateWatchlistButton(btn, false);
+                showNotification('Auction removed from watchlist', 'success');
+            }
+        } else {
+            // Add to watchlist
+            const response = await fetch('/api/watchlist/add', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({ auctionId })
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                userWatchlist.push(data.watchlistItem);
+                updateWatchlistButton(btn, true);
+                showNotification('Auction added to watchlist', 'success');
+            }
+        }
+    } catch (error) {
+        console.error('Error toggling watchlist:', error);
+        showNotification('Failed to update watchlist', 'error');
+    }
+}
+
+// Update watchlist button state
+function updateWatchlistButton(btn, isInWatchlist) {
+    if (!btn) return;
+    
+    if (isInWatchlist) {
+        btn.classList.remove('bg-yellow-500', 'hover:bg-yellow-600');
+        btn.classList.add('bg-red-500', 'hover:bg-red-600');
+        btn.innerHTML = '<i class="fas fa-eye-slash"></i>';
+        btn.title = 'Remove from Watchlist';
+    } else {
+        btn.classList.remove('bg-red-500', 'hover:bg-red-600');
+        btn.classList.add('bg-yellow-500', 'hover:bg-yellow-600');
+        btn.innerHTML = '<i class="fas fa-eye"></i>';
+        btn.title = 'Add to Watchlist';
+    }
+}
+
+// Update all watchlist buttons
+function updateWatchlistButtons() {
+    userWatchlist.forEach(item => {
+        const btn = document.getElementById(`watchlist-btn-${item.auction_id}`);
+        if (btn) {
+            updateWatchlistButton(btn, true);
+        }
+    });
+}
+
+// Make watchlist functions globally available
+window.toggleWatchlist = toggleWatchlist;
+window.loadUserWatchlist = loadUserWatchlist;
