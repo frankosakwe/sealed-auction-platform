@@ -24,9 +24,13 @@ const session = require('express-session');
 const passport = require('passport');
 const AuctionDatabase = require('./database');
 const { ApplicationMetrics, createMetricsMiddleware } = require('./utils/metrics');
+const NetworkMonitor = require('./utils/network-monitor');
 
 // Initialize database
 const db = new AuctionDatabase();
+
+// Initialize network monitor
+const networkMonitor = new NetworkMonitor();
 
 const app = express();
 const server = http.createServer(app);
@@ -630,6 +634,7 @@ app.post('/api/auctions',
     };
     
     io.emit('auctionCreated', auction);
+    io.to('dashboard').emit('auction_update', { type: 'auction', data: auction });
     res.status(201).sendData(responseData, 'auctionCreated');
   } catch (error) {
     logError('Auction creation failed:', error, { endpoint: '/api/auctions', method: 'POST' });
@@ -730,6 +735,16 @@ app.post('/api/auctions/:id/bids',
     }
     
     io.emit('bidPlaced', { auctionId, bidCount: auction ? auction.bids.length : 1 });
+    
+    // Send detailed bid data to dashboard
+    const bidData = {
+      id: bidId,
+      auction_id: auctionId,
+      amount: amount,
+      timestamp: new Date().toISOString(),
+      bidder_id: req.user?.id || 'anonymous'
+    };
+    io.to('dashboard').emit('bid_update', { type: 'bid', data: bidData });
     res.status(201).sendData({ 
       message: 'Bid placed successfully', 
       bidId,
@@ -806,6 +821,7 @@ app.patch('/api/auctions/:id',
       }
     };
     io.emit('auctionClosed', responseData);
+    io.to('dashboard').emit('auction_update', { type: 'auction', data: responseData });
     res.sendData(responseData, 'auctionClosed');
   } catch (error) {
     logError('Error closing auction:', error, { endpoint: '/api/auctions/:id', method: 'PATCH' });
@@ -1503,6 +1519,594 @@ app.post('/api/share/generate-image', async (req, res) => {
   }
 });
 
+// Dashboard analytics endpoint
+app.get('/api/dashboard/data', (req, res) => {
+  try {
+    const auctions = db.getAllAuctions();
+    const bids = [];
+    
+    // Collect all bids from all auctions
+    auctions.forEach(auction => {
+      const auctionBids = db.getBidsForAuction(auction.id);
+      bids.push(...auctionBids);
+    });
+    
+    // Get revenue data
+    const revenue = [];
+    try {
+      // Simulate revenue data from database (you may need to add this method to database.js)
+      const stmt = db.db.prepare('SELECT * FROM revenue_tracking ORDER BY created_at DESC');
+      const revenueData = stmt.all();
+      revenue.push(...revenueData);
+    } catch (error) {
+      console.warn('Revenue tracking table not found or empty:', error.message);
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        auctions,
+        bids,
+        revenue
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching dashboard data:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch dashboard data'
+    });
+  }
+});
+
+// ==================== BOOKMARK MANAGEMENT API ENDPOINTS ====================
+
+// Get all bookmarks for a user
+app.get('/api/bookmarks', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { folderId, type, isFavorite, search, tags, limit } = req.query;
+    
+    const options = {};
+    if (folderId !== undefined) options.folderId = folderId === 'null' ? null : folderId;
+    if (type) options.type = type;
+    if (isFavorite !== undefined) options.isFavorite = isFavorite === 'true';
+    if (search) options.search = search;
+    if (tags) options.tags = tags.split(',');
+    if (limit) options.limit = parseInt(limit);
+    
+    const bookmarks = db.getBookmarks(userId, options);
+    const folders = db.getBookmarkFolders(userId);
+    const bookmarkTags = db.getBookmarkTags(userId);
+    
+    res.json({
+      success: true,
+      data: {
+        bookmarks,
+        folders,
+        tags: bookmarkTags
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching bookmarks:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch bookmarks'
+    });
+  }
+});
+
+// Create a new bookmark
+app.post('/api/bookmarks', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const bookmarkData = {
+      id: db.generateId(),
+      title: req.body.title,
+      description: req.body.description,
+      url: req.body.url,
+      type: req.body.type || 'custom',
+      targetId: req.body.targetId,
+      userId: userId,
+      folderId: req.body.folderId,
+      favicon: req.body.favicon,
+      thumbnail: req.body.thumbnail,
+      isFavorite: req.body.isFavorite,
+      isPrivate: req.body.isPrivate,
+      sortOrder: req.body.sortOrder,
+      metadata: req.body.metadata,
+      tags: req.body.tags || []
+    };
+    
+    const result = db.createBookmark(bookmarkData);
+    
+    // Create sync record
+    db.createSyncRecord({
+      id: db.generateId(),
+      userId: userId,
+      deviceId: req.body.deviceId || 'web',
+      bookmarkId: bookmarkData.id,
+      action: 'create',
+      syncData: bookmarkData
+    });
+    
+    res.status(201).json({
+      success: true,
+      data: { id: bookmarkData.id }
+    });
+  } catch (error) {
+    console.error('Error creating bookmark:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create bookmark'
+    });
+  }
+});
+
+// Get a specific bookmark
+app.get('/api/bookmarks/:id', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const bookmarkId = req.params.id;
+    
+    const bookmark = db.getBookmarkById(bookmarkId, userId);
+    
+    if (!bookmark) {
+      return res.status(404).json({
+        success: false,
+        error: 'Bookmark not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: bookmark
+    });
+  } catch (error) {
+    console.error('Error fetching bookmark:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch bookmark'
+    });
+  }
+});
+
+// Update a bookmark
+app.put('/api/bookmarks/:id', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const bookmarkId = req.params.id;
+    
+    // Check if bookmark exists and belongs to user
+    const existingBookmark = db.getBookmarkById(bookmarkId, userId);
+    if (!existingBookmark) {
+      return res.status(404).json({
+        success: false,
+        error: 'Bookmark not found'
+      });
+    }
+    
+    const updates = {
+      title: req.body.title,
+      description: req.body.description,
+      url: req.body.url,
+      folderId: req.body.folderId,
+      favicon: req.body.favicon,
+      thumbnail: req.body.thumbnail,
+      isFavorite: req.body.isFavorite,
+      isPrivate: req.body.isPrivate,
+      sortOrder: req.body.sortOrder,
+      metadata: req.body.metadata,
+      tags: req.body.tags
+    };
+    
+    // Remove undefined values
+    Object.keys(updates).forEach(key => updates[key] === undefined && delete updates[key]);
+    
+    const result = db.updateBookmark(bookmarkId, updates, userId);
+    
+    // Create sync record
+    db.createSyncRecord({
+      id: db.generateId(),
+      userId: userId,
+      deviceId: req.body.deviceId || 'web',
+      bookmarkId: bookmarkId,
+      action: 'update',
+      syncData: { ...updates, id: bookmarkId }
+    });
+    
+    res.json({
+      success: true,
+      data: { updated: result.changes > 0 }
+    });
+  } catch (error) {
+    console.error('Error updating bookmark:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update bookmark'
+    });
+  }
+});
+
+// Update bookmark sort order
+app.put('/api/bookmarks/:id/sort', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const bookmarkId = req.params.id;
+    const { sortOrder } = req.body;
+    
+    const result = db.updateBookmark(bookmarkId, { sortOrder }, userId);
+    
+    res.json({
+      success: true,
+      data: { updated: result.changes > 0 }
+    });
+  } catch (error) {
+    console.error('Error updating bookmark sort order:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update bookmark sort order'
+    });
+  }
+});
+
+// Delete a bookmark
+app.delete('/api/bookmarks/:id', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const bookmarkId = req.params.id;
+    
+    // Check if bookmark exists and belongs to user
+    const existingBookmark = db.getBookmarkById(bookmarkId, userId);
+    if (!existingBookmark) {
+      return res.status(404).json({
+        success: false,
+        error: 'Bookmark not found'
+      });
+    }
+    
+    const result = db.deleteBookmark(bookmarkId, userId);
+    
+    // Create sync record
+    db.createSyncRecord({
+      id: db.generateId(),
+      userId: userId,
+      deviceId: req.body.deviceId || 'web',
+      bookmarkId: bookmarkId,
+      action: 'delete',
+      syncData: { id: bookmarkId }
+    });
+    
+    res.json({
+      success: true,
+      data: { deleted: result.changes > 0 }
+    });
+  } catch (error) {
+    console.error('Error deleting bookmark:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to delete bookmark'
+    });
+  }
+});
+
+// ==================== BOOKMARK FOLDERS API ENDPOINTS ====================
+
+// Get all folders for a user
+app.get('/api/bookmarks/folders', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { parentFolderId } = req.query;
+    
+    const folders = db.getBookmarkFolders(userId, parentFolderId);
+    
+    res.json({
+      success: true,
+      data: folders
+    });
+  } catch (error) {
+    console.error('Error fetching folders:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch folders'
+    });
+  }
+});
+
+// Create a new folder
+app.post('/api/bookmarks/folders', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const folderData = {
+      id: db.generateId(),
+      name: req.body.name,
+      description: req.body.description,
+      userId: userId,
+      parentFolderId: req.body.parentFolderId,
+      color: req.body.color || '#3b82f6',
+      icon: req.body.icon || 'folder',
+      sortOrder: req.body.sortOrder
+    };
+    
+    const result = db.createBookmarkFolder(folderData);
+    
+    res.status(201).json({
+      success: true,
+      data: { id: folderData.id }
+    });
+  } catch (error) {
+    console.error('Error creating folder:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create folder'
+    });
+  }
+});
+
+// Update a folder
+app.put('/api/bookmarks/folders/:id', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const folderId = req.params.id;
+    
+    const updates = {
+      name: req.body.name,
+      description: req.body.description,
+      parentFolderId: req.body.parentFolderId,
+      color: req.body.color,
+      icon: req.body.icon,
+      sortOrder: req.body.sortOrder
+    };
+    
+    // Remove undefined values
+    Object.keys(updates).forEach(key => updates[key] === undefined && delete updates[key]);
+    
+    const result = db.updateBookmarkFolder(folderId, updates, userId);
+    
+    res.json({
+      success: true,
+      data: { updated: result.changes > 0 }
+    });
+  } catch (error) {
+    console.error('Error updating folder:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update folder'
+    });
+  }
+});
+
+// Delete a folder
+app.delete('/api/bookmarks/folders/:id', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const folderId = req.params.id;
+    
+    const result = db.deleteBookmarkFolder(folderId, userId);
+    
+    res.json({
+      success: true,
+      data: { deleted: result.changes > 0 }
+    });
+  } catch (error) {
+    console.error('Error deleting folder:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to delete folder'
+    });
+  }
+});
+
+// ==================== BOOKMARK TAGS API ENDPOINTS ====================
+
+// Get all tags for a user
+app.get('/api/bookmarks/tags', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const tags = db.getBookmarkTags(userId);
+    
+    res.json({
+      success: true,
+      data: tags
+    });
+  } catch (error) {
+    console.error('Error fetching tags:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch tags'
+    });
+  }
+});
+
+// Create a new tag
+app.post('/api/bookmarks/tags', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const tagData = {
+      id: db.generateId(),
+      name: req.body.name,
+      color: req.body.color || '#10b981',
+      userId: userId
+    };
+    
+    const result = db.createBookmarkTag(tagData);
+    
+    res.status(201).json({
+      success: true,
+      data: { id: tagData.id }
+    });
+  } catch (error) {
+    console.error('Error creating tag:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create tag'
+    });
+  }
+});
+
+// Delete a tag
+app.delete('/api/bookmarks/tags/:id', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const tagId = req.params.id;
+    
+    const result = db.deleteBookmarkTag(tagId, userId);
+    
+    res.json({
+      success: true,
+      data: { deleted: result.changes > 0 }
+    });
+  } catch (error) {
+    console.error('Error deleting tag:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to delete tag'
+    });
+  }
+});
+
+// ==================== BOOKMARK IMPORT/EXPORT API ENDPOINTS ====================
+
+// Export bookmarks
+app.get('/api/bookmarks/export', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { format = 'json' } = req.query;
+    
+    const exportData = db.exportBookmarks(userId, format);
+    
+    if (format === 'json') {
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', 'attachment; filename="bookmarks.json"');
+      res.send(exportData);
+    } else if (format === 'csv') {
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename="bookmarks.csv"');
+      res.send(exportData);
+    } else {
+      res.status(400).json({
+        success: false,
+        error: 'Unsupported export format'
+      });
+    }
+  } catch (error) {
+    console.error('Error exporting bookmarks:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to export bookmarks'
+    });
+  }
+});
+
+// Import bookmarks
+app.post('/api/bookmarks/import', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { data, format = 'json', overwrite = false } = req.body;
+    
+    if (overwrite) {
+      // Delete existing bookmarks before import
+      // This would require additional database methods
+    }
+    
+    const results = db.importBookmarks(userId, data, format);
+    
+    res.json({
+      success: true,
+      data: results
+    });
+  } catch (error) {
+    console.error('Error importing bookmarks:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to import bookmarks'
+    });
+  }
+});
+
+// ==================== BOOKMARK SYNC API ENDPOINTS ====================
+
+// Sync bookmarks
+app.post('/api/bookmarks/sync', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { deviceId } = req.body;
+    
+    // Get pending sync records for this device
+    const pendingRecords = db.getPendingSyncRecords(userId, deviceId);
+    
+    let updated = 0;
+    
+    // Process each sync record
+    for (const record of pendingRecords) {
+      try {
+        switch (record.action) {
+          case 'create':
+            // Check if bookmark already exists
+            const existing = db.getBookmarkById(record.bookmark_id, userId);
+            if (!existing && record.sync_data) {
+              db.createBookmark(record.sync_data);
+              updated++;
+            }
+            break;
+            
+          case 'update':
+            if (record.sync_data) {
+              db.updateBookmark(record.bookmark_id, record.sync_data, userId);
+              updated++;
+            }
+            break;
+            
+          case 'delete':
+            db.deleteBookmark(record.bookmark_id, userId);
+            updated++;
+            break;
+        }
+        
+        // Mark record as synced
+        db.markSyncRecordsAsSynced([record.id]);
+      } catch (error) {
+        console.error('Error processing sync record:', error);
+      }
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        updated,
+        total: pendingRecords.length
+      }
+    });
+  } catch (error) {
+    console.error('Error syncing bookmarks:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to sync bookmarks'
+    });
+  }
+});
+
+// Get pending sync records
+app.get('/api/bookmarks/sync/pending', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { deviceId } = req.query;
+    
+    const pendingRecords = db.getPendingSyncRecords(userId, deviceId);
+    
+    res.json({
+      success: true,
+      data: pendingRecords
+    });
+  } catch (error) {
+    console.error('Error fetching sync records:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch sync records'
+    });
+  }
+});
+
 // Serve generated share images
 app.get('/api/share/image/:auctionId', (req, res) => {
   try {
@@ -1548,12 +2152,27 @@ app.get('/api/share/image/:auctionId', (req, res) => {
   }
 });
 
+// Dashboard route
+app.get('/dashboard', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
+});
+
+// Bookmark manager route
+app.get('/bookmarks', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'bookmarks.html'));
+});
+
 // Socket.io connections
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
   
   socket.on('joinAuction', (auctionId) => {
     socket.join(auctionId);
+  });
+  
+  socket.on('joinDashboard', () => {
+    socket.join('dashboard');
+    console.log('User joined dashboard room:', socket.id);
   });
   
   socket.on('disconnect', () => {
@@ -1583,6 +2202,10 @@ setInterval(() => {
       db.closeAuction(auction.id, winnerId, winningBidId);
       
       io.emit('auctionClosed', { ...auction, status: 'closed', winner: winnerId, winningBid: winningBidId });
+      io.to('dashboard').emit('auction_update', { 
+        type: 'auction', 
+        data: { ...auction, status: 'closed', winner: winnerId, winningBid: winningBidId } 
+      });
     }
   }
 }, 60000); // Check every minute
@@ -1596,6 +2219,518 @@ setInterval(() => {
     logError('Error resetting expired lockouts:', error, { operation: 'resetExpiredLockouts' });
   }
 }, 5 * 60 * 1000); // Check every 5 minutes
+
+// --- Gas Fee Optimization API Endpoints ---
+
+// Gas fee estimation and optimization
+const feeHistory = [];
+const networkCongestionData = [];
+const scheduledTransactions = new Map();
+
+// Initialize fee tracking
+setInterval(async () => {
+  try {
+    const feeStats = await fetch('https://horizon-testnet.stellar.org/fee_stats').then(r => r.json());
+    const congestionData = await fetch('https://horizon-testnet.stellar.org/').then(r => r.json());
+    
+    const feeEntry = {
+      timestamp: new Date().toISOString(),
+      min_fee: feeStats.min_fee || 100,
+      max_fee: feeStats.max_fee || 1000,
+      p50_fee: feeStats.fee_charged?.p50 || 500,
+      p75_fee: feeStats.fee_charged?.p75 || 750,
+      p95_fee: feeStats.fee_charged?.p95 || 1000,
+      ledger: congestionData.history_latest_ledger || 0
+    };
+    
+    feeHistory.push(feeEntry);
+    if (feeHistory.length > 1000) feeHistory.shift(); // Keep last 1000 entries
+    
+    // Calculate network congestion
+    const congestionLevel = calculateCongestionLevel(feeStats);
+    networkCongestionData.push({
+      timestamp: new Date().toISOString(),
+      level: congestionLevel,
+      ledger: congestionData.history_latest_ledger || 0
+    });
+    if (networkCongestionData.length > 100) networkCongestionData.shift();
+    
+  } catch (error) {
+    logError('Error updating fee data:', error);
+  }
+}, 30000); // Update every 30 seconds
+
+function calculateCongestionLevel(feeStats) {
+  const p50 = feeStats.fee_charged?.p50 || 500;
+  const max = feeStats.max_fee || 1000;
+  const ratio = p50 / max;
+  
+  if (ratio < 0.3) return 'low';
+  if (ratio < 0.6) return 'medium';
+  if (ratio < 0.8) return 'high';
+  return 'critical';
+}
+
+// Get current gas fee estimates
+app.get('/api/gas/estimate', async (req, res) => {
+  try {
+    const response = await fetch('https://horizon-testnet.stellar.org/fee_stats');
+    const feeStats = await response.json();
+    
+    const currentCongestion = networkCongestionData[networkCongestionData.length - 1];
+    
+    const estimates = {
+      current: {
+        min: feeStats.min_fee || 100,
+        max: feeStats.max_fee || 1000,
+        recommended: feeStats.fee_charged?.p50 || 500,
+        fast: feeStats.fee_charged?.p75 || 750,
+        instant: feeStats.fee_charged?.p95 || 1000
+      },
+      network: {
+        congestion: currentCongestion?.level || 'medium',
+        ledger: feeStats.ledger || 0,
+        timestamp: new Date().toISOString()
+      },
+      optimization: {
+        savings_potential: calculateSavingsPotential(feeStats),
+        best_time_to_transact: getBestTransactionTime(),
+        estimated_wait_times: getEstimatedWaitTimes(feeStats)
+      }
+    };
+    
+    res.json(estimates);
+  } catch (error) {
+    logError('Error getting gas estimates:', error, { endpoint: '/api/gas/estimate' });
+    res.status(500).json({ error: 'Failed to get gas estimates' });
+  }
+});
+
+// Get fee history
+app.get('/api/gas/history', (req, res) => {
+  try {
+    const hours = parseInt(req.query.hours) || 24;
+    const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000);
+    
+    const filteredHistory = feeHistory.filter(entry => 
+      new Date(entry.timestamp) >= cutoff
+    );
+    
+    res.json({
+      history: filteredHistory,
+      statistics: {
+        average_fee: calculateAverageFee(filteredHistory),
+        min_fee: Math.min(...filteredHistory.map(h => h.p50_fee)),
+        max_fee: Math.max(...filteredHistory.map(h => h.p50_fee)),
+        trend: calculateFeeTrend(filteredHistory)
+      },
+      period: `${hours} hours`
+    });
+  } catch (error) {
+    logError('Error getting fee history:', error, { endpoint: '/api/gas/history' });
+    res.status(500).json({ error: 'Failed to get fee history' });
+  }
+});
+
+// Get network congestion information
+app.get('/api/gas/congestion', (req, res) => {
+  try {
+    const currentCongestion = networkCongestionData[networkCongestionData.length - 1];
+    const recentCongestion = networkCongestionData.slice(-24); // Last 24 data points
+    
+    res.json({
+      current: currentCongestion || { level: 'medium', timestamp: new Date().toISOString() },
+      recent: recentCongestion,
+      forecast: predictCongestionTrend(recentCongestion),
+      recommendations: getCongestionRecommendations(currentCongestion?.level || 'medium')
+    });
+  } catch (error) {
+    logError('Error getting congestion data:', error, { endpoint: '/api/gas/congestion' });
+    res.status(500).json({ error: 'Failed to get congestion data' });
+  }
+});
+
+// Schedule transaction for optimal fee timing
+app.post('/api/gas/schedule', authenticateToken, (req, res) => {
+  try {
+    const { 
+      transactionType, 
+      maxFee, 
+      targetTime, 
+      priority = 'normal',
+      auctionId 
+    } = req.body;
+    
+    const scheduleId = uuidv4();
+    const scheduledTx = {
+      id: scheduleId,
+      userId: req.user.userId,
+      transactionType,
+      maxFee,
+      targetTime: new Date(targetTime),
+      priority,
+      auctionId,
+      status: 'pending',
+      createdAt: new Date(),
+      estimatedFee: estimateOptimalFee(maxFee, priority),
+      savings: calculatePotentialSavings(maxFee, priority)
+    };
+    
+    scheduledTransactions.set(scheduleId, scheduledTx);
+    
+    // Set up execution timer
+    const delay = new Date(targetTime) - new Date();
+    if (delay > 0) {
+      setTimeout(() => executeScheduledTransaction(scheduleId), delay);
+    }
+    
+    res.json({
+      scheduleId,
+      estimatedFee: scheduledTx.estimatedFee,
+      potentialSavings: scheduledTx.savings,
+      executionTime: scheduledTx.targetTime
+    });
+  } catch (error) {
+    logError('Error scheduling transaction:', error, { endpoint: '/api/gas/schedule' });
+    res.status(500).json({ error: 'Failed to schedule transaction' });
+  }
+});
+
+// Get scheduled transactions
+app.get('/api/gas/scheduled', authenticateToken, (req, res) => {
+  try {
+    const userScheduled = Array.from(scheduledTransactions.values())
+      .filter(tx => tx.userId === req.user.userId)
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    
+    res.json({
+      scheduled: userScheduled,
+      statistics: {
+        total: userScheduled.length,
+        pending: userScheduled.filter(tx => tx.status === 'pending').length,
+        executed: userScheduled.filter(tx => tx.status === 'executed').length,
+        failed: userScheduled.filter(tx => tx.status === 'failed').length,
+        totalSavings: userScheduled.reduce((sum, tx) => sum + (tx.savings || 0), 0)
+      }
+    });
+  } catch (error) {
+    logError('Error getting scheduled transactions:', error, { endpoint: '/api/gas/scheduled' });
+    res.status(500).json({ error: 'Failed to get scheduled transactions' });
+  }
+});
+
+// Cancel scheduled transaction
+app.delete('/api/gas/schedule/:id', authenticateToken, (req, res) => {
+  try {
+    const scheduleId = req.params.id;
+    const scheduledTx = scheduledTransactions.get(scheduleId);
+    
+    if (!scheduledTx || scheduledTx.userId !== req.user.userId) {
+      return res.status(404).json({ error: 'Scheduled transaction not found' });
+    }
+    
+    if (scheduledTx.status !== 'pending') {
+      return res.status(400).json({ error: 'Cannot cancel transaction in progress' });
+    }
+    
+    scheduledTx.status = 'cancelled';
+    scheduledTransactions.delete(scheduleId);
+    
+    res.json({ message: 'Scheduled transaction cancelled successfully' });
+  } catch (error) {
+    logError('Error cancelling scheduled transaction:', error, { endpoint: '/api/gas/schedule/:id' });
+    res.status(500).json({ error: 'Failed to cancel scheduled transaction' });
+  }
+});
+
+// Get cost savings analysis
+app.get('/api/gas/savings', authenticateToken, (req, res) => {
+  try {
+    const period = req.query.period || '30d';
+    const userScheduled = Array.from(scheduledTransactions.values())
+      .filter(tx => tx.userId === req.user.userId);
+    
+    const analysis = {
+      period,
+      totalSavings: userScheduled.reduce((sum, tx) => sum + (tx.savings || 0), 0),
+      averageSavingsPerTransaction: userScheduled.length > 0 
+        ? userScheduled.reduce((sum, tx) => sum + (tx.savings || 0), 0) / userScheduled.length 
+        : 0,
+      optimizationRate: calculateOptimizationRate(userScheduled),
+      recommendations: generateSavingsRecommendations(userScheduled),
+      breakdown: getSavingsBreakdown(userScheduled)
+    };
+    
+    res.json(analysis);
+  } catch (error) {
+    logError('Error getting savings analysis:', error, { endpoint: '/api/gas/savings' });
+    res.status(500).json({ error: 'Failed to get savings analysis' });
+  }
+});
+
+// Helper functions
+function calculateSavingsPotential(feeStats) {
+  const current = feeStats.fee_charged?.p50 || 500;
+  const min = feeStats.min_fee || 100;
+  return ((current - min) / current * 100).toFixed(2);
+}
+
+function getBestTransactionTime() {
+  const recentFees = feeHistory.slice(-48); // Last 24 hours (30-second intervals)
+  const hourlyAverages = {};
+  
+  recentFees.forEach(entry => {
+    const hour = new Date(entry.timestamp).getHours();
+    if (!hourlyAverages[hour]) hourlyAverages[hour] = [];
+    hourlyAverages[hour].push(entry.p50_fee);
+  });
+  
+  let bestHour = 0;
+  let lowestAverage = Infinity;
+  
+  Object.entries(hourlyAverages).forEach(([hour, fees]) => {
+    const average = fees.reduce((sum, fee) => sum + fee, 0) / fees.length;
+    if (average < lowestAverage) {
+      lowestAverage = average;
+      bestHour = parseInt(hour);
+    }
+  });
+  
+  return {
+    hour: bestHour,
+    reason: `Historically lowest fees around ${bestHour}:00`,
+    estimatedSavings: `${((500 - lowestAverage) / 500 * 100).toFixed(1)}%`
+  };
+}
+
+function getEstimatedWaitTimes(feeStats) {
+  return {
+    min_fee: '~5-10 minutes',
+    p50_fee: '~1-2 minutes',
+    p75_fee: '~30-60 seconds',
+    p95_fee: '~10-30 seconds'
+  };
+}
+
+function calculateAverageFee(history) {
+  if (history.length === 0) return 0;
+  return history.reduce((sum, entry) => sum + entry.p50_fee, 0) / history.length;
+}
+
+function calculateFeeTrend(history) {
+  if (history.length < 2) return 'stable';
+  
+  const recent = history.slice(-10);
+  const older = history.slice(-20, -10);
+  
+  const recentAvg = recent.reduce((sum, entry) => sum + entry.p50_fee, 0) / recent.length;
+  const olderAvg = older.reduce((sum, entry) => sum + entry.p50_fee, 0) / older.length;
+  
+  const change = (recentAvg - olderAvg) / olderAvg;
+  
+  if (change > 0.1) return 'increasing';
+  if (change < -0.1) return 'decreasing';
+  return 'stable';
+}
+
+function predictCongestionTrend(recentCongestion) {
+  if (recentCongestion.length < 3) return 'stable';
+  
+  const levels = { low: 1, medium: 2, high: 3, critical: 4 };
+  const recent = recentCongestion.slice(-5);
+  const avgLevel = recent.reduce((sum, c) => sum + levels[c.level], 0) / recent.length;
+  
+  if (avgLevel <= 1.5) return 'improving';
+  if (avgLevel >= 3.5) return 'worsening';
+  return 'stable';
+}
+
+function getCongestionRecommendations(level) {
+  const recommendations = {
+    low: ['Excellent time for transactions', 'Use minimum fees for maximum savings'],
+    medium: ['Normal network activity', 'Standard fees recommended'],
+    high: ['Network is busy', 'Consider higher fees or schedule for later'],
+    critical: ['Network is congested', 'Use instant fees or wait for better timing']
+  };
+  
+  return recommendations[level] || recommendations.medium;
+}
+
+function estimateOptimalFee(maxFee, priority) {
+  const current = feeHistory[feeHistory.length - 1];
+  if (!current) return maxFee;
+  
+  const multipliers = {
+    low: 0.8,
+    normal: 1.0,
+    high: 1.5,
+    instant: 2.0
+  };
+  
+  return Math.min(maxFee, Math.round(current.p50_fee * multipliers[priority]));
+}
+
+function calculatePotentialSavings(maxFee, priority) {
+  const optimal = estimateOptimalFee(maxFee, priority);
+  return Math.max(0, maxFee - optimal);
+}
+
+async function executeScheduledTransaction(scheduleId) {
+  const scheduledTx = scheduledTransactions.get(scheduleId);
+  if (!scheduledTx) return;
+  
+  try {
+    scheduledTx.status = 'executing';
+    // Here you would execute the actual transaction
+    // For now, we'll simulate successful execution
+    scheduledTx.status = 'executed';
+    scheduledTx.executedAt = new Date();
+    scheduledTx.actualFee = scheduledTx.estimatedFee;
+  } catch (error) {
+    scheduledTx.status = 'failed';
+    scheduledTx.error = error.message;
+    logError('Error executing scheduled transaction:', error, { scheduleId });
+  }
+}
+
+function calculateOptimizationRate(transactions) {
+  if (transactions.length === 0) return 0;
+  const optimized = transactions.filter(tx => tx.savings > 0).length;
+  return (optimized / transactions.length * 100).toFixed(1);
+}
+
+function generateSavingsRecommendations(transactions) {
+  const recommendations = [];
+  
+  if (transactions.length === 0) {
+    recommendations.push('Start scheduling transactions to see savings recommendations');
+  } else {
+    const avgSavings = transactions.reduce((sum, tx) => sum + (tx.savings || 0), 0) / transactions.length;
+    
+    if (avgSavings < 50) {
+      recommendations.push('Consider scheduling transactions during off-peak hours for better savings');
+    }
+    
+    const failedRate = transactions.filter(tx => tx.status === 'failed').length / transactions.length;
+    if (failedRate > 0.1) {
+      recommendations.push('Review failed transactions and adjust fee settings');
+    }
+  }
+  
+  return recommendations;
+}
+
+function getSavingsBreakdown(transactions) {
+  return {
+    byType: transactions.reduce((acc, tx) => {
+      acc[tx.transactionType] = (acc[tx.transactionType] || 0) + (tx.savings || 0);
+      return acc;
+    }, {}),
+    byPriority: transactions.reduce((acc, tx) => {
+      acc[tx.priority] = (acc[tx.priority] || 0) + (tx.savings || 0);
+      return acc;
+    }, {}),
+    byMonth: transactions.reduce((acc, tx) => {
+      const month = new Date(tx.createdAt).toISOString().slice(0, 7);
+      acc[month] = (acc[month] || 0) + (tx.savings || 0);
+      return acc;
+    }, {})
+  };
+}
+
+// Network Status Monitoring Endpoints
+
+// Get current network status
+app.get('/api/network/status', (req, res) => {
+  try {
+    const status = networkMonitor.getNetworkStatus();
+    res.json(status);
+  } catch (error) {
+    logError('Error getting network status:', error, { endpoint: '/api/network/status' });
+    res.status(500).json({ error: 'Failed to get network status' });
+  }
+});
+
+// Get historical network data
+app.get('/api/network/history', (req, res) => {
+  try {
+    const hours = parseInt(req.query.hours) || 24;
+    const history = networkMonitor.getHistoricalData(hours);
+    res.json(history);
+  } catch (error) {
+    logError('Error getting network history:', error, { endpoint: '/api/network/history' });
+    res.status(500).json({ error: 'Failed to get network history' });
+  }
+});
+
+// Get network alerts
+app.get('/api/network/alerts', (req, res) => {
+  try {
+    const status = networkMonitor.getNetworkStatus();
+    res.json(status.alerts);
+  } catch (error) {
+    logError('Error getting network alerts:', error, { endpoint: '/api/network/alerts' });
+    res.status(500).json({ error: 'Failed to get network alerts' });
+  }
+});
+
+// Acknowledge network alert
+app.post('/api/network/alerts/:id/acknowledge', (req, res) => {
+  try {
+    const alertId = req.params.id;
+    const success = networkMonitor.acknowledgeAlert(alertId);
+    
+    if (success) {
+      res.json({ message: 'Alert acknowledged successfully' });
+    } else {
+      res.status(404).json({ error: 'Alert not found' });
+    }
+  } catch (error) {
+    logError('Error acknowledging alert:', error, { endpoint: '/api/network/alerts/:id/acknowledge' });
+    res.status(500).json({ error: 'Failed to acknowledge alert' });
+  }
+});
+
+// Clear all network alerts
+app.delete('/api/network/alerts', (req, res) => {
+  try {
+    networkMonitor.clearAlerts();
+    res.json({ message: 'All alerts cleared successfully' });
+  } catch (error) {
+    logError('Error clearing alerts:', error, { endpoint: '/api/network/alerts' });
+    res.status(500).json({ error: 'Failed to clear alerts' });
+  }
+});
+
+// Get network recommendations
+app.get('/api/network/recommendations', (req, res) => {
+  try {
+    const recommendations = networkMonitor.getRecommendations();
+    res.json(recommendations);
+  } catch (error) {
+    logError('Error getting network recommendations:', error, { endpoint: '/api/network/recommendations' });
+    res.status(500).json({ error: 'Failed to get network recommendations' });
+  }
+});
+
+// Get congestion information
+app.get('/api/network/congestion', (req, res) => {
+  try {
+    await networkMonitor.checkCongestion();
+    const status = networkMonitor.getNetworkStatus();
+    const trend = networkMonitor.getCongestionTrend();
+    
+    res.json({
+      level: status.congestionLevel,
+      operationsPerSecond: status.operationsPerSecond,
+      trend,
+      history: networkMonitor.metrics.congestionHistory.slice(-20)
+    });
+  } catch (error) {
+    logError('Error getting congestion info:', error, { endpoint: '/api/network/congestion' });
+    res.status(500).json({ error: 'Failed to get congestion information' });
+  }
+});
 
 // Schedule regular backups
 const BACKUP_INTERVAL = 5 * 60 * 1000; // 5 minutes

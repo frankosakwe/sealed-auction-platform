@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bookmark Manager - Sealed Auction Platform</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- SortableJS for drag and drop -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    
+    <!-- PapaParse for CSV import/export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    
+    <style>
+        .folder-tree {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .folder-tree ul {
+            list-style: none;
+            padding-left: 1.5rem;
+            margin-top: 0.25rem;
+        }
+        
+        .folder-item {
+            display: flex;
+            align-items: center;
+            padding: 0.5rem;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .folder-item:hover {
+            background-color: rgba(59, 130, 246, 0.1);
+        }
+        
+        .folder-item.active {
+            background-color: rgba(59, 130, 246, 0.2);
+            font-weight: 600;
+        }
+        
+        .bookmark-card {
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        
+        .bookmark-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+        
+        .bookmark-card.dragging {
+            opacity: 0.5;
+            transform: rotate(5deg);
+        }
+        
+        .tag-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.5rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            margin: 0.125rem;
+            transition: all 0.2s;
+        }
+        
+        .tag-badge:hover {
+            transform: scale(1.05);
+        }
+        
+        .search-input {
+            transition: all 0.2s;
+        }
+        
+        .search-input:focus {
+            transform: scale(1.02);
+        }
+        
+        .modal-overlay {
+            backdrop-filter: blur(4px);
+        }
+        
+        .sortable-ghost {
+            opacity: 0.4;
+            background: #f3f4f6;
+        }
+        
+        .sortable-drag {
+            opacity: 0.9;
+        }
+        
+        @media (max-width: 768px) {
+            .bookmark-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .folder-sidebar {
+                width: 100%;
+                margin-bottom: 1rem;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header Navigation -->
+    <nav class="bg-white shadow-sm border-b sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <button id="sidebarToggle" class="p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 md:hidden">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <h1 class="ml-3 text-xl font-semibold text-gray-900">
+                        <i class="fas fa-bookmark text-blue-600 mr-2"></i>
+                        Bookmark Manager
+                    </h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button id="addBookmarkBtn" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition">
+                        <i class="fas fa-plus mr-2"></i>Add Bookmark
+                    </button>
+                    <button id="addFolderBtn" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition">
+                        <i class="fas fa-folder-plus mr-2"></i>New Folder
+                    </button>
+                    <div class="relative">
+                        <button id="importExportBtn" class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition">
+                            <i class="fas fa-file-import mr-2"></i>Import/Export
+                        </button>
+                        <div id="importExportMenu" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50">
+                            <button id="importBtn" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                <i class="fas fa-upload mr-2"></i>Import Bookmarks
+                            </button>
+                            <button id="exportJsonBtn" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                <i class="fas fa-download mr-2"></i>Export as JSON
+                            </button>
+                            <button id="exportCsvBtn" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                <i class="fas fa-file-csv mr-2"></i>Export as CSV
+                            </button>
+                        </div>
+                    </div>
+                    <button id="syncBtn" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition">
+                        <i class="fas fa-sync mr-2"></i>Sync
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div class="flex flex-col md:flex-row gap-6">
+            <!-- Sidebar with Folders -->
+            <aside id="folderSidebar" class="folder-sidebar w-full md:w-64 bg-white rounded-lg shadow p-4">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold text-gray-900">Folders</h2>
+                    <button id="collapseFoldersBtn" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-chevron-up"></i>
+                    </button>
+                </div>
+                
+                <!-- Search Bar -->
+                <div class="mb-4">
+                    <div class="relative">
+                        <input 
+                            type="text" 
+                            id="searchInput" 
+                            placeholder="Search bookmarks..." 
+                            class="search-input w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                        <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                    </div>
+                </div>
+                
+                <!-- Quick Filters -->
+                <div class="mb-4">
+                    <div class="flex flex-wrap gap-2">
+                        <button class="filter-btn px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200 transition" data-filter="all">
+                            All
+                        </button>
+                        <button class="filter-btn px-3 py-1 text-sm bg-yellow-100 text-yellow-700 rounded-full hover:bg-yellow-200 transition" data-filter="favorites">
+                            <i class="fas fa-star mr-1"></i>Favorites
+                        </button>
+                        <button class="filter-btn px-3 py-1 text-sm bg-green-100 text-green-700 rounded-full hover:bg-green-200 transition" data-filter="recent">
+                            Recent
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Folder Tree -->
+                <div id="folderTree" class="folder-tree">
+                    <ul id="folderList">
+                        <!-- Folders will be populated here -->
+                    </ul>
+                </div>
+                
+                <!-- Tags Section -->
+                <div class="mt-6">
+                    <h3 class="text-sm font-semibold text-gray-700 mb-2">Tags</h3>
+                    <div id="tagCloud" class="flex flex-wrap gap-1">
+                        <!-- Tags will be populated here -->
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Main Content Area -->
+            <main class="flex-1">
+                <!-- Breadcrumb -->
+                <div id="breadcrumb" class="mb-4 text-sm text-gray-600">
+                    <span class="hover:text-blue-600 cursor-pointer">Home</span>
+                </div>
+
+                <!-- View Options -->
+                <div class="flex justify-between items-center mb-4">
+                    <div class="flex items-center space-x-4">
+                        <span class="text-sm text-gray-600">
+                            <span id="bookmarkCount">0</span> bookmarks
+                        </span>
+                        <select id="sortSelect" class="text-sm border border-gray-300 rounded px-2 py-1">
+                            <option value="created_desc">Newest First</option>
+                            <option value="created_asc">Oldest First</option>
+                            <option value="title_asc">Title A-Z</option>
+                            <option value="title_desc">Title Z-A</option>
+                            <option value="url_asc">URL A-Z</option>
+                        </select>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button id="gridViewBtn" class="p-2 text-gray-600 hover:text-blue-600">
+                            <i class="fas fa-th"></i>
+                        </button>
+                        <button id="listViewBtn" class="p-2 text-blue-600">
+                            <i class="fas fa-list"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Bookmarks Container -->
+                <div id="bookmarksContainer" class="bookmark-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Bookmarks will be populated here -->
+                </div>
+
+                <!-- Empty State -->
+                <div id="emptyState" class="text-center py-12">
+                    <i class="fas fa-bookmark text-6xl text-gray-300 mb-4"></i>
+                    <h3 class="text-lg font-medium text-gray-900 mb-2">No bookmarks yet</h3>
+                    <p class="text-gray-600 mb-4">Start by adding your first bookmark or importing existing ones.</p>
+                    <button id="emptyAddBookmarkBtn" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition">
+                        <i class="fas fa-plus mr-2"></i>Add Your First Bookmark
+                    </button>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Add/Edit Bookmark Modal -->
+    <div id="bookmarkModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+        <div class="modal-overlay flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
+            <div class="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onclick="closeBookmarkModal()"></div>
+            
+            <div class="inline-block w-full max-w-md p-6 my-8 text-left align-middle transition-all transform bg-white shadow-xl rounded-lg">
+                <h3 id="bookmarkModalTitle" class="text-lg font-medium leading-6 text-gray-900 mb-4">Add Bookmark</h3>
+                
+                <form id="bookmarkForm">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Title *</label>
+                        <input 
+                            type="text" 
+                            id="bookmarkTitle" 
+                            required
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">URL *</label>
+                        <input 
+                            type="url" 
+                            id="bookmarkUrl" 
+                            required
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                        <textarea 
+                            id="bookmarkDescription" 
+                            rows="3"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        ></textarea>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Folder</label>
+                        <select id="bookmarkFolder" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="">No Folder</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Tags</label>
+                        <div class="flex flex-wrap gap-2 mb-2" id="selectedTags"></div>
+                        <div class="flex">
+                            <input 
+                                type="text" 
+                                id="tagInput" 
+                                placeholder="Add tag..."
+                                class="flex-1 px-3 py-2 border border-gray-300 rounded-l-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            >
+                            <button type="button" id="addTagBtn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-r-md hover:bg-gray-300 transition">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="flex items-center">
+                            <input type="checkbox" id="bookmarkFavorite" class="mr-2">
+                            <span class="text-sm text-gray-700">Mark as favorite</span>
+                        </label>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="flex items-center">
+                            <input type="checkbox" id="bookmarkPrivate" class="mr-2">
+                            <span class="text-sm text-gray-700">Private bookmark</span>
+                        </label>
+                    </div>
+                    
+                    <div class="flex justify-end space-x-3">
+                        <button type="button" onclick="closeBookmarkModal()" class="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition">
+                            Cancel
+                        </button>
+                        <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition">
+                            Save Bookmark
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Folder Modal -->
+    <div id="folderModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+        <div class="modal-overlay flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
+            <div class="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onclick="closeFolderModal()"></div>
+            
+            <div class="inline-block w-full max-w-md p-6 my-8 text-left align-middle transition-all transform bg-white shadow-xl rounded-lg">
+                <h3 class="text-lg font-medium leading-6 text-gray-900 mb-4">Add Folder</h3>
+                
+                <form id="folderForm">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Folder Name *</label>
+                        <input 
+                            type="text" 
+                            id="folderName" 
+                            required
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                        <textarea 
+                            id="folderDescription" 
+                            rows="3"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        ></textarea>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Parent Folder</label>
+                        <select id="parentFolder" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="">Root Level</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Color</label>
+                        <div class="flex space-x-2">
+                            <button type="button" class="color-btn w-8 h-8 rounded-full bg-blue-500" data-color="#3b82f6"></button>
+                            <button type="button" class="color-btn w-8 h-8 rounded-full bg-green-500" data-color="#10b981"></button>
+                            <button type="button" class="color-btn w-8 h-8 rounded-full bg-yellow-500" data-color="#f59e0b"></button>
+                            <button type="button" class="color-btn w-8 h-8 rounded-full bg-red-500" data-color="#ef4444"></button>
+                            <button type="button" class="color-btn w-8 h-8 rounded-full bg-purple-500" data-color="#8b5cf6"></button>
+                            <button type="button" class="color-btn w-8 h-8 rounded-full bg-pink-500" data-color="#ec4899"></button>
+                            <button type="button" class="color-btn w-8 h-8 rounded-full bg-gray-500" data-color="#6b7280"></button>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-end space-x-3">
+                        <button type="button" onclick="closeFolderModal()" class="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition">
+                            Cancel
+                        </button>
+                        <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition">
+                            Create Folder
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Modal -->
+    <div id="importModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+        <div class="modal-overlay flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
+            <div class="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onclick="closeImportModal()"></div>
+            
+            <div class="inline-block w-full max-w-md p-6 my-8 text-left align-middle transition-all transform bg-white shadow-xl rounded-lg">
+                <h3 class="text-lg font-medium leading-6 text-gray-900 mb-4">Import Bookmarks</h3>
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Select File</label>
+                    <input 
+                        type="file" 
+                        id="importFile" 
+                        accept=".json,.csv"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                </div>
+                
+                <div class="mb-4">
+                    <label class="flex items-center">
+                        <input type="checkbox" id="importOverwrite" class="mr-2">
+                        <span class="text-sm text-gray-700">Overwrite existing bookmarks</span>
+                    </label>
+                </div>
+                
+                <div id="importResults" class="hidden mb-4 p-3 bg-gray-100 rounded-md">
+                    <!-- Import results will be shown here -->
+                </div>
+                
+                <div class="flex justify-end space-x-3">
+                    <button type="button" onclick="closeImportModal()" class="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition">
+                        Cancel
+                    </button>
+                    <button type="button" onclick="importBookmarks()" class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition">
+                        Import
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 flex flex-col items-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+            <p class="text-gray-700">Loading bookmarks...</p>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toastContainer" class="fixed bottom-4 right-4 z-50 space-y-2">
+        <!-- Toast notifications will appear here -->
+    </div>
+
+    <script src="bookmarks.js"></script>
+</body>
+</html>

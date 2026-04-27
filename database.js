@@ -178,6 +178,90 @@ class AuctionDatabase {
       )
     `);
 
+    // Create bookmark folders table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS bookmark_folders (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT,
+        user_id TEXT NOT NULL,
+        parent_folder_id TEXT,
+        color TEXT DEFAULT '#3b82f6',
+        icon TEXT DEFAULT 'folder',
+        sort_order INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (parent_folder_id) REFERENCES bookmark_folders(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Create bookmark tags table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS bookmark_tags (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        color TEXT DEFAULT '#10b981',
+        user_id TEXT NOT NULL,
+        usage_count INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(user_id, name)
+      )
+    `);
+
+    // Create bookmarks table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS bookmarks (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        description TEXT,
+        url TEXT NOT NULL,
+        type TEXT NOT NULL CHECK(type IN ('auction', 'user', 'search', 'custom')),
+        target_id TEXT,
+        user_id TEXT NOT NULL,
+        folder_id TEXT,
+        favicon TEXT,
+        thumbnail TEXT,
+        is_favorite INTEGER DEFAULT 0,
+        is_private INTEGER DEFAULT 0,
+        sort_order INTEGER DEFAULT 0,
+        metadata TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (folder_id) REFERENCES bookmark_folders(id) ON DELETE SET NULL
+      )
+    `);
+
+    // Create bookmark-tag relationship table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS bookmark_tag_relations (
+        bookmark_id TEXT NOT NULL,
+        tag_id TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (bookmark_id, tag_id),
+        FOREIGN KEY (bookmark_id) REFERENCES bookmarks(id) ON DELETE CASCADE,
+        FOREIGN KEY (tag_id) REFERENCES bookmark_tags(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Create bookmark sync table for cross-device synchronization
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS bookmark_sync (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        device_id TEXT NOT NULL,
+        bookmark_id TEXT NOT NULL,
+        action TEXT NOT NULL CHECK(action IN ('create', 'update', 'delete')),
+        sync_data TEXT,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+        synced INTEGER DEFAULT 0,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (bookmark_id) REFERENCES bookmarks(id) ON DELETE CASCADE
+      )
+    `);
+
     // Create share engagement tracking table
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS share_engagement (
@@ -216,6 +300,22 @@ class AuctionDatabase {
       CREATE INDEX IF NOT EXISTS idx_social_shares_created_at ON social_shares(created_at);
       CREATE INDEX IF NOT EXISTS idx_share_engagement_share_id ON share_engagement(share_id);
       CREATE INDEX IF NOT EXISTS idx_share_engagement_type ON share_engagement(engagement_type);
+      
+      -- Bookmark-related indexes
+      CREATE INDEX IF NOT EXISTS idx_bookmark_folders_user_id ON bookmark_folders(user_id);
+      CREATE INDEX IF NOT EXISTS idx_bookmark_folders_parent_id ON bookmark_folders(parent_folder_id);
+      CREATE INDEX IF NOT EXISTS idx_bookmark_tags_user_id ON bookmark_tags(user_id);
+      CREATE INDEX IF NOT EXISTS idx_bookmark_tags_name ON bookmark_tags(name);
+      CREATE INDEX IF NOT EXISTS idx_bookmarks_user_id ON bookmarks(user_id);
+      CREATE INDEX IF NOT EXISTS idx_bookmarks_folder_id ON bookmarks(folder_id);
+      CREATE INDEX IF NOT EXISTS idx_bookmarks_type ON bookmarks(type);
+      CREATE INDEX IF NOT EXISTS idx_bookmarks_target_id ON bookmarks(target_id);
+      CREATE INDEX IF NOT EXISTS idx_bookmarks_favorite ON bookmarks(is_favorite);
+      CREATE INDEX IF NOT EXISTS idx_bookmark_tag_relations_bookmark_id ON bookmark_tag_relations(bookmark_id);
+      CREATE INDEX IF NOT EXISTS idx_bookmark_tag_relations_tag_id ON bookmark_tag_relations(tag_id);
+      CREATE INDEX IF NOT EXISTS idx_bookmark_sync_user_id ON bookmark_sync(user_id);
+      CREATE INDEX IF NOT EXISTS idx_bookmark_sync_device_id ON bookmark_sync(device_id);
+      CREATE INDEX IF NOT EXISTS idx_bookmark_sync_synced ON bookmark_sync(synced);
     `);
   }
 
@@ -1799,6 +1899,816 @@ class AuctionDatabase {
     });
 
     return { auctions, bids, users };
+  }
+
+  // ==================== BOOKMARK MANAGEMENT METHODS ====================
+
+  // Bookmark Folder Operations
+  createBookmarkFolder(folder) {
+    const validation = this.securityLayer.validateInputs({
+      id: folder.id,
+      name: folder.name,
+      description: folder.description,
+      userId: folder.userId,
+      parentFolderId: folder.parentFolderId,
+      color: folder.color,
+      icon: folder.icon
+    });
+    
+    if (!validation.valid) {
+      throw new Error(validation.errors.join(', '));
+    }
+    
+    const stmt = this.securityLayer.prepare(`
+      INSERT INTO bookmark_folders (id, name, description, user_id, parent_folder_id, color, icon, sort_order)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    
+    return stmt.run(
+      validation.sanitized.id,
+      validation.sanitized.name,
+      validation.sanitized.description || null,
+      validation.sanitized.userId,
+      validation.sanitized.parentFolderId || null,
+      validation.sanitized.color || '#3b82f6',
+      validation.sanitized.icon || 'folder',
+      folder.sortOrder || 0
+    );
+  }
+
+  getBookmarkFolders(userId, parentFolderId = null) {
+    const validation = this.securityLayer.validateInputs({ userId, parentFolderId });
+    if (!validation.valid) {
+      throw new Error(validation.errors.join(', '));
+    }
+    
+    let query = 'SELECT * FROM bookmark_folders WHERE user_id = ?';
+    const params = [validation.sanitized.userId];
+    
+    if (parentFolderId === null) {
+      query += ' AND parent_folder_id IS NULL';
+    } else {
+      query += ' AND parent_folder_id = ?';
+      params.push(validation.sanitized.parentFolderId);
+    }
+    
+    query += ' ORDER BY sort_order, name';
+    
+    const stmt = this.securityLayer.prepare(query);
+    return stmt.all(...params);
+  }
+
+  updateBookmarkFolder(folderId, updates, userId) {
+    const validation = this.securityLayer.validateInputs({ folderId, userId });
+    if (!validation.valid) {
+      throw new Error(validation.errors.join(', '));
+    }
+    
+    const setClause = [];
+    const params = [];
+    
+    if (updates.name !== undefined) {
+      setClause.push('name = ?');
+      params.push(updates.name);
+    }
+    if (updates.description !== undefined) {
+      setClause.push('description = ?');
+      params.push(updates.description);
+    }
+    if (updates.color !== undefined) {
+      setClause.push('color = ?');
+      params.push(updates.color);
+    }
+    if (updates.icon !== undefined) {
+      setClause.push('icon = ?');
+      params.push(updates.icon);
+    }
+    if (updates.parentFolderId !== undefined) {
+      setClause.push('parent_folder_id = ?');
+      params.push(updates.parentFolderId);
+    }
+    if (updates.sortOrder !== undefined) {
+      setClause.push('sort_order = ?');
+      params.push(updates.sortOrder);
+    }
+    
+    setClause.push('updated_at = CURRENT_TIMESTAMP');
+    params.push(validation.sanitized.folderId, validation.sanitized.userId);
+    
+    const stmt = this.securityLayer.prepare(`
+      UPDATE bookmark_folders 
+      SET ${setClause.join(', ')}
+      WHERE id = ? AND user_id = ?
+    `);
+    
+    return stmt.run(...params);
+  }
+
+  deleteBookmarkFolder(folderId, userId) {
+    const validation = this.securityLayer.validateInputs({ folderId, userId });
+    if (!validation.valid) {
+      throw new Error(validation.errors.join(', '));
+    }
+    
+    // First, move bookmarks in this folder to root (set folder_id to null)
+    const moveBookmarksStmt = this.securityLayer.prepare(`
+      UPDATE bookmarks 
+      SET folder_id = NULL 
+      WHERE folder_id = ? AND user_id = ?
+    `);
+    moveBookmarksStmt.run(validation.sanitized.folderId, validation.sanitized.userId);
+    
+    // Then delete the folder
+    const stmt = this.securityLayer.prepare(`
+      DELETE FROM bookmark_folders 
+      WHERE id = ? AND user_id = ?
+    `);
+    
+    return stmt.run(validation.sanitized.folderId, validation.sanitized.userId);
+  }
+
+  // Bookmark Tag Operations
+  createBookmarkTag(tag) {
+    const validation = this.securityLayer.validateInputs({
+      id: tag.id,
+      name: tag.name,
+      color: tag.color,
+      userId: tag.userId
+    });
+    
+    if (!validation.valid) {
+      throw new Error(validation.errors.join(', '));
+    }
+    
+    const stmt = this.securityLayer.prepare(`
+      INSERT OR IGNORE INTO bookmark_tags (id, name, color, user_id)
+      VALUES (?, ?, ?, ?)
+    `);
+    
+    const result = stmt.run(
+      validation.sanitized.id,
+      validation.sanitized.name,
+      validation.sanitized.color || '#10b981',
+      validation.sanitized.userId
+    );
+    
+    // If tag was created, increment usage count
+    if (result.changes > 0) {
+      this.incrementTagUsage(validation.sanitized.name, validation.sanitized.userId);
+    }
+    
+    return result;
+  }
+
+  getBookmarkTags(userId) {
+    const validation = this.securityLayer.validateInput(userId);
+    if (!validation.valid) {
+      throw new Error('Invalid user ID format');
+    }
+    
+    const stmt = this.securityLayer.prepare(`
+      SELECT * FROM bookmark_tags 
+      WHERE user_id = ? 
+      ORDER BY usage_count DESC, name
+    `);
+    
+    return stmt.all(validation.sanitized.userId);
+  }
+
+  incrementTagUsage(tagName, userId) {
+    const validation = this.securityLayer.validateInputs({ tagName, userId });
+    if (!validation.valid) {
+      throw new Error(validation.errors.join(', '));
+    }
+    
+    const stmt = this.securityLayer.prepare(`
+      UPDATE bookmark_tags 
+      SET usage_count = usage_count + 1 
+      WHERE name = ? AND user_id = ?
+    `);
+    
+    return stmt.run(validation.sanitized.tagName, validation.sanitized.userId);
+  }
+
+  decrementTagUsage(tagName, userId) {
+    const validation = this.securityLayer.validateInputs({ tagName, userId });
+    if (!validation.valid) {
+      throw new Error(validation.errors.join(', '));
+    }
+    
+    const stmt = this.securityLayer.prepare(`
+      UPDATE bookmark_tags 
+      SET usage_count = usage_count - 1 
+      WHERE name = ? AND user_id = ? AND usage_count > 0
+    `);
+    
+    return stmt.run(validation.sanitized.tagName, validation.sanitized.userId);
+  }
+
+  deleteBookmarkTag(tagId, userId) {
+    const validation = this.securityLayer.validateInputs({ tagId, userId });
+    if (!validation.valid) {
+      throw new Error(validation.errors.join(', '));
+    }
+    
+    // Remove tag relations first
+    const deleteRelationsStmt = this.securityLayer.prepare(`
+      DELETE FROM bookmark_tag_relations 
+      WHERE tag_id = ?
+    `);
+    deleteRelationsStmt.run(validation.sanitized.tagId);
+    
+    // Then delete the tag
+    const stmt = this.securityLayer.prepare(`
+      DELETE FROM bookmark_tags 
+      WHERE id = ? AND user_id = ?
+    `);
+    
+    return stmt.run(validation.sanitized.tagId, validation.sanitized.userId);
+  }
+
+  // Bookmark Operations
+  createBookmark(bookmark) {
+    const validation = this.securityLayer.validateInputs({
+      id: bookmark.id,
+      title: bookmark.title,
+      description: bookmark.description,
+      url: bookmark.url,
+      type: bookmark.type,
+      targetId: bookmark.targetId,
+      userId: bookmark.userId,
+      folderId: bookmark.folderId,
+      favicon: bookmark.favicon,
+      thumbnail: bookmark.thumbnail,
+      isFavorite: bookmark.isFavorite,
+      isPrivate: bookmark.isPrivate,
+      sortOrder: bookmark.sortOrder,
+      metadata: bookmark.metadata
+    });
+    
+    if (!validation.valid) {
+      throw new Error(validation.errors.join(', '));
+    }
+    
+    const stmt = this.securityLayer.prepare(`
+      INSERT INTO bookmarks (
+        id, title, description, url, type, target_id, user_id, folder_id, 
+        favicon, thumbnail, is_favorite, is_private, sort_order, metadata
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    
+    const result = stmt.run(
+      validation.sanitized.id,
+      validation.sanitized.title,
+      validation.sanitized.description || null,
+      validation.sanitized.url,
+      validation.sanitized.type,
+      validation.sanitized.targetId || null,
+      validation.sanitized.userId,
+      validation.sanitized.folderId || null,
+      validation.sanitized.favicon || null,
+      validation.sanitized.thumbnail || null,
+      validation.sanitized.isFavorite ? 1 : 0,
+      validation.sanitized.isPrivate ? 1 : 0,
+      validation.sanitized.sortOrder || 0,
+      validation.sanitized.metadata ? JSON.stringify(validation.sanitized.metadata) : null
+    );
+    
+    // Add tag relations if provided
+    if (bookmark.tags && bookmark.tags.length > 0) {
+      bookmark.tags.forEach(tagId => {
+        this.addTagToBookmark(validation.sanitized.id, tagId);
+        
+        // Increment tag usage
+        const tag = this.getTagById(tagId);
+        if (tag) {
+          this.incrementTagUsage(tag.name, validation.sanitized.userId);
+        }
+      });
+    }
+    
+    return result;
+  }
+
+  getBookmarks(userId, options = {}) {
+    const validation = this.securityLayer.validateInputs({ userId });
+    if (!validation.valid) {
+      throw new Error('Invalid user ID format');
+    }
+    
+    let query = `
+      SELECT b.*, 
+             GROUP_CONCAT(t.name) as tags,
+             GROUP_CONCAT(t.color) as tag_colors,
+             f.name as folder_name,
+             f.color as folder_color
+      FROM bookmarks b
+      LEFT JOIN bookmark_tag_relations btr ON b.id = btr.bookmark_id
+      LEFT JOIN bookmark_tags t ON btr.tag_id = t.id
+      LEFT JOIN bookmark_folders f ON b.folder_id = f.id
+      WHERE b.user_id = ?
+    `;
+    
+    const params = [validation.sanitized.userId];
+    
+    // Apply filters
+    if (options.folderId !== undefined) {
+      if (options.folderId === null) {
+        query += ' AND b.folder_id IS NULL';
+      } else {
+        query += ' AND b.folder_id = ?';
+        params.push(options.folderId);
+      }
+    }
+    
+    if (options.type) {
+      query += ' AND b.type = ?';
+      params.push(options.type);
+    }
+    
+    if (options.isFavorite !== undefined) {
+      query += ' AND b.is_favorite = ?';
+      params.push(options.isFavorite ? 1 : 0);
+    }
+    
+    if (options.search) {
+      query += ' AND (b.title LIKE ? OR b.description LIKE ? OR b.url LIKE ?)';
+      const searchTerm = `%${options.search}%`;
+      params.push(searchTerm, searchTerm, searchTerm);
+    }
+    
+    if (options.tags && options.tags.length > 0) {
+      query += ` AND b.id IN (
+        SELECT bookmark_id FROM bookmark_tag_relations 
+        WHERE tag_id IN (${options.tags.map(() => '?').join(',')})
+        GROUP BY bookmark_id
+        HAVING COUNT(DISTINCT tag_id) = ?
+      )`;
+      params.push(...options.tags, options.tags.length);
+    }
+    
+    query += ' GROUP BY b.id ORDER BY b.sort_order, b.created_at DESC';
+    
+    if (options.limit) {
+      query += ' LIMIT ?';
+      params.push(options.limit);
+    }
+    
+    const stmt = this.securityLayer.prepare(query);
+    const bookmarks = stmt.all(...params);
+    
+    // Parse tags and metadata
+    return bookmarks.map(bookmark => ({
+      ...bookmark,
+      tags: bookmark.tags ? bookmark.tags.split(',') : [],
+      tag_colors: bookmark.tag_colors ? bookmark.tag_colors.split(',') : [],
+      metadata: bookmark.metadata ? JSON.parse(bookmark.metadata) : null,
+      is_favorite: Boolean(bookmark.is_favorite),
+      is_private: Boolean(bookmark.is_private)
+    }));
+  }
+
+  getBookmarkById(bookmarkId, userId) {
+    const validation = this.securityLayer.validateInputs({ bookmarkId, userId });
+    if (!validation.valid) {
+      throw new Error(validation.errors.join(', '));
+    }
+    
+    const stmt = this.securityLayer.prepare(`
+      SELECT b.*, 
+             GROUP_CONCAT(t.name) as tags,
+             GROUP_CONCAT(t.color) as tag_colors,
+             f.name as folder_name,
+             f.color as folder_color
+      FROM bookmarks b
+      LEFT JOIN bookmark_tag_relations btr ON b.id = btr.bookmark_id
+      LEFT JOIN bookmark_tags t ON btr.tag_id = t.id
+      LEFT JOIN bookmark_folders f ON b.folder_id = f.id
+      WHERE b.id = ? AND b.user_id = ?
+      GROUP BY b.id
+    `);
+    
+    const bookmark = stmt.get(validation.sanitized.bookmarkId, validation.sanitized.userId);
+    
+    if (bookmark) {
+      return {
+        ...bookmark,
+        tags: bookmark.tags ? bookmark.tags.split(',') : [],
+        tag_colors: bookmark.tag_colors ? bookmark.tag_colors.split(',') : [],
+        metadata: bookmark.metadata ? JSON.parse(bookmark.metadata) : null,
+        is_favorite: Boolean(bookmark.is_favorite),
+        is_private: Boolean(bookmark.is_private)
+      };
+    }
+    
+    return null;
+  }
+
+  updateBookmark(bookmarkId, updates, userId) {
+    const validation = this.securityLayer.validateInputs({ bookmarkId, userId });
+    if (!validation.valid) {
+      throw new Error(validation.errors.join(', '));
+    }
+    
+    const setClause = [];
+    const params = [];
+    
+    if (updates.title !== undefined) {
+      setClause.push('title = ?');
+      params.push(updates.title);
+    }
+    if (updates.description !== undefined) {
+      setClause.push('description = ?');
+      params.push(updates.description);
+    }
+    if (updates.url !== undefined) {
+      setClause.push('url = ?');
+      params.push(updates.url);
+    }
+    if (updates.folderId !== undefined) {
+      setClause.push('folder_id = ?');
+      params.push(updates.folderId);
+    }
+    if (updates.favicon !== undefined) {
+      setClause.push('favicon = ?');
+      params.push(updates.favicon);
+    }
+    if (updates.thumbnail !== undefined) {
+      setClause.push('thumbnail = ?');
+      params.push(updates.thumbnail);
+    }
+    if (updates.isFavorite !== undefined) {
+      setClause.push('is_favorite = ?');
+      params.push(updates.isFavorite ? 1 : 0);
+    }
+    if (updates.isPrivate !== undefined) {
+      setClause.push('is_private = ?');
+      params.push(updates.isPrivate ? 1 : 0);
+    }
+    if (updates.sortOrder !== undefined) {
+      setClause.push('sort_order = ?');
+      params.push(updates.sortOrder);
+    }
+    if (updates.metadata !== undefined) {
+      setClause.push('metadata = ?');
+      params.push(JSON.stringify(updates.metadata));
+    }
+    
+    setClause.push('updated_at = CURRENT_TIMESTAMP');
+    params.push(validation.sanitized.bookmarkId, validation.sanitized.userId);
+    
+    const stmt = this.securityLayer.prepare(`
+      UPDATE bookmarks 
+      SET ${setClause.join(', ')}
+      WHERE id = ? AND user_id = ?
+    `);
+    
+    const result = stmt.run(...params);
+    
+    // Update tag relations if provided
+    if (updates.tags !== undefined) {
+      this.updateBookmarkTags(validation.sanitized.bookmarkId, updates.tags, validation.sanitized.userId);
+    }
+    
+    return result;
+  }
+
+  deleteBookmark(bookmarkId, userId) {
+    const validation = this.securityLayer.validateInputs({ bookmarkId, userId });
+    if (!validation.valid) {
+      throw new Error(validation.errors.join(', '));
+    }
+    
+    // Get bookmark tags before deletion to decrement usage
+    const bookmark = this.getBookmarkById(validation.sanitized.bookmarkId, validation.sanitized.userId);
+    if (bookmark && bookmark.tags) {
+      bookmark.tags.forEach(tagName => {
+        this.decrementTagUsage(tagName, validation.sanitized.userId);
+      });
+    }
+    
+    // Delete tag relations
+    const deleteRelationsStmt = this.securityLayer.prepare(`
+      DELETE FROM bookmark_tag_relations 
+      WHERE bookmark_id = ?
+    `);
+    deleteRelationsStmt.run(validation.sanitized.bookmarkId);
+    
+    // Delete the bookmark
+    const stmt = this.securityLayer.prepare(`
+      DELETE FROM bookmarks 
+      WHERE id = ? AND user_id = ?
+    `);
+    
+    return stmt.run(validation.sanitized.bookmarkId, validation.sanitized.userId);
+  }
+
+  // Tag Relations Management
+  addTagToBookmark(bookmarkId, tagId) {
+    const validation = this.securityLayer.validateInputs({ bookmarkId, tagId });
+    if (!validation.valid) {
+      throw new Error(validation.errors.join(', '));
+    }
+    
+    const stmt = this.securityLayer.prepare(`
+      INSERT OR IGNORE INTO bookmark_tag_relations (bookmark_id, tag_id)
+      VALUES (?, ?)
+    `);
+    
+    return stmt.run(validation.sanitized.bookmarkId, validation.sanitized.tagId);
+  }
+
+  removeTagFromBookmark(bookmarkId, tagId) {
+    const validation = this.securityLayer.validateInputs({ bookmarkId, tagId });
+    if (!validation.valid) {
+      throw new Error(validation.errors.join(', '));
+    }
+    
+    const stmt = this.securityLayer.prepare(`
+      DELETE FROM bookmark_tag_relations 
+      WHERE bookmark_id = ? AND tag_id = ?
+    `);
+    
+    return stmt.run(validation.sanitized.bookmarkId, validation.sanitized.tagId);
+  }
+
+  updateBookmarkTags(bookmarkId, tagNames, userId) {
+    const validation = this.securityLayer.validateInputs({ bookmarkId, userId });
+    if (!validation.valid) {
+      throw new Error(validation.errors.join(', '));
+    }
+    
+    // Get current tags to decrement usage
+    const currentBookmark = this.getBookmarkById(validation.sanitized.bookmarkId, validation.sanitized.userId);
+    if (currentBookmark && currentBookmark.tags) {
+      currentBookmark.tags.forEach(tagName => {
+        this.decrementTagUsage(tagName, validation.sanitized.userId);
+      });
+    }
+    
+    // Remove all existing tag relations
+    const deleteRelationsStmt = this.securityLayer.prepare(`
+      DELETE FROM bookmark_tag_relations 
+      WHERE bookmark_id = ?
+    `);
+    deleteRelationsStmt.run(validation.sanitized.bookmarkId);
+    
+    // Add new tag relations
+    tagNames.forEach(tagName => {
+      // Get or create tag
+      let tag = this.getTagByName(tagName, validation.sanitized.userId);
+      if (!tag) {
+        const tagId = this.generateId();
+        this.createBookmarkTag({
+          id: tagId,
+          name: tagName,
+          userId: validation.sanitized.userId
+        });
+        tag = this.getTagByName(tagName, validation.sanitized.userId);
+      }
+      
+      if (tag) {
+        this.addTagToBookmark(validation.sanitized.bookmarkId, tag.id);
+        this.incrementTagUsage(tagName, validation.sanitized.userId);
+      }
+    });
+  }
+
+  // Helper Methods
+  getTagById(tagId) {
+    const validation = this.securityLayer.validateInput(tagId);
+    if (!validation.valid) {
+      return null;
+    }
+    
+    const stmt = this.securityLayer.prepare('SELECT * FROM bookmark_tags WHERE id = ?');
+    return stmt.get(validation.sanitized.tagId);
+  }
+
+  getTagByName(tagName, userId) {
+    const validation = this.securityLayer.validateInputs({ tagName, userId });
+    if (!validation.valid) {
+      return null;
+    }
+    
+    const stmt = this.securityLayer.prepare('SELECT * FROM bookmark_tags WHERE name = ? AND user_id = ?');
+    return stmt.get(validation.sanitized.tagName, validation.sanitized.userId);
+  }
+
+  // Search functionality
+  searchBookmarks(userId, query, options = {}) {
+    return this.getBookmarks(userId, { ...options, search: query });
+  }
+
+  // Import/Export functionality
+  exportBookmarks(userId, format = 'json') {
+    const bookmarks = this.getBookmarks(userId);
+    const folders = this.getBookmarkFolders(userId);
+    const tags = this.getBookmarkTags(userId);
+    
+    const exportData = {
+      bookmarks,
+      folders,
+      tags,
+      exported_at: new Date().toISOString(),
+      version: '1.0'
+    };
+    
+    if (format === 'json') {
+      return JSON.stringify(exportData, null, 2);
+    } else if (format === 'csv') {
+      // Convert to CSV format
+      const csvHeaders = ['title', 'description', 'url', 'type', 'tags', 'folder_name', 'is_favorite', 'created_at'];
+      const csvRows = bookmarks.map(bookmark => [
+        bookmark.title,
+        bookmark.description || '',
+        bookmark.url,
+        bookmark.type,
+        bookmark.tags.join(';'),
+        bookmark.folder_name || '',
+        bookmark.is_favorite,
+        bookmark.created_at
+      ]);
+      
+      return [csvHeaders, ...csvRows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+    }
+    
+    throw new Error('Unsupported export format');
+  }
+
+  importBookmarks(userId, importData, format = 'json') {
+    let data;
+    
+    if (format === 'json') {
+      data = typeof importData === 'string' ? JSON.parse(importData) : importData;
+    } else {
+      throw new Error('Unsupported import format');
+    }
+    
+    const results = {
+      imported: 0,
+      skipped: 0,
+      errors: []
+    };
+    
+    // Import folders first
+    if (data.folders && Array.isArray(data.folders)) {
+      data.folders.forEach(folder => {
+        try {
+          // Check if folder already exists
+          const existing = this.getBookmarkFolders(userId).find(f => f.name === folder.name);
+          if (!existing) {
+            this.createBookmarkFolder({
+              id: this.generateId(),
+              name: folder.name,
+              description: folder.description,
+              userId: userId,
+              color: folder.color,
+              icon: folder.icon,
+              sortOrder: folder.sortOrder
+            });
+          }
+        } catch (error) {
+          results.errors.push(`Error importing folder ${folder.name}: ${error.message}`);
+        }
+      });
+    }
+    
+    // Import tags
+    if (data.tags && Array.isArray(data.tags)) {
+      data.tags.forEach(tag => {
+        try {
+          const existing = this.getTagByName(tag.name, userId);
+          if (!existing) {
+            this.createBookmarkTag({
+              id: this.generateId(),
+              name: tag.name,
+              color: tag.color,
+              userId: userId
+            });
+          }
+        } catch (error) {
+          results.errors.push(`Error importing tag ${tag.name}: ${error.message}`);
+        }
+      });
+    }
+    
+    // Import bookmarks
+    if (data.bookmarks && Array.isArray(data.bookmarks)) {
+      data.bookmarks.forEach(bookmark => {
+        try {
+          // Check if bookmark already exists (by URL)
+          const existing = this.getBookmarks(userId).find(b => b.url === bookmark.url);
+          if (!existing) {
+            // Find folder ID if folder name is provided
+            let folderId = null;
+            if (bookmark.folder_name) {
+              const folder = this.getBookmarkFolders(userId).find(f => f.name === bookmark.folder_name);
+              if (folder) {
+                folderId = folder.id;
+              }
+            }
+            
+            this.createBookmark({
+              id: this.generateId(),
+              title: bookmark.title,
+              description: bookmark.description,
+              url: bookmark.url,
+              type: bookmark.type || 'custom',
+              targetId: bookmark.target_id,
+              userId: userId,
+              folderId: folderId,
+              favicon: bookmark.favicon,
+              thumbnail: bookmark.thumbnail,
+              isFavorite: bookmark.is_favorite,
+              isPrivate: bookmark.is_private,
+              sortOrder: bookmark.sort_order,
+              metadata: bookmark.metadata,
+              tags: bookmark.tags || []
+            });
+            
+            results.imported++;
+          } else {
+            results.skipped++;
+          }
+        } catch (error) {
+          results.errors.push(`Error importing bookmark ${bookmark.title}: ${error.message}`);
+        }
+      });
+    }
+    
+    return results;
+  }
+
+  // Sync functionality
+  createSyncRecord(syncRecord) {
+    const validation = this.securityLayer.validateInputs({
+      id: syncRecord.id,
+      userId: syncRecord.userId,
+      deviceId: syncRecord.deviceId,
+      bookmarkId: syncRecord.bookmarkId,
+      action: syncRecord.action,
+      syncData: syncRecord.syncData
+    });
+    
+    if (!validation.valid) {
+      throw new Error(validation.errors.join(', '));
+    }
+    
+    const stmt = this.securityLayer.prepare(`
+      INSERT INTO bookmark_sync (id, user_id, device_id, bookmark_id, action, sync_data)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+    
+    return stmt.run(
+      validation.sanitized.id,
+      validation.sanitized.userId,
+      validation.sanitized.deviceId,
+      validation.sanitized.bookmarkId,
+      validation.sanitized.action,
+      validation.sanitized.syncData ? JSON.stringify(validation.sanitized.syncData) : null
+    );
+  }
+
+  getPendingSyncRecords(userId, deviceId = null) {
+    const validation = this.securityLayer.validateInputs({ userId, deviceId });
+    if (!validation.valid) {
+      throw new Error(validation.errors.join(', '));
+    }
+    
+    let query = 'SELECT * FROM bookmark_sync WHERE user_id = ? AND synced = 0';
+    const params = [validation.sanitized.userId];
+    
+    if (deviceId) {
+      query += ' AND device_id != ?';
+      params.push(validation.sanitized.deviceId);
+    }
+    
+    query += ' ORDER BY timestamp ASC';
+    
+    const stmt = this.securityLayer.prepare(query);
+    const records = stmt.all(...params);
+    
+    return records.map(record => ({
+      ...record,
+      sync_data: record.sync_data ? JSON.parse(record.sync_data) : null
+    }));
+  }
+
+  markSyncRecordsAsSynced(recordIds) {
+    if (!recordIds || recordIds.length === 0) {
+      return;
+    }
+    
+    const placeholders = recordIds.map(() => '?').join(',');
+    const stmt = this.securityLayer.prepare(`
+      UPDATE bookmark_sync 
+      SET synced = 1 
+      WHERE id IN (${placeholders})
+    `);
+    
+    return stmt.run(...recordIds);
   }
 }
 

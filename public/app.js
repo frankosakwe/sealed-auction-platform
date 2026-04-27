@@ -540,6 +540,11 @@ function switchTab(tabName) {
         AIRecommendations.refresh(window._allAuctions || auctions);
     }
     
+    // Initialize network monitor when switching to network tab
+    if (tabName === 'network' && window.networkMonitor) {
+        window.networkMonitor.showNetworkPanel();
+    }
+    
     currentTab = tabName;
 }
 
@@ -1126,12 +1131,14 @@ const VOICE_COMMANDS  = {
     'map':            () => switchTab('map'),
     'open video':     () => switchTab('video'),
     'video':          () => switchTab('video'),
+    'open network':   () => switchTab('network'),
+    'network':        () => switchTab('network'),
     'voice':          () => switchTab('voice'),
     'scroll down':    () => window.scrollBy({ top: 400, behavior: 'smooth' }),
     'scroll up':      () => window.scrollBy({ top: -400, behavior: 'smooth' }),
     'stop listening': () => stopVoiceRecognition(),
     'stop':           () => stopVoiceRecognition(),
-    'help':           () => { switchTab('voice'); speakFeedback('Available commands: show auctions, create auction, my bids, open filter, open map, open video, scroll down, scroll up, stop listening.'); },
+    'help':           () => { switchTab('voice'); speakFeedback('Available commands: show auctions, create auction, my bids, open filter, open map, open video, open network, scroll down, scroll up, stop listening.'); },
 };
 
 function initVoiceRecognition() {
