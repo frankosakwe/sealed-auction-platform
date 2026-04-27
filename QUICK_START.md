@@ -6,7 +6,7 @@
 1. **Double-click `setup.bat`**
    - This will check for Node.js and install all dependencies
    - Follow the on-screen instructions
-
+<!-- 
 ### Option 2: Manual Setup
 1. **Install Node.js** (if not already installed)
    - Download from: https://nodejs.org/
@@ -15,7 +15,7 @@
 2. **Install Dependencies**
    ```bash
    npm install
-   ```
+   ``` -->
 
 ## 🏃‍♂️ Running the Application
 

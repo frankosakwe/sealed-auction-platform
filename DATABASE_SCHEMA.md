@@ -8,12 +8,12 @@ This document describes the normalized database schema for the Sealed-Bid Auctio
 - **File**: `auctions.db` (configurable via DATABASE_PATH environment variable)
 
 ## Entity Relationship Diagram
-
+<!-- 
 ```
 users (1) ----< (N) auctions (creator_id)
 users (1) ----< (N) auctions (winner_id)
 users (1) ----< (N) bids
-auctions (1) --< (N) bids
+auctions (1) --< (N) bids -->
 ```
 
 ## Tables

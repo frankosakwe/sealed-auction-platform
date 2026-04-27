@@ -1,7 +1,7 @@
 # Quick PR Creation & Closure
 
 ## 🚀 **Create PR (Short Version)**
-1. **Go to**: https://github.com/Great-2025/sealed-auction-platform/pull/new/form-validation-fix
+<!-- 1. **Go to**: https://github.com/Great-2025/sealed-auction-platform/pull/new/form-validation-fix
 2. **Title**: `Form Validation Enhancement`
 3. **Description**: Copy contents from `SHORT_PR_DESCRIPTION.md`
 4. **Click**: "Create pull request"
@@ -14,7 +14,7 @@
 - PR created to document the work
 - PR closed as requested
 - Form validation issue resolved
-- Branch preserved for reference
+- Branch preserved for reference -->
 
 ---
 

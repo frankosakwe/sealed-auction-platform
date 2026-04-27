@@ -11,13 +11,13 @@ This implementation adds JSON Web Token (JWT) based authentication to the sealed
 - 24-hour expiration time
 - Secure signing using JWT_SECRET environment variable
 
-### 2. Authentication Middleware
+<!-- ### 2. Authentication Middleware
 - `authenticateToken` middleware protects sensitive endpoints
 - Validates JWT tokens on each request
 - Checks against token blacklist for revoked tokens
 - Returns appropriate HTTP status codes (401, 403)
 
-### 3. New API Endpoints
+### 3. New API Endpoints -->
 
 #### POST /api/users/register
 ```json

@@ -13,7 +13,7 @@ The platform now supports social authentication using:
 1. Node.js and npm installed
 2. OAuth applications created on Google and GitHub
 3. Environment variables configured
-
+<!-- 
 ## Step 1: Google OAuth Setup
 
 ### 1.1 Create Google OAuth Application
@@ -21,7 +21,7 @@ The platform now supports social authentication using:
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a new project or select existing one
 3. Navigate to **APIs & Services** > **Credentials**
-4. Click **Create Credentials** > **OAuth client ID**
+4. Click **Create Credentials** > **OAuth client ID** -->
 5. Configure:
    - **Application type**: Web application
    - **Name**: Sealed Auction Platform

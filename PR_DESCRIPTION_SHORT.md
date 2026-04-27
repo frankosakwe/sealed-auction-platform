@@ -15,11 +15,11 @@
 - **Text Sizing**: Implemented `text-xs sm:text-sm md:text-base` scaling
 - **Buttons**: Mobile-optimized with truncated text (`Bid` vs `Place Bid`)
 - **Forms**: Better max-width handling on small screens
-
+<!-- 
 ### Files Modified
 - `public/index.html` - Main responsive layout improvements
 - `public/app.js` - Auction card mobile optimizations
-- `test-responsive-updated.html` - Test page (new)
+- `test-responsive-updated.html` - Test page (new) -->
 
 ### Testing
 - Verified single column layout on mobile (< 768px)
