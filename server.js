@@ -24,9 +24,13 @@ const session = require('express-session');
 const passport = require('passport');
 const AuctionDatabase = require('./database');
 const { ApplicationMetrics, createMetricsMiddleware } = require('./utils/metrics');
+const NetworkMonitor = require('./utils/network-monitor');
 
 // Initialize database
 const db = new AuctionDatabase();
+
+// Initialize network monitor
+const networkMonitor = new NetworkMonitor();
 
 const app = express();
 const server = http.createServer(app);
@@ -2014,6 +2018,100 @@ function getSavingsBreakdown(transactions) {
     }, {})
   };
 }
+
+// Network Status Monitoring Endpoints
+
+// Get current network status
+app.get('/api/network/status', (req, res) => {
+  try {
+    const status = networkMonitor.getNetworkStatus();
+    res.json(status);
+  } catch (error) {
+    logError('Error getting network status:', error, { endpoint: '/api/network/status' });
+    res.status(500).json({ error: 'Failed to get network status' });
+  }
+});
+
+// Get historical network data
+app.get('/api/network/history', (req, res) => {
+  try {
+    const hours = parseInt(req.query.hours) || 24;
+    const history = networkMonitor.getHistoricalData(hours);
+    res.json(history);
+  } catch (error) {
+    logError('Error getting network history:', error, { endpoint: '/api/network/history' });
+    res.status(500).json({ error: 'Failed to get network history' });
+  }
+});
+
+// Get network alerts
+app.get('/api/network/alerts', (req, res) => {
+  try {
+    const status = networkMonitor.getNetworkStatus();
+    res.json(status.alerts);
+  } catch (error) {
+    logError('Error getting network alerts:', error, { endpoint: '/api/network/alerts' });
+    res.status(500).json({ error: 'Failed to get network alerts' });
+  }
+});
+
+// Acknowledge network alert
+app.post('/api/network/alerts/:id/acknowledge', (req, res) => {
+  try {
+    const alertId = req.params.id;
+    const success = networkMonitor.acknowledgeAlert(alertId);
+    
+    if (success) {
+      res.json({ message: 'Alert acknowledged successfully' });
+    } else {
+      res.status(404).json({ error: 'Alert not found' });
+    }
+  } catch (error) {
+    logError('Error acknowledging alert:', error, { endpoint: '/api/network/alerts/:id/acknowledge' });
+    res.status(500).json({ error: 'Failed to acknowledge alert' });
+  }
+});
+
+// Clear all network alerts
+app.delete('/api/network/alerts', (req, res) => {
+  try {
+    networkMonitor.clearAlerts();
+    res.json({ message: 'All alerts cleared successfully' });
+  } catch (error) {
+    logError('Error clearing alerts:', error, { endpoint: '/api/network/alerts' });
+    res.status(500).json({ error: 'Failed to clear alerts' });
+  }
+});
+
+// Get network recommendations
+app.get('/api/network/recommendations', (req, res) => {
+  try {
+    const recommendations = networkMonitor.getRecommendations();
+    res.json(recommendations);
+  } catch (error) {
+    logError('Error getting network recommendations:', error, { endpoint: '/api/network/recommendations' });
+    res.status(500).json({ error: 'Failed to get network recommendations' });
+  }
+});
+
+// Get congestion information
+app.get('/api/network/congestion', (req, res) => {
+  try {
+    await networkMonitor.checkCongestion();
+    const status = networkMonitor.getNetworkStatus();
+    const trend = networkMonitor.getCongestionTrend();
+    
+    res.json({
+      level: status.congestionLevel,
+      operationsPerSecond: status.operationsPerSecond,
+      trend,
+      history: networkMonitor.metrics.congestionHistory.slice(-20)
+    });
+  } catch (error) {
+    logError('Error getting congestion info:', error, { endpoint: '/api/network/congestion' });
+    res.status(500).json({ error: 'Failed to get congestion information' });
+  }
+});
 
 // Schedule regular backups
 const BACKUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
