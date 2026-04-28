@@ -86,6 +86,9 @@
     </style>
 </head>
 <body class="bg-gray-50">
+    <!-- Skip Navigation Link -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    
     <!-- Navigation -->
     <nav class="bg-white shadow-sm border-b">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -111,7 +114,7 @@
     </nav>
 
     <!-- Main Content -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <main id="main-content" role="main" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <!-- Filters Section -->
         <div class="bg-white rounded-lg shadow p-6 mb-6">
             <h2 class="text-lg font-semibold mb-4">Filters</h2>
@@ -137,11 +140,11 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Min Bid Amount</label>
-                    <input type="number" id="minBid" placeholder="0" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <input type="number" id="minBid" placeholder="0" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" aria-label="0">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Max Bid Amount</label>
-                    <input type="number" id="maxBid" placeholder="10000" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <input type="number" id="maxBid" placeholder="10000" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" aria-label="10000">
                 </div>
             </div>
         </div>
@@ -248,13 +251,13 @@
             <h3 class="text-lg font-semibold mb-4">Top Performing Auctions</h3>
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
+                    <thead class="bg-gray-50" scope="col">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Auction Title</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Bids</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Highest Bid</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" scope="col">Auction Title</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" scope="col">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" scope="col">Total Bids</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" scope="col">Highest Bid</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" scope="col">Created</th>
                         </tr>
                     </thead>
                     <tbody id="topAuctionsTable" class="bg-white divide-y divide-gray-200">
@@ -275,5 +278,12 @@
 
     <script src="dashboard.js"></script>
     <script src="pwa.js"></script>
+    
+    <!-- ARIA Live Regions -->
+    <div id="aria-live-polite" role="status" aria-live="polite" aria-atomic="true" class="sr-only"></div>
+    <div id="aria-live-assertive" role="alert" aria-live="assertive" aria-atomic="true" class="sr-only"></div>
+    
+    <!-- Accessibility JavaScript -->
+    <script src="accessibility.js"></script>
 </body>
 </html>

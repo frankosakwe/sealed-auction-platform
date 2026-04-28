@@ -43,6 +43,12 @@ document.addEventListener("DOMContentLoaded", () => {
     setupSocketListeners();
     checkOAuthStatus();
     checkOAuthCallback();
+    
+    // Initialize VR integration after main app is ready
+    setTimeout(() => {
+        initializeVRIntegration();
+        addVRControlsToUI();
+    }, 1000);
 });
 
 function initializeApp() {
@@ -1756,6 +1762,187 @@ function startOnboardingWizard() {
     }
 }
 
+// VR Integration Functions
+function initializeVRIntegration() {
+    // Check if VR is available and setup integration
+    if (window.vrIntegration) {
+        console.log('VR integration available');
+        
+        // Load current auctions into VR
+        if (auctions.length > 0) {
+            window.vrIntegration.loadAuctions(auctions);
+        }
+        
+        // Setup VR event listeners
+        setupVREventListeners();
+    }
+}
+
+function setupVREventListeners() {
+    // Listen for VR-specific events
+    document.addEventListener('vr-auction-selected', (event) => {
+        const auctionId = event.detail.auctionId;
+        selectAuction(auctionId);
+    });
+    
+    document.addEventListener('vr-bid-requested', (event) => {
+        const auctionId = event.detail.auctionId;
+        showBidModal(auctionId);
+    });
+}
+
+// Enhanced auction loading with VR support
+function loadAuctions(reset = false) {
+    if (isLoading || (!hasMoreAuctions && !reset)) return;
+    
+    isLoading = true;
+    showLoadingIndicator();
+    
+    if (reset) {
+        currentPage = 1;
+        auctions = [];
+        renderAuctions();
+    }
+    
+    fetch(`/api/auctions?page=${currentPage}&limit=${AUCTIONS_PER_PAGE}`)
+    .then(response => response.json())
+    .then(data => {
+        const { auctions: newAuctions, pagination } = data;
+        
+        if (reset) {
+            auctions = newAuctions;
+        } else {
+            auctions = [...auctions, ...newAuctions];
+        }
+        
+        currentPage = pagination.page;
+        hasMoreAuctions = pagination.hasMore;
+        isLoading = false;
+        hideLoadingIndicator();
+        
+        renderAuctions();
+        
+        // Update VR with new auctions
+        if (window.vrIntegration && reset) {
+            window.vrIntegration.loadAuctions(auctions);
+        }
+        
+        // Update auction counts
+        updateAuctionCounts();
+    })
+    .catch(error => {
+        console.error('Error loading auctions:', error);
+        isLoading = false;
+        hideLoadingIndicator();
+        showNotification('Failed to load auctions', 'error');
+    });
+}
+
+// Enhanced socket listeners with VR updates
+function setupSocketListeners() {
+    // Connection events
+    socket.on("connect", () => {
+        console.log("Connected to server");
+    });
+    
+    socket.on("disconnect", () => {
+        console.log("Disconnected from server");
+        showNotification("Connection lost. Reconnecting...", "warning");
+    });
+    
+    // Auction events
+    socket.on("auctionCreated", (auction) => {
+        console.log("New auction created:", auction);
+        addAuctionToGrid(auction);
+        addNotification(`New auction: ${auction.title}`, "auction", { auctionId: auction.id });
+        
+        // Update VR with new auction
+        if (window.vrIntegration) {
+            window.vrIntegration.onAuctionCreated(auction);
+        }
+    });
+    
+    socket.on("auctionClosed", (auction) => {
+        console.log("Auction closed:", auction);
+        updateAuctionInGrid(auction);
+        
+        if (auction.winner) {
+            addNotification(`Auction "${auction.title}" closed! Winner: ${auction.winner}`, "success", { auctionId: auction.id });
+        } else {
+            addNotification(`Auction "${auction.title}" closed without bids`, "info", { auctionId: auction.id });
+        }
+        
+        // Update VR with closed auction
+        if (window.vrIntegration) {
+            window.vrIntegration.onAuctionClosed(auction);
+        }
+    });
+    
+    socket.on("bidPlaced", (data) => {
+        console.log("New bid placed:", data);
+        updateBidCount(data.auctionId, data.bidCount);
+        addNotification("New bid placed on auction!", "bid", { auctionId: data.auctionId });
+        
+        // Update VR with new bid
+        if (window.vrIntegration) {
+            window.vrIntegration.onBidPlaced(data);
+        }
+    });
+}
+
+// VR UI Controls
+function addVRControlsToUI() {
+    // Add VR button to navigation
+    const navContainer = document.querySelector('.nav-container') || document.querySelector('header');
+    if (navContainer) {
+        const vrButton = document.createElement('button');
+        vrButton.id = 'vr-nav-button';
+        vrButton.innerHTML = '<i class="fas fa-vr-cardboard"></i> VR Mode';
+        vrButton.className = 'px-4 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-lg hover:from-purple-600 hover:to-indigo-700 transition-all duration-200 shadow-lg';
+        vrButton.onclick = enterVRMode;
+        
+        navContainer.appendChild(vrButton);
+    }
+    
+    // Add VR status to user menu
+    const userMenu = document.querySelector('.user-menu');
+    if (userMenu) {
+        const vrStatusItem = document.createElement('li');
+        vrStatusItem.innerHTML = `
+            <a href="#" onclick="toggleVRPerformance()" class="block px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700">
+                <i class="fas fa-tachometer-alt mr-2"></i>
+                VR Performance: <span id="vr-perf-status">Normal</span>
+            </a>
+        `;
+        userMenu.appendChild(vrStatusItem);
+    }
+}
+
+function enterVRMode() {
+    if (window.vrIntegration) {
+        window.vrIntegration.enterVR().then(success => {
+            if (success) {
+                showNotification('Entering VR mode...', 'success');
+            } else {
+                showNotification('Failed to enter VR mode', 'error');
+            }
+        });
+    } else {
+        showNotification('VR not available', 'error');
+    }
+}
+
+function toggleVRPerformance() {
+    if (window.vrIntegration) {
+        const isPerformanceMode = window.vrIntegration.togglePerformanceMode();
+        const statusElement = document.getElementById('vr-perf-status');
+        if (statusElement) {
+            statusElement.textContent = isPerformanceMode ? 'Optimized' : 'Normal';
+        }
+        showNotification(`VR performance mode: ${isPerformanceMode ? 'Optimized' : 'Normal'}`, 'info');
+    }
+}
+
 // Make functions globally available
 window.startOnboardingWizard = startOnboardingWizard;
 
@@ -1865,3 +2052,6 @@ function updateWatchlistButtons() {
 // Make watchlist functions globally available
 window.toggleWatchlist = toggleWatchlist;
 window.loadUserWatchlist = loadUserWatchlist;
+window.initializeVRIntegration = initializeVRIntegration;
+window.enterVRMode = enterVRMode;
+window.toggleVRPerformance = toggleVRPerformance;

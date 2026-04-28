@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cross-Chain Bridge - Sealed Auction Platform</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8fafc;
+            --bg-tertiary: #e2e8f0;
+            --text-primary: #1a202c;
+            --text-secondary: #4a5568;
+            --text-tertiary: #718096;
+            --border-color: #e2e8f0;
+            --glass-bg: rgba(255, 255, 255, 0.8);
+            --glass-border: rgba(255, 255, 255, 0.3);
+            --gradient-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --stellar-gradient: linear-gradient(135deg, #f7fafc 0%, #edf2f7 50%, #e2e8f0 100%);
+            --button-primary: #667eea;
+            --button-primary-hover: #5a67d8;
+            --button-secondary: #718096;
+            --button-secondary-hover: #4a5568;
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #1a202c;
+            --bg-secondary: #2d3748;
+            --bg-tertiary: #4a5568;
+            --text-primary: #ffffff;
+            --text-secondary: #e2e8f0;
+            --text-tertiary: #a0aec0;
+            --border-color: #4a5568;
+            --glass-bg: rgba(255, 255, 255, 0.1);
+            --glass-border: rgba(255, 255, 255, 0.2);
+            --gradient-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --stellar-gradient: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            --button-primary: #9f7aea;
+            --button-primary-hover: #805ad5;
+            --button-secondary: #4a5568;
+            --button-secondary-hover: #2d3748;
+        }
+
+        body {
+            background: var(--gradient-bg);
+            min-height: 100vh;
+            color: var(--text-primary);
+        }
+
+        .glass-effect {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+        }
+
+        .chain-card {
+            background: var(--bg-secondary);
+            border: 2px solid var(--border-color);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .chain-card:hover {
+            border-color: var(--button-primary);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .chain-card.selected {
+            border-color: var(--button-primary);
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+        }
+
+        .bridge-arrow {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-pending { background: #fef3c7; color: #92400e; }
+        .status-processing { background: #dbeafe; color: #1e40af; }
+        .status-completed { background: #d1fae5; color: #065f46; }
+        .status-failed { background: #fee2e2; color: #991b1b; }
+
+        .transfer-item {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .transfer-item:hover {
+            transform: translateX(4px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .security-check {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .security-check.verified {
+            background: rgba(34, 197, 94, 0.1);
+            color: #16a34a;
+        }
+
+        .security-check.warning {
+            background: rgba(245, 158, 11, 0.1);
+            color: #d97706;
+        }
+
+        .loading-spinner {
+            border: 3px solid var(--border-color);
+            border-top: 3px solid var(--button-primary);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .mobile-menu {
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .mobile-menu {
+                display: block;
+            }
+            
+            .desktop-menu {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="min-h-screen p-4 md:p-8">
+        <!-- Header -->
+        <header class="glass-effect rounded-2xl p-6 mb-8">
+            <div class="flex justify-between items-center flex-wrap gap-4">
+                <div class="flex items-center gap-4">
+                    <button onclick="window.history.back()" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i>
+                        Back
+                    </button>
+                    <h1 class="text-2xl md:text-3xl font-bold flex items-center gap-3">
+                        <i class="fas fa-bridge text-purple-500"></i>
+                        Cross-Chain Bridge
+                    </h1>
+                </div>
+                <div class="flex items-center gap-4">
+                    <button id="themeToggle" class="btn btn-secondary">
+                        <i class="fas fa-moon" id="themeIcon"></i>
+                    </button>
+                    <div class="flex items-center gap-2">
+                        <img src="/icons/icon-32x32.png" alt="User" class="w-8 h-8 rounded-full">
+                        <span id="userDisplay" class="font-medium">Guest</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="max-w-6xl mx-auto">
+            <!-- Bridge Interface -->
+            <section class="glass-effect rounded-2xl p-6 mb-8">
+                <h2 class="text-xl font-bold mb-6 flex items-center gap-2">
+                    <i class="fas fa-exchange-alt text-purple-500"></i>
+                    Bridge Assets
+                </h2>
+
+                <!-- Chain Selection -->
+                <div class="grid md:grid-cols-2 gap-8 mb-8">
+                    <!-- Source Chain -->
+                    <div>
+                        <label class="block text-sm font-medium mb-3">From Chain</label>
+                        <div id="sourceChains" class="space-y-3">
+                            <!-- Chains will be populated by JavaScript -->
+                        </div>
+                    </div>
+
+                    <!-- Bridge Arrow -->
+                    <div class="flex items-center justify-center md:col-span-2">
+                        <button id="swapChains" class="bridge-arrow text-3xl text-purple-500 hover:text-purple-600 transition-colors">
+                            <i class="fas fa-exchange-alt"></i>
+                        </button>
+                    </div>
+
+                    <!-- Target Chain -->
+                    <div>
+                        <label class="block text-sm font-medium mb-3">To Chain</label>
+                        <div id="targetChains" class="space-y-3">
+                            <!-- Chains will be populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Asset Selection -->
+                <div class="mb-8">
+                    <label class="block text-sm font-medium mb-3">Select Asset</label>
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">Available Assets</label>
+                            <select id="assetSelect" class="w-full p-3 border rounded-lg bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600">
+                                <option value="">Select an asset...</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">Amount</label>
+                            <div class="flex gap-2">
+                                <input type="number" id="amountInput" placeholder="0.00" min="0" step="0.01" 
+                                       class="flex-1 p-3 border rounded-lg bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600">
+                                <button id="maxButton" class="btn btn-secondary">MAX</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="balanceInfo" class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                        <!-- Balance will be shown here -->
+                    </div>
+                </div>
+
+                <!-- Fee Estimation -->
+                <div class="mb-8 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <h3 class="font-medium mb-3 flex items-center gap-2">
+                        <i class="fas fa-calculator text-blue-500"></i>
+                        Fee Estimation
+                    </h3>
+                    <div id="feeEstimation" class="space-y-2">
+                        <div class="flex justify-between">
+                            <span>Bridge Fee:</span>
+                            <span id="bridgeFee" class="font-mono">--</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Network Fee:</span>
+                            <span id="networkFee" class="font-mono">--</span>
+                        </div>
+                        <div class="flex justify-between font-bold border-t pt-2">
+                            <span>Total Fee:</span>
+                            <span id="totalFee" class="font-mono">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Security Verification -->
+                <div class="mb-8">
+                    <h3 class="font-medium mb-3 flex items-center gap-2">
+                        <i class="fas fa-shield-alt text-green-500"></i>
+                        Security Verification
+                    </h3>
+                    <div id="securityChecks" class="space-y-2">
+                        <!-- Security checks will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex gap-4">
+                    <button id="bridgeButton" class="btn btn-primary flex-1" disabled>
+                        <i class="fas fa-paper-plane mr-2"></i>
+                        Bridge Assets
+                    </button>
+                    <button id="previewButton" class="btn btn-secondary">
+                        <i class="fas fa-eye mr-2"></i>
+                        Preview
+                    </button>
+                </div>
+            </section>
+
+            <!-- Transfer Tracking -->
+            <section class="glass-effect rounded-2xl p-6 mb-8">
+                <h2 class="text-xl font-bold mb-6 flex items-center gap-2">
+                    <i class="fas fa-history text-blue-500"></i>
+                    Transfer History
+                </h2>
+                <div id="transferHistory" class="space-y-4">
+                    <!-- Transfer history will be populated here -->
+                </div>
+            </section>
+
+            <!-- Bridge Status -->
+            <section class="glass-effect rounded-2xl p-6">
+                <h2 class="text-xl font-bold mb-6 flex items-center gap-2">
+                    <i class="fas fa-info-circle text-purple-500"></i>
+                    Bridge Status
+                </h2>
+                <div id="bridgeStatus" class="grid md:grid-cols-3 gap-4">
+                    <!-- Bridge status will be populated here -->
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Preview Modal -->
+    <div id="previewModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-md w-full">
+            <h3 class="text-lg font-bold mb-4">Bridge Preview</h3>
+            <div id="previewContent" class="space-y-3 mb-6">
+                <!-- Preview content will be populated here -->
+            </div>
+            <div class="flex gap-3">
+                <button id="confirmBridge" class="btn btn-primary flex-1">Confirm</button>
+                <button id="cancelPreview" class="btn btn-secondary flex-1">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="cross-chain-bridge.js"></script>
+</body>
+</html>

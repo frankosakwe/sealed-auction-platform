@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NFT Gallery - Sealed Auction Platform</title>
+    
+    <!-- Scripts and Styles -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="nft-mobile.css">
+    <style>
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8fafc;
+            --text-primary: #1a202c;
+            --text-secondary: #4a5568;
+            --border-color: #e2e8f0;
+            --glass-bg: rgba(255, 255, 255, 0.8);
+            --glass-border: rgba(255, 255, 255, 0.3);
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #1a202c;
+            --bg-secondary: #2d3748;
+            --text-primary: #ffffff;
+            --text-secondary: #e2e8f0;
+            --border-color: #4a5568;
+            --glass-bg: rgba(255, 255, 255, 0.1);
+            --glass-border: rgba(255, 255, 255, 0.2);
+        }
+
+        .glass-effect {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+        }
+
+        .nft-card {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .nft-card:hover {
+            transform: translateY(-4px);
+        }
+
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        
+        /* Standard line-clamp property */
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            line-clamp: 2;
+            -o-line-clamp: 2;
+            -moz-line-clamp: 2;
+            -ms-line-clamp: 2;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .skeleton {
+            background: linear-gradient(90deg, rgba(0,0,0,0.1) 25%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.1) 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+        }
+
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .tooltip {
+            position: relative;
+        }
+
+        .tooltip:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.875rem;
+            white-space: nowrap;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white">
+    <!-- Navigation -->
+    <nav class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 nav-mobile">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <a href="index.html" class="flex items-center">
+                        <i class="fas fa-gavel text-2xl text-blue-600 mr-3"></i>
+                        <span class="font-bold text-xl">Auction Platform</span>
+                    </a>
+                    <div class="hidden md:flex ml-10 space-x-8">
+                        <a href="index.html" class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">
+                            Auctions
+                        </a>
+                        <a href="nft-gallery.html" class="text-blue-600 dark:text-blue-400 font-semibold">
+                            NFT Gallery
+                        </a>
+                        <a href="dashboard.html" class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">
+                            Dashboard
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <button id="themeToggle" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+                        <i class="fas fa-moon dark:hidden"></i>
+                        <i class="fas fa-sun hidden dark:block"></i>
+                    </button>
+                    <button id="walletConnect" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                        <i class="fas fa-wallet mr-2"></i>Connect Wallet
+                    </button>
+                    <!-- Mobile menu toggle -->
+                    <button id="mobileMenuToggle" class="mobile-menu-toggle md:hidden">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Mobile Menu -->
+    <div id="mobileMenu" class="mobile-menu">
+        <div class="p-4">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold">Menu</h2>
+                <button id="closeMobileMenu" class="p-2">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <nav class="space-y-4">
+                <a href="index.html" class="block py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">
+                    <i class="fas fa-gavel mr-2"></i>Auctions
+                </a>
+                <a href="nft-gallery.html" class="block py-2 text-blue-600 dark:text-blue-400 font-semibold">
+                    <i class="fas fa-image mr-2"></i>NFT Gallery
+                </a>
+                <a href="dashboard.html" class="block py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">
+                    <i class="fas fa-chart-line mr-2"></i>Dashboard
+                </a>
+            </nav>
+        </div>
+    </div>
+    <div id="mobileMenuOverlay" class="mobile-menu-overlay"></div>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Header Section -->
+        <div class="mb-8">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-2">NFT Gallery</h1>
+                    <p class="text-gray-600 dark:text-gray-400">Discover, collect, and trade unique digital assets</p>
+                </div>
+                <div class="mt-4 md:mt-0 flex space-x-3">
+                    <button onclick="nftDisplay.createNFT()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                        <i class="fas fa-plus mr-2"></i>Create NFT
+                    </button>
+                    <button onclick="nftDisplay.importNFT()" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                        <i class="fas fa-download mr-2"></i>Import NFT
+                    </button>
+                </div>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 stats-grid">
+                <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm stats-card">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Total NFTs</p>
+                            <p class="text-2xl font-bold text-gray-900 dark:text-white" id="totalNFTs">0</p>
+                        </div>
+                        <div class="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                            <i class="fas fa-image text-blue-600 dark:text-blue-400"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm stats-card">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Collections</p>
+                            <p class="text-2xl font-bold text-gray-900 dark:text-white" id="totalCollections">0</p>
+                        </div>
+                        <div class="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
+                            <i class="fas fa-layer-group text-green-600 dark:text-green-400"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm stats-card">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Your NFTs</p>
+                            <p class="text-2xl font-bold text-gray-900 dark:text-white" id="yourNFTs">0</p>
+                        </div>
+                        <div class="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center">
+                            <i class="fas fa-crown text-purple-600 dark:text-purple-400"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm stats-card">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Total Value</p>
+                            <p class="text-2xl font-bold text-gray-900 dark:text-white" id="totalValue">$0</p>
+                        </div>
+                        <div class="w-12 h-12 bg-yellow-100 dark:bg-yellow-900 rounded-full flex items-center justify-center">
+                            <i class="fas fa-dollar-sign text-yellow-600 dark:text-yellow-400"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filters and Controls -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6 filters-section">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 filters-grid">
+                <!-- Search -->
+                <div class="relative">
+                    <input type="text" 
+                           id="nftSearch" 
+                           placeholder="Search NFTs..." 
+                           class="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 filter-input">
+                    <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                </div>
+
+                <!-- Category Filter -->
+                <select id="nftCategoryFilter" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 filter-select">
+                    <option value="all">All Categories</option>
+                    <option value="art">Art</option>
+                    <option value="gaming">Gaming</option>
+                    <option value="music">Music</option>
+                    <option value="photography">Photography</option>
+                    <option value="sports">Sports</option>
+                    <option value="utility">Utility</option>
+                </select>
+
+                <!-- Verification Filter -->
+                <select id="nftVerificationFilter" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 filter-select">
+                    <option value="all">All Status</option>
+                    <option value="verified">Verified</option>
+                    <option value="pending">Pending</option>
+                    <option value="unverified">Unverified</option>
+                </select>
+
+                <!-- Sort -->
+                <select id="nftSort" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 filter-select">
+                    <option value="created_at-desc">Newest First</option>
+                    <option value="created_at-asc">Oldest First</option>
+                    <option value="name-asc">Name (A-Z)</option>
+                    <option value="name-desc">Name (Z-A)</option>
+                    <option value="price-asc">Price (Low to High)</option>
+                    <option value="price-desc">Price (High to Low)</option>
+                    <option value="rarity_score-desc">Rarity (High to Low)</option>
+                </select>
+            </div>
+
+            <!-- Price Range Filter -->
+            <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 filter-row">
+                <div class="flex items-center space-x-3">
+                    <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Price Range:</label>
+                    <input type="number" 
+                           id="priceRangeMin" 
+                           placeholder="Min" 
+                           class="w-24 px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 filter-input">
+                    <span class="text-gray-500">-</span>
+                    <input type="number" 
+                           id="priceRangeMax" 
+                           placeholder="Max" 
+                           class="w-24 px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 filter-input">
+                </div>
+
+                <!-- View Mode Toggle -->
+                <div class="flex items-center space-x-2 view-toggle">
+                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">View:</span>
+                    <div class="flex space-x-1">
+                        <button data-nft-view="grid" class="px-3 py-1 bg-blue-500 text-white rounded-lg transition-colors">
+                            <i class="fas fa-th"></i>
+                        </button>
+                        <button data-nft-view="list" class="px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+                            <i class="fas fa-list"></i>
+                        </button>
+                        <button data-nft-view="detail" class="px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+                            <i class="fas fa-th-large"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Selection Counter -->
+                <div class="flex items-center justify-end">
+                    <span id="selectionCount" class="text-sm text-gray-600 dark:text-gray-400">0 selected</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bulk Actions (Hidden by default) -->
+        <div id="bulkActions" class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6 hidden">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <span class="text-sm font-medium text-blue-800 dark:text-blue-200">
+                        <span id="bulkSelectionCount">0</span> items selected
+                    </span>
+                    <button onclick="nftDisplay.clearSelection()" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">
+                        Clear selection
+                    </button>
+                </div>
+                <div class="flex space-x-3">
+                    <button onclick="nftDisplay.bulkListForSale()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                        <i class="fas fa-tag mr-2"></i>List for Sale
+                    </button>
+                    <button onclick="nftDisplay.bulkTransfer()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                        <i class="fas fa-exchange-alt mr-2"></i>Transfer
+                    </button>
+                    <button onclick="nftDisplay.bulkBurn()" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+                        <i class="fas fa-fire mr-2"></i>Burn
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error Message -->
+        <div id="nftError" class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-6 hidden">
+            <div class="flex items-center">
+                <i class="fas fa-exclamation-triangle text-red-600 dark:text-red-400 mr-3"></i>
+                <span class="text-red-800 dark:text-red-200"></span>
+            </div>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div id="nftLoader" class="flex justify-center py-8 hidden">
+            <div class="flex items-center space-x-2">
+                <i class="fas fa-spinner fa-spin text-blue-600 text-xl"></i>
+                <span class="text-gray-600 dark:text-gray-400">Loading NFTs...</span>
+            </div>
+        </div>
+
+        <!-- NFT Gallery Grid -->
+        <div id="nftGallery" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 nft-gallery mobile-pull-refresh">
+            <!-- Mobile pull-to-refresh indicator -->
+            <div class="refresh-indicator">
+                <i class="fas fa-spinner fa-spin"></i>
+                <span>Pulling to refresh...</span>
+            </div>
+            <!-- NFT cards will be dynamically inserted here -->
+        </div>
+
+        <!-- Load More Button -->
+        <div class="flex justify-center mt-8">
+            <button id="loadMoreBtn" onclick="nftDisplay.loadMoreNFTs()" class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors hidden">
+                <i class="fas fa-plus mr-2"></i>Load More
+            </button>
+        </div>
+    </main>
+
+    <!-- NFT Modal Container -->
+    <div id="nftModal"></div>
+
+    <!-- Create NFT Modal -->
+    <div id="createNFTModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">Create New NFT</h2>
+                
+                <form id="createNFTForm" class="space-y-6">
+                    <!-- Basic Info -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">NFT Name *</label>
+                        <input type="text" 
+                               name="name" 
+                               required 
+                               class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</label>
+                        <textarea name="description" 
+                                  rows="3" 
+                                  class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700"></textarea>
+                    </div>
+
+                    <!-- Collection -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Collection</label>
+                        <select name="collection_id" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700">
+                            <option value="">Create New Collection</option>
+                            <!-- Collections will be loaded dynamically -->
+                        </select>
+                    </div>
+
+                    <!-- Media Upload -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">NFT Image *</label>
+                        <div class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center hover:border-gray-400 dark:hover:border-gray-500 transition-colors">
+                            <input type="file" 
+                                   id="nftImageUpload" 
+                                   accept="image/*" 
+                                   class="hidden" 
+                                   required>
+                            <label for="nftImageUpload" class="cursor-pointer">
+                                <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-3"></i>
+                                <p class="text-gray-600 dark:text-gray-400">Click to upload or drag and drop</p>
+                                <p class="text-sm text-gray-500 dark:text-gray-500 mt-1">PNG, JPG, GIF up to 10MB</p>
+                            </label>
+                            <div id="imagePreview" class="mt-4 hidden">
+                                <img src="" alt="Preview" class="mx-auto max-h-48 rounded-lg">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Properties/Attributes -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Properties</label>
+                        <div id="propertiesContainer" class="space-y-2">
+                            <div class="flex space-x-2">
+                                <input type="text" 
+                                       placeholder="Trait Type" 
+                                       class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700">
+                                <input type="text" 
+                                       placeholder="Value" 
+                                       class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700">
+                                <button type="button" onclick="nftDisplay.addProperty()" class="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Blockchain Selection -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Blockchain</label>
+                        <select name="blockchain" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700">
+                            <option value="stellar">Stellar</option>
+                            <option value="ethereum">Ethereum</option>
+                            <option value="polygon">Polygon</option>
+                            <option value="bsc">Binance Smart Chain</option>
+                        </select>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="flex space-x-3 pt-4">
+                        <button type="button" 
+                                onclick="nftDisplay.closeCreateNFTModal()" 
+                                class="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+                            Cancel
+                        </button>
+                        <button type="submit" 
+                                class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                            <i class="fas fa-magic mr-2"></i>Create NFT
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="nft-display.js"></script>
+    <script src="app.js"></script>
+    
+    <script>
+        // Theme toggle
+        const themeToggle = document.getElementById('themeToggle');
+        const html = document.documentElement;
+        
+        // Check for saved theme preference
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        html.setAttribute('data-theme', savedTheme);
+        
+        themeToggle.addEventListener('click', () => {
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+        });
+
+        // Image upload preview
+        const imageUpload = document.getElementById('nftImageUpload');
+        const imagePreview = document.getElementById('imagePreview');
+        const previewImg = imagePreview.querySelector('img');
+
+        imageUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file && file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    previewImg.src = e.target.result;
+                    imagePreview.classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Create NFT form submission
+        const createNFTForm = document.getElementById('createNFTForm');
+        createNFTForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            // Handle NFT creation
+            console.log('Creating NFT with data:', Object.fromEntries(formData));
+        });
+
+        // Wallet connection
+        document.getElementById('walletConnect').addEventListener('click', () => {
+            // Handle wallet connection
+            console.log('Connect wallet clicked');
+        });
+
+        // Mobile menu functionality
+        const mobileMenuToggle = document.getElementById('mobileMenuToggle');
+        const mobileMenu = document.getElementById('mobileMenu');
+        const mobileMenuOverlay = document.getElementById('mobileMenuOverlay');
+        const closeMobileMenu = document.getElementById('closeMobileMenu');
+
+        if (mobileMenuToggle && mobileMenu && mobileMenuOverlay) {
+            mobileMenuToggle.addEventListener('click', () => {
+                mobileMenu.classList.add('active');
+                mobileMenuOverlay.classList.add('active');
+                document.body.style.overflow = 'hidden';
+            });
+
+            const closeMenu = () => {
+                mobileMenu.classList.remove('active');
+                mobileMenuOverlay.classList.remove('active');
+                document.body.style.overflow = '';
+            };
+
+            closeMobileMenu.addEventListener('click', closeMenu);
+            mobileMenuOverlay.addEventListener('click', closeMenu);
+        }
+
+        // Mobile pull-to-refresh functionality
+        let pullStartY = 0;
+        let pullDistance = 0;
+        let isPulling = false;
+        const pullRefresh = document.querySelector('.mobile-pull-refresh');
+        const refreshIndicator = document.querySelector('.refresh-indicator');
+
+        if (pullRefresh && refreshIndicator) {
+            pullRefresh.addEventListener('touchstart', (e) => {
+                if (window.scrollY === 0) {
+                    pullStartY = e.touches[0].clientY;
+                    isPulling = true;
+                }
+            });
+
+            pullRefresh.addEventListener('touchmove', (e) => {
+                if (!isPulling) return;
+                
+                pullDistance = e.touches[0].clientY - pullStartY;
+                
+                if (pullDistance > 0 && pullDistance < 150) {
+                    pullRefresh.style.marginTop = `${pullDistance}px`;
+                    refreshIndicator.style.opacity = pullDistance / 150;
+                }
+            });
+
+            pullRefresh.addEventListener('touchend', async () => {
+                if (!isPulling) return;
+                
+                isPulling = false;
+                
+                if (pullDistance > 80) {
+                    // Trigger refresh
+                    refreshIndicator.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Refreshing...</span>';
+                    
+                    try {
+                        if (nftDisplay) {
+                            await nftDisplay.loadNFTCollection();
+                        }
+                    } catch (error) {
+                        console.error('Refresh error:', error);
+                    }
+                }
+                
+                // Reset
+                pullRefresh.style.marginTop = '-60px';
+                refreshIndicator.style.opacity = '0';
+                refreshIndicator.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Pulling to refresh...</span>';
+                pullDistance = 0;
+            });
+        }
+
+        // Mobile scroll indicator
+        let scrollTimeout;
+        const showScrollIndicator = () => {
+            const indicator = document.createElement('div');
+            indicator.className = 'mobile-scroll-indicator visible';
+            indicator.textContent = 'Scroll for more';
+            document.body.appendChild(indicator);
+            
+            clearTimeout(scrollTimeout);
+            scrollTimeout = setTimeout(() => {
+                indicator.classList.remove('visible');
+                setTimeout(() => indicator.remove(), 300);
+            }, 2000);
+        };
+
+        // Show scroll indicator on first scroll
+        let hasScrolled = false;
+        window.addEventListener('scroll', () => {
+            if (!hasScrolled && window.innerWidth <= 768) {
+                hasScrolled = true;
+                showScrollIndicator();
+            }
+        });
+
+        // Mobile touch feedback
+        const addTouchFeedback = () => {
+            const buttons = document.querySelectorAll('button, .nft-card, .btn');
+            buttons.forEach(button => {
+                button.addEventListener('touchstart', () => {
+                    button.style.transform = 'scale(0.98)';
+                });
+                
+                button.addEventListener('touchend', () => {
+                    setTimeout(() => {
+                        button.style.transform = '';
+                    }, 100);
+                });
+            });
+        };
+
+        addTouchFeedback();
+
+        // Mobile viewport height fix
+        const setViewportHeight = () => {
+            const vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+        };
+
+        setViewportHeight();
+        window.addEventListener('resize', setViewportHeight);
+        window.addEventListener('orientationchange', setViewportHeight);
+
+        // Mobile swipe gestures for NFT cards
+        let startX = 0;
+        let currentX = 0;
+        let isSwipe = false;
+
+        const addSwipeGestures = () => {
+            const nftCards = document.querySelectorAll('.nft-card');
+            
+            nftCards.forEach(card => {
+                card.addEventListener('touchstart', (e) => {
+                    startX = e.touches[0].clientX;
+                    isSwipe = false;
+                });
+
+                card.addEventListener('touchmove', (e) => {
+                    currentX = e.touches[0].clientX;
+                    const diff = startX - currentX;
+                    
+                    if (Math.abs(diff) > 10) {
+                        isSwipe = true;
+                        card.style.transform = `translateX(${diff * 0.3}px)`;
+                    }
+                });
+
+                card.addEventListener('touchend', () => {
+                    const diff = startX - currentX;
+                    
+                    if (isSwipe && Math.abs(diff) > 50) {
+                        // Swipe detected - could trigger action
+                        if (diff > 0) {
+                            // Swipe left - could show quick actions
+                            console.log('Swipe left detected');
+                        } else {
+                            // Swipe right - could show details
+                            console.log('Swipe right detected');
+                        }
+                    }
+                    
+                    card.style.transform = '';
+                    isSwipe = false;
+                });
+            });
+        };
+
+        // Initialize swipe gestures after NFTs load
+        if (nftDisplay) {
+            const originalRenderNFTGallery = nftDisplay.renderNFTGallery.bind(nftDisplay);
+            nftDisplay.renderNFTGallery = function() {
+                originalRenderNFTGallery();
+                setTimeout(addSwipeGestures, 100);
+            };
+        }
+
+        // Mobile performance optimization
+        const optimizeMobilePerformance = () => {
+            if (window.innerWidth <= 768) {
+                // Reduce animations on mobile
+                document.body.classList.add('mobile-performance');
+                
+                // Lazy load images
+                const images = document.querySelectorAll('img[data-src]');
+                const imageObserver = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            const img = entry.target;
+                            img.src = img.dataset.src;
+                            img.removeAttribute('data-src');
+                            imageObserver.unobserve(img);
+                        }
+                    });
+                });
+                
+                images.forEach(img => imageObserver.observe(img));
+            }
+        };
+
+        optimizeMobilePerformance();
+        window.addEventListener('resize', optimizeMobilePerformance);
+    </script>
+</body>
+</html>

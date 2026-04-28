@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>500 - Server Error | Auction Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+
+        .error-container {
+            text-align: center;
+            color: white;
+            padding: 2rem;
+            max-width: 600px;
+        }
+
+        .error-code {
+            font-size: 8rem;
+            font-weight: bold;
+            line-height: 1;
+            margin-bottom: 1rem;
+            text-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .error-icon {
+            font-size: 4rem;
+            margin-bottom: 2rem;
+            animation: shake 3s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-5deg); }
+            75% { transform: rotate(5deg); }
+        }
+
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 1rem;
+            padding: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            margin: 0.5rem;
+            cursor: pointer;
+            border: none;
+        }
+
+        .btn-primary {
+            background: white;
+            color: #ef4444;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .status-check {
+            margin-top: 2rem;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 0.5rem;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem;
+            margin: 0.25rem 0;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            animation: blink 1.5s ease-in-out infinite;
+        }
+
+        .status-checking {
+            background: #fbbf24;
+        }
+
+        .status-ok {
+            background: #10b981;
+        }
+
+        .status-error {
+            background: #ef4444;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .retry-countdown {
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 1rem 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <div class="glass-effect">
+            <div class="error-icon">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <div class="error-code">500</div>
+            <h1 class="text-3xl font-bold mb-4">Server Error</h1>
+            <p class="text-lg mb-6 opacity-90">
+                We're experiencing technical difficulties. Our team has been notified and is working on a fix.
+            </p>
+
+            <div class="flex flex-wrap justify-center mb-6">
+                <button onclick="retryNow()" class="btn btn-primary">
+                    <i class="fas fa-redo"></i>
+                    Retry Now
+                </button>
+                <a href="/" class="btn btn-secondary">
+                    <i class="fas fa-home"></i>
+                    Go Home
+                </button>
+                <button onclick="checkStatus()" class="btn btn-secondary">
+                    <i class="fas fa-heartbeat"></i>
+                    Check Status
+                </button>
+            </div>
+
+            <div id="retryCountdown" class="retry-countdown" style="display: none;">
+                Retrying in <span id="countdown">10</span>s
+            </div>
+
+            <div id="statusCheck" class="status-check" style="display: none;">
+                <h3 class="text-lg font-semibold mb-3">System Status:</h3>
+                <div class="status-item">
+                    <span>Server Connection</span>
+                    <div class="status-indicator status-checking" id="serverStatus"></div>
+                </div>
+                <div class="status-item">
+                    <span>Database</span>
+                    <div class="status-indicator status-checking" id="databaseStatus"></div>
+                </div>
+                <div class="status-item">
+                    <span>API Services</span>
+                    <div class="status-indicator status-checking" id="apiStatus"></div>
+                </div>
+            </div>
+
+            <div class="mt-6 text-sm opacity-75">
+                <p>Error ID: <span id="errorId"></span></p>
+                <p class="mt-2">If the problem persists, please <a href="/contact" class="underline hover:opacity-100">contact support</a> with the error ID.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Generate error ID
+        const errorId = 'ERR-' + Date.now().toString(36).toUpperCase();
+        document.getElementById('errorId').textContent = errorId;
+
+        // Auto-retry countdown
+        let countdown = 10;
+        let countdownInterval;
+
+        function startCountdown() {
+            const countdownEl = document.getElementById('retryCountdown');
+            const countdownNum = document.getElementById('countdown');
+            countdownEl.style.display = 'block';
+
+            countdownInterval = setInterval(() => {
+                countdown--;
+                countdownNum.textContent = countdown;
+
+                if (countdown <= 0) {
+                    clearInterval(countdownInterval);
+                    retryNow();
+                }
+            }, 1000);
+        }
+
+        function retryNow() {
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+            }
+            window.location.reload();
+        }
+
+        async function checkStatus() {
+            const statusCheck = document.getElementById('statusCheck');
+            statusCheck.style.display = 'block';
+
+            // Reset indicators
+            document.getElementById('serverStatus').className = 'status-indicator status-checking';
+            document.getElementById('databaseStatus').className = 'status-indicator status-checking';
+            document.getElementById('apiStatus').className = 'status-indicator status-checking';
+
+            // Check server
+            try {
+                const response = await fetch('/api/health', { method: 'GET', timeout: 5000 });
+                document.getElementById('serverStatus').className = 
+                    response.ok ? 'status-indicator status-ok' : 'status-indicator status-error';
+            } catch (error) {
+                document.getElementById('serverStatus').className = 'status-indicator status-error';
+            }
+
+            // Check database (simulated)
+            setTimeout(() => {
+                document.getElementById('databaseStatus').className = 'status-indicator status-checking';
+            }, 1000);
+
+            // Check API (simulated)
+            setTimeout(() => {
+                document.getElementById('apiStatus').className = 'status-indicator status-checking';
+            }, 2000);
+        }
+
+        // Log error
+        if (typeof fetch !== 'undefined') {
+            fetch('/api/errors/500', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    errorId: errorId,
+                    url: window.location.href,
+                    referrer: document.referrer,
+                    userAgent: navigator.userAgent,
+                    timestamp: new Date().toISOString()
+                })
+            }).catch(err => console.warn('Failed to log 500 error:', err));
+        }
+
+        // Start auto-retry countdown
+        setTimeout(() => {
+            startCountdown();
+        }, 2000);
+    </script>
+</body>
+</html>

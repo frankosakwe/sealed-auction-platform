@@ -39,6 +39,9 @@
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
+    <!-- Accessibility Styles -->
+    <link rel="stylesheet" href="accessibility.css">
+    
     <!-- SortableJS for drag and drop -->
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     
@@ -139,44 +142,47 @@
     </style>
 </head>
 <body class="bg-gray-50">
+    <!-- Skip Navigation Link -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    
     <!-- Header Navigation -->
     <nav class="bg-white shadow-sm border-b sticky top-0 z-40">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
                 <div class="flex items-center">
-                    <button id="sidebarToggle" class="p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 md:hidden">
-                        <i class="fas fa-bars"></i>
+                    <button aria-label="bars" id="sidebarToggle" class="p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 md:hidden">
+                        <i class="fas fa-bars" aria-hidden="true"></i>
                     </button>
                     <h1 class="ml-3 text-xl font-semibold text-gray-900">
-                        <i class="fas fa-bookmark text-blue-600 mr-2"></i>
+                        <i class="fas fa-bookmark text-blue-600 mr-2" aria-hidden="true"></i>
                         Bookmark Manager
                     </h1>
                 </div>
                 <div class="flex items-center space-x-4">
                     <button id="addBookmarkBtn" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition">
-                        <i class="fas fa-plus mr-2"></i>Add Bookmark
+                        <i class="fas fa-plus mr-2" aria-hidden="true"></i>Add Bookmark
                     </button>
                     <button id="addFolderBtn" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition">
-                        <i class="fas fa-folder-plus mr-2"></i>New Folder
+                        <i class="fas fa-folder-plus mr-2" aria-hidden="true"></i>New Folder
                     </button>
                     <div class="relative">
                         <button id="importExportBtn" class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition">
-                            <i class="fas fa-file-import mr-2"></i>Import/Export
+                            <i class="fas fa-file-import mr-2" aria-hidden="true"></i>Import/Export
                         </button>
                         <div id="importExportMenu" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50">
                             <button id="importBtn" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                <i class="fas fa-upload mr-2"></i>Import Bookmarks
+                                <i class="fas fa-upload mr-2" aria-hidden="true"></i>Import Bookmarks
                             </button>
                             <button id="exportJsonBtn" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                <i class="fas fa-download mr-2"></i>Export as JSON
+                                <i class="fas fa-download mr-2" aria-hidden="true"></i>Export as JSON
                             </button>
                             <button id="exportCsvBtn" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                <i class="fas fa-file-csv mr-2"></i>Export as CSV
+                                <i class="fas fa-file-csv mr-2" aria-hidden="true"></i>Export as CSV
                             </button>
                         </div>
                     </div>
                     <button id="syncBtn" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition">
-                        <i class="fas fa-sync mr-2"></i>Sync
+                        <i class="fas fa-sync mr-2" aria-hidden="true"></i>Sync
                     </button>
                 </div>
             </div>
@@ -190,8 +196,8 @@
             <aside id="folderSidebar" class="folder-sidebar w-full md:w-64 bg-white rounded-lg shadow p-4">
                 <div class="flex items-center justify-between mb-4">
                     <h2 class="text-lg font-semibold text-gray-900">Folders</h2>
-                    <button id="collapseFoldersBtn" class="text-gray-500 hover:text-gray-700">
-                        <i class="fas fa-chevron-up"></i>
+                    <button aria-label="chevron up" id="collapseFoldersBtn" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-chevron-up" aria-hidden="true"></i>
                     </button>
                 </div>
                 
@@ -203,8 +209,8 @@
                             id="searchInput" 
                             placeholder="Search bookmarks..." 
                             class="search-input w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        >
-                        <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                         aria-label="Search bookmarks...">
+                        <i class="fas fa-search absolute left-3 top-3 text-gray-400" aria-hidden="true"></i>
                     </div>
                 </div>
                 
@@ -215,7 +221,7 @@
                             All
                         </button>
                         <button class="filter-btn px-3 py-1 text-sm bg-yellow-100 text-yellow-700 rounded-full hover:bg-yellow-200 transition" data-filter="favorites">
-                            <i class="fas fa-star mr-1"></i>Favorites
+                            <i class="fas fa-star mr-1" aria-hidden="true"></i>Favorites
                         </button>
                         <button class="filter-btn px-3 py-1 text-sm bg-green-100 text-green-700 rounded-full hover:bg-green-200 transition" data-filter="recent">
                             Recent
@@ -240,7 +246,7 @@
             </aside>
 
             <!-- Main Content Area -->
-            <main class="flex-1">
+            <main id="main-content" role="main" class="flex-1">
                 <!-- Breadcrumb -->
                 <div id="breadcrumb" class="mb-4 text-sm text-gray-600">
                     <span class="hover:text-blue-600 cursor-pointer">Home</span>
@@ -261,11 +267,11 @@
                         </select>
                     </div>
                     <div class="flex space-x-2">
-                        <button id="gridViewBtn" class="p-2 text-gray-600 hover:text-blue-600">
-                            <i class="fas fa-th"></i>
+                        <button aria-label="th" id="gridViewBtn" class="p-2 text-gray-600 hover:text-blue-600">
+                            <i class="fas fa-th" aria-hidden="true"></i>
                         </button>
-                        <button id="listViewBtn" class="p-2 text-blue-600">
-                            <i class="fas fa-list"></i>
+                        <button aria-label="list" id="listViewBtn" class="p-2 text-blue-600">
+                            <i class="fas fa-list" aria-hidden="true"></i>
                         </button>
                     </div>
                 </div>
@@ -277,11 +283,11 @@
 
                 <!-- Empty State -->
                 <div id="emptyState" class="text-center py-12">
-                    <i class="fas fa-bookmark text-6xl text-gray-300 mb-4"></i>
+                    <i class="fas fa-bookmark text-6xl text-gray-300 mb-4" aria-hidden="true"></i>
                     <h3 class="text-lg font-medium text-gray-900 mb-2">No bookmarks yet</h3>
                     <p class="text-gray-600 mb-4">Start by adding your first bookmark or importing existing ones.</p>
                     <button id="emptyAddBookmarkBtn" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition">
-                        <i class="fas fa-plus mr-2"></i>Add Your First Bookmark
+                        <i class="fas fa-plus mr-2" aria-hidden="true"></i>Add Your First Bookmark
                     </button>
                 </div>
             </main>
@@ -289,8 +295,8 @@
     </div>
 
     <!-- Add/Edit Bookmark Modal -->
-    <div id="bookmarkModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
-        <div class="modal-overlay flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
+    <div id="bookmarkModal" class="hidden fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
+        <div class="modal-overlay flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0" role="dialog" aria-modal="true">
             <div class="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onclick="closeBookmarkModal()"></div>
             
             <div class="inline-block w-full max-w-md p-6 my-8 text-left align-middle transition-all transform bg-white shadow-xl rounded-lg">
@@ -302,7 +308,7 @@
                         <input 
                             type="text" 
                             id="bookmarkTitle" 
-                            required
+                            required aria-required="true"
                             class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         >
                     </div>
@@ -312,7 +318,7 @@
                         <input 
                             type="url" 
                             id="bookmarkUrl" 
-                            required
+                            required aria-required="true"
                             class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         >
                     </div>
@@ -342,9 +348,9 @@
                                 id="tagInput" 
                                 placeholder="Add tag..."
                                 class="flex-1 px-3 py-2 border border-gray-300 rounded-l-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            >
-                            <button type="button" id="addTagBtn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-r-md hover:bg-gray-300 transition">
-                                <i class="fas fa-plus"></i>
+                             aria-label="Add tag...">
+                            <button aria-label="plus" type="button" id="addTagBtn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-r-md hover:bg-gray-300 transition">
+                                <i class="fas fa-plus" aria-hidden="true"></i>
                             </button>
                         </div>
                     </div>
@@ -377,8 +383,8 @@
     </div>
 
     <!-- Add/Edit Folder Modal -->
-    <div id="folderModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
-        <div class="modal-overlay flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
+    <div id="folderModal" class="hidden fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
+        <div class="modal-overlay flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0" role="dialog" aria-modal="true">
             <div class="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onclick="closeFolderModal()"></div>
             
             <div class="inline-block w-full max-w-md p-6 my-8 text-left align-middle transition-all transform bg-white shadow-xl rounded-lg">
@@ -390,7 +396,7 @@
                         <input 
                             type="text" 
                             id="folderName" 
-                            required
+                            required aria-required="true"
                             class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         >
                     </div>
@@ -438,8 +444,8 @@
     </div>
 
     <!-- Import Modal -->
-    <div id="importModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
-        <div class="modal-overlay flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
+    <div id="importModal" class="hidden fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
+        <div class="modal-overlay flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0" role="dialog" aria-modal="true">
             <div class="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onclick="closeImportModal()"></div>
             
             <div class="inline-block w-full max-w-md p-6 my-8 text-left align-middle transition-all transform bg-white shadow-xl rounded-lg">
@@ -493,5 +499,12 @@
 
     <script src="bookmarks.js"></script>
     <script src="pwa.js"></script>
+    
+    <!-- ARIA Live Regions -->
+    <div id="aria-live-polite" role="status" aria-live="polite" aria-atomic="true" class="sr-only"></div>
+    <div id="aria-live-assertive" role="alert" aria-live="assertive" aria-atomic="true" class="sr-only"></div>
+    
+    <!-- Accessibility JavaScript -->
+    <script src="accessibility.js"></script>
 </body>
 </html>

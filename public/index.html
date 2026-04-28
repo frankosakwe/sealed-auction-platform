@@ -38,17 +38,23 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/stellar-sdk@11.0.0/dist/stellar-sdk.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r169/three.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="vr-styles.css">
     <style>
         :root {
             /* Light theme colors */
             --bg-primary: #ffffff;
             --bg-secondary: #f8fafc;
             --bg-tertiary: #e2e8f0;
+            --bg-quaternary: #edf2f7;
             --text-primary: #1a202c;
             --text-secondary: #4a5568;
             --text-tertiary: #718096;
+            --text-quaternary: #a0aec0;
             --border-color: #e2e8f0;
+            --border-color-light: #f7fafc;
+            --border-color-dark: #cbd5e0;
             --glass-bg: rgba(255, 255, 255, 0.8);
             --glass-border: rgba(255, 255, 255, 0.3);
             --gradient-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -57,6 +63,15 @@
             --button-primary-hover: #5a67d8;
             --button-secondary: #718096;
             --button-secondary-hover: #4a5568;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            --success-color: #48bb78;
+            --warning-color: #ed8936;
+            --error-color: #f56565;
+            --info-color: #4299e1;
         }
 
         [data-theme="dark"] {
@@ -64,10 +79,14 @@
             --bg-primary: #1a202c;
             --bg-secondary: #2d3748;
             --bg-tertiary: #4a5568;
+            --bg-quaternary: #2d3748;
             --text-primary: #ffffff;
             --text-secondary: #e2e8f0;
             --text-tertiary: #a0aec0;
+            --text-quaternary: #718096;
             --border-color: #4a5568;
+            --border-color-light: #2d3748;
+            --border-color-dark: #718096;
             --glass-bg: rgba(255, 255, 255, 0.1);
             --glass-border: rgba(255, 255, 255, 0.2);
             --gradient-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -76,6 +95,32 @@
             --button-primary-hover: #805ad5;
             --button-secondary: #4a5568;
             --button-secondary-hover: #2d3748;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+            --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+            --success-color: #68d391;
+            --warning-color: #f6ad55;
+            --error-color: #fc8181;
+            --info-color: #63b3ed;
+        }
+
+        /* High contrast mode support */
+        .high-contrast {
+            --text-primary: #000000;
+            --text-secondary: #333333;
+            --border-color: #000000;
+            --button-primary: #0000ff;
+            --button-primary-hover: #000080;
+        }
+
+        [data-theme="dark"].high-contrast {
+            --text-primary: #ffffff;
+            --text-secondary: #cccccc;
+            --border-color: #ffffff;
+            --button-primary: #00ffff;
+            --button-primary-hover: #0080ff;
         }
 
         .gradient-bg {
@@ -321,29 +366,36 @@
             position: relative;
             width: 60px;
             height: 30px;
-            background: var(--button-secondary);
+            background: var(--bg-tertiary);
             border-radius: 15px;
             border: 2px solid var(--border-color);
             cursor: pointer;
             transition: all 0.3s ease;
+            outline: none;
         }
 
         .theme-toggle:hover {
-            background: var(--button-secondary-hover);
+            background: var(--bg-quaternary);
+            box-shadow: var(--shadow-md);
+        }
+
+        .theme-toggle:focus {
+            box-shadow: 0 0 0 3px var(--button-primary);
         }
 
         .theme-toggle-slider {
             position: absolute;
-            top: 3px;
-            left: 3px;
-            width: 20px;
-            height: 20px;
-            background: white;
+            top: 2px;
+            left: 2px;
+            width: 22px;
+            height: 22px;
+            background: var(--bg-primary);
             border-radius: 50%;
-            transition: transform 0.3s ease;
+            transition: transform 0.3s ease, background-color 0.3s ease;
             display: flex;
             align-items: center;
             justify-content: center;
+            box-shadow: var(--shadow-sm);
         }
 
         [data-theme="dark"] .theme-toggle-slider {
@@ -352,39 +404,64 @@
 
         .theme-toggle-slider i {
             font-size: 12px;
-            color: var(--text-primary);
+            color: var(--text-secondary);
+            transition: color 0.3s ease;
+        }
+
+        /* Enhanced component theming */
+        .glass-effect {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            box-shadow: var(--shadow-lg);
         }
 
         /* Form input styles */
         .form-input {
-            background: var(--glass-bg);
-            border: 1px solid var(--glass-border);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
             color: var(--text-primary);
+            transition: all 0.3s ease;
         }
 
         .form-input:focus {
             outline: none;
-            box-shadow: 0 0 0 2px var(--button-primary);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.3);
+            border-color: var(--button-primary);
         }
 
+        .form-input::placeholder {
+            color: var(--text-tertiary);
+        }
+
+        /* Button styles */
         .btn-primary {
             background: var(--button-primary);
             color: white;
+            border: none;
+            transition: all 0.3s ease;
         }
 
         .btn-primary:hover {
             background: var(--button-primary-hover);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-md);
         }
 
         .btn-secondary {
             background: var(--button-secondary);
             color: white;
+            border: none;
+            transition: all 0.3s ease;
         }
 
         .btn-secondary:hover {
             background: var(--button-secondary-hover);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-md);
         }
 
+        /* Text color utilities */
         .text-primary {
             color: var(--text-primary);
         }
@@ -393,8 +470,193 @@
             color: var(--text-secondary);
         }
 
-        .text-secondary:hover {
+        .text-tertiary {
+            color: var(--text-tertiary);
+        }
+
+        .text-quaternary {
+            color: var(--text-quaternary);
+        }
+
+        /* Background utilities */
+        .bg-primary {
+            background-color: var(--bg-primary);
+        }
+
+        .bg-secondary {
+            background-color: var(--bg-secondary);
+        }
+
+        .bg-tertiary {
+            background-color: var(--bg-tertiary);
+        }
+
+        /* Border utilities */
+        .border-primary {
+            border-color: var(--border-color);
+        }
+
+        /* Status colors */
+        .text-success {
+            color: var(--success-color);
+        }
+
+        .text-warning {
+            color: var(--warning-color);
+        }
+
+        .text-error {
+            color: var(--error-color);
+        }
+
+        .text-info {
+            color: var(--info-color);
+        }
+
+        .bg-success {
+            background-color: var(--success-color);
+        }
+
+        .bg-warning {
+            background-color: var(--warning-color);
+        }
+
+        .bg-error {
+            background-color: var(--error-color);
+        }
+
+        .bg-info {
+            background-color: var(--info-color);
+        }
+
+        /* Card and container theming */
+        .auction-card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
             color: var(--text-primary);
+            transition: all 0.3s ease;
+        }
+
+        .auction-card:hover {
+            box-shadow: var(--shadow-xl);
+            transform: translateY(-2px);
+        }
+
+        /* Modal theming */
+        .modal-content {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-xl);
+        }
+
+        /* Navigation theming */
+        .nav-item {
+            color: var(--text-secondary);
+            transition: all 0.3s ease;
+        }
+
+        .nav-item:hover {
+            color: var(--text-primary);
+            background: var(--bg-secondary);
+        }
+
+        .nav-item.active {
+            color: var(--button-primary);
+            background: var(--bg-secondary);
+        }
+
+        /* Notification theming */
+        .notification {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            box-shadow: var(--shadow-lg);
+        }
+
+        /* Table theming */
+        .table {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .table th {
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .table td {
+            border-bottom: 1px solid var(--border-color-light);
+        }
+
+        .table tr:hover {
+            background: var(--bg-secondary);
+        }
+
+        /* Dropdown theming */
+        .dropdown {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .dropdown-item {
+            color: var(--text-primary);
+            transition: all 0.3s ease;
+        }
+
+        .dropdown-item:hover {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
+        /* Scrollbar theming */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--border-color-dark);
+        }
+
+        /* Selection theming */
+        ::selection {
+            background: var(--button-primary);
+            color: white;
+        }
+
+        ::-moz-selection {
+            background: var(--button-primary);
+            color: white;
+        }
+
+        /* Focus outline theming */
+        *:focus {
+            outline: 2px solid var(--button-primary);
+            outline-offset: 2px;
+        }
+
+        /* Reduced motion support */
+        @media (prefers-reduced-motion: reduce) {
+            .theme-toggle,
+            .theme-toggle-slider,
+            .auction-card,
+            .btn-primary,
+            .btn-secondary,
+            .form-input,
+            .nav-item {
+                transition: none !important;
+            }
         }
         
         .loading-content {
@@ -856,12 +1118,15 @@
     </style>
 </head>
 <body class="stellar-gradient min-h-screen" style="color: var(--text-primary);">
+    <!-- Skip Navigation Link -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    
     <!-- Header -->
-    <header class="glass-effect shadow-lg">
+    <header role="banner" class="glass-effect shadow-lg">
         <div class="container mx-auto px-4 py-4">
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-3 sm:space-y-0">
                 <div class="flex items-center space-x-3">
-                    <i class="fas fa-gavel text-xl sm:text-2xl"></i>
+                    <i class="fas fa-gavel text-xl sm:text-2xl" aria-hidden="true"></i>
                     <h1 class="text-lg sm:text-2xl font-bold">Stellar Sealed-Bid Auction</h1>
                     <span class="bg-purple-600 px-2 py-1 rounded text-xs hidden sm:inline">Blockchain</span>
                 </div>
@@ -870,7 +1135,7 @@
                     <!-- Bid Analytics Link -->
                     <div id="analyticsLink" class="hidden">
                         <a href="bid-analytics.html" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors">
-                            <i class="fas fa-chart-line mr-2"></i>Analytics
+                            <i class="fas fa-chart-line mr-2" aria-hidden="true"></i>Analytics
                         </a>
                     </div>
                     
@@ -881,7 +1146,7 @@
                             class="relative p-2 hover:bg-white/10 rounded-full transition-colors"
                             title="Help & Tutorial"
                         >
-                            <i class="fas fa-question-circle text-xl"></i>
+                            <i class="fas fa-question-circle text-xl" aria-hidden="true"></i>
                         </button>
                     </div>
                     
@@ -892,7 +1157,7 @@
                             class="relative p-2 hover:bg-white/10 rounded-full transition-colors"
                             title="Notifications"
                         >
-                            <i class="fas fa-bell text-xl"></i>
+                            <i class="fas fa-bell text-xl" aria-hidden="true"></i>
                             <span id="notification-badge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center animate-pulse">
                                 0
                             </span>
@@ -901,10 +1166,33 @@
                     
                     <!-- User Menu -->
                     <div id="userMenu" class="hidden">
-                        <span id="usernameDisplay" class="mr-2"></span>
-                        <button onclick="logout()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors">
-                            <i class="fas fa-sign-out-alt mr-2"></i>Logout
-                        </button>
+                        <div class="relative">
+                            <button onclick="toggleUserDropdown()" class="flex items-center space-x-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors">
+                                <i class="fas fa-user"></i>
+                                <span id="usernameDisplay"></span>
+                                <i class="fas fa-chevron-down text-sm"></i>
+                            </button>
+                            
+                            <!-- User Dropdown -->
+                            <div id="userDropdown" class="hidden absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                                <div class="p-4 border-b">
+                                    <p class="font-medium text-gray-900" id="dropdownUsername"></p>
+                                    <p class="text-sm text-gray-500" id="dropdownEmail"></p>
+                                </div>
+                                
+                                <div class="p-2">
+                                    <button onclick="showOAuthAccounts()" class="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded">
+                                        <i class="fas fa-link mr-2"></i>Linked Accounts
+                                    </button>
+                                    <button onclick="refreshToken()" class="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded">
+                                        <i class="fas fa-sync mr-2"></i>Refresh Token
+                                    </button>
+                                    <button onclick="logout()" class="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded">
+                                        <i class="fas fa-sign-out-alt mr-2"></i>Logout
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -921,21 +1209,21 @@
                     class="text-sm text-purple-600 hover:text-purple-700 transition-colors"
                     title="Mark all as read"
                 >
-                    <i class="fas fa-check-double mr-1"></i>Mark all read
+                    <i class="fas fa-check-double mr-1" aria-hidden="true"></i>Mark all read
                 </button>
                 <button 
                     onclick="clearAllNotifications()"
                     class="text-sm text-red-600 hover:text-red-700 transition-colors"
                     title="Clear all notifications"
                 >
-                    <i class="fas fa-trash mr-1"></i>Clear all
+                    <i class="fas fa-trash mr-1" aria-hidden="true"></i>Clear all
                 </button>
                 <button 
                     onclick="closeNotificationCenter()"
                     class="text-gray-500 hover:text-gray-700 transition-colors"
                     title="Close"
                 >
-                    <i class="fas fa-times"></i>
+                    <i class="fas fa-times" aria-hidden="true"></i>
                 </button>
             </div>
         </div>
@@ -947,7 +1235,7 @@
                 onclick="openNotificationSettings()"
                 class="w-full text-left text-sm text-purple-600 hover:text-purple-700 transition-colors"
             >
-                <i class="fas fa-cog mr-2"></i>Notification Settings
+                <i class="fas fa-cog mr-2" aria-hidden="true"></i>Notification Settings
             </button>
         </div>
     </div>
@@ -1011,7 +1299,7 @@
     </div>
 
     <!-- Main Content -->
-    <main class="container mx-auto px-4 py-8">
+    <main id="main-content" role="main" class="container mx-auto px-4 py-8">
         <!-- Auth Modal -->
         <div id="authModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
             <div class="glass-effect rounded-xl p-6 sm:p-8 max-w-md w-full max-h-[90vh] overflow-y-auto">
@@ -1060,37 +1348,82 @@
                     </div>
                 </form>
 
-                    <i class="fas fa-times mr-2"></i>Close
+                    <i class="fas fa-times mr-2" aria-hidden="true"></i>Close
                 </button>
+            </div>
+        </div>
+
+        <!-- OAuth Accounts Modal -->
+        <div id="oauthAccountsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+            <div class="glass-effect rounded-xl p-6 sm:p-8 max-w-md w-full max-h-[90vh] overflow-y-auto">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl sm:text-2xl font-bold">Linked Accounts</h2>
+                    <button onclick="hideOAuthAccounts()" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                
+                <div id="oauthAccountsContainer" class="space-y-4">
+                    <!-- OAuth accounts will be loaded here -->
+                </div>
+                
+                <div class="mt-6 pt-6 border-t">
+                    <h3 class="text-lg font-semibold mb-3">Add More Accounts</h3>
+                    <div class="space-y-3">
+                        <div id="modalGoogleLoginBtn" class="hidden">
+                            <a href="/auth/google" class="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition">
+                                <svg class="w-5 h-5 mr-2" viewBox="0 0 24 24">
+                                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                                </svg>
+                                Link Google Account
+                            </a>
+                        </div>
+                        
+                        <div id="modalGithubLoginBtn" class="hidden">
+                            <a href="/auth/github" class="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition">
+                                <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 0C4.477 0 0 4.484 0 10.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0110 4.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.203 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.942.359.31.678.921.678 1.856 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0020 10.017C20 4.484 15.522 0 10 0z" clip-rule="evenodd"/>
+                                </svg>
+                                Link GitHub Account
+                            </a>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
         <!-- Navigation Tabs -->
         <div class="glass-effect rounded-xl p-1 mb-8">
-            <div class="flex flex-wrap gap-1">
-                <button data-tab="auctions" onclick="switchTab('auctions')" class="bg-purple-600 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium">
-                    <i class="fas fa-gavel mr-2"></i>Auctions
+            <div role="tablist" aria-label="Auction sections" class="flex flex-wrap gap-1">
+                <button role="tab" aria-selected="true" aria-controls="auctionsContent" data-tab="auctions" onclick="switchTab('auctions')" class="bg-purple-600 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium" tabindex="0">
+                    <i class="fas fa-gavel mr-2" aria-hidden="true"></i>Auctions
                 </button>
-                <button data-tab="create" onclick="switchTab('create')" class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20">
-                    <i class="fas fa-plus mr-2"></i>Create
+                <button role="tab" aria-selected="false" aria-controls="createContent" data-tab="create" onclick="switchTab('create')" class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20" tabindex="-1">
+                    <i class="fas fa-plus mr-2" aria-hidden="true"></i>Create
                 </button>
-                <button data-tab="myBids" onclick="switchTab('myBids')" class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20">
-                    <i class="fas fa-hand-paper mr-2"></i>My Bids
+                <button role="tab" aria-selected="false" aria-controls="myBidsContent" data-tab="myBids" onclick="switchTab('myBids')" class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20" tabindex="-1">
+                    <i class="fas fa-hand-paper mr-2" aria-hidden="true"></i>My Bids
                 </button>
-                <button data-tab="filter" onclick="switchTab('filter')" class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20">
-                    <i class="fas fa-filter mr-2"></i>Filter
+                <button role="tab" aria-selected="false" aria-controls="filterContent" data-tab="filter" onclick="switchTab('filter')" class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20" tabindex="-1">
+                    <i class="fas fa-filter mr-2" aria-hidden="true"></i>Filter
                 </button>
-                <button data-tab="map" onclick="switchTab('map')" class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20">
-                    <i class="fas fa-map-marker-alt mr-2"></i>Map
+                <button role="tab" aria-selected="false" aria-controls="mapContent" data-tab="map" onclick="switchTab('map')" class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20" tabindex="-1">
+                    <i class="fas fa-map-marker-alt mr-2" aria-hidden="true"></i>Map
                 </button>
-                <button data-tab="video" onclick="switchTab('video')" class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20">
-                    <i class="fas fa-video mr-2"></i>Video
+                <button role="tab" aria-selected="false" aria-controls="videoContent" data-tab="video" onclick="switchTab('video')" class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20" tabindex="-1">
+                    <i class="fas fa-video mr-2" aria-hidden="true"></i>Video
                 </button>
-                <button data-tab="voice" onclick="switchTab('voice')" class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20">
-                    <i class="fas fa-microphone mr-2"></i>Voice
+                <button role="tab" aria-selected="false" aria-controls="voiceContent" data-tab="voice" onclick="switchTab('voice')" class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20" tabindex="-1">
+                    <i class="fas fa-microphone mr-2" aria-hidden="true"></i>Voice
                 </button>
-                <button data-tab="network" onclick="switchTab('network')" class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20">
-                    <i class="fas fa-network-wired mr-2"></i>Network
+                <button role="tab" aria-selected="false" aria-controls="networkContent" data-tab="network" onclick="switchTab('network')" class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20" tabindex="-1">
+                    <i class="fas fa-network-wired mr-2" aria-hidden="true"></i>Network
+                </button>
+                <button data-tab="tokens" onclick="switchTab('tokens')" class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20">
+                    <i class="fas fa-coins mr-2"></i>Tokens
                 </button>
                 <button data-tab="admin" onclick="switchTab('admin')" class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20" id="adminTab" style="display: none;">
                     <i class="fas fa-shield-alt mr-2"></i>Admin
@@ -1099,14 +1432,14 @@
         </div>
 
         <!-- Auctions Tab -->
-        <div id="auctionsContent" class="tab-content">
+        <div id="auctionsContent" role="tabpanel" aria-labelledby="auctions-tab" class="tab-content">
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6" id="auctionsGrid">
                 <!-- Auctions will be dynamically loaded here -->
             </div>
         </div>
 
         <!-- Create Auction Tab -->
-        <div id="createContent" class="tab-content hidden">
+        <div id="createContent" role="tabpanel" aria-labelledby="create-tab" class="tab-content hidden">
             <div class="glass-effect rounded-xl p-3 sm:p-4 lg:p-6 max-w-full sm:max-w-2xl mx-auto">
                 <h2 class="text-xl sm:text-2xl font-bold mb-6">Create New Auction</h2>
                 <form id="createAuctionForm" class="space-y-4 sm:space-y-6">
@@ -1116,14 +1449,14 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
 
-                        <i class="fas fa-gavel mr-2"></i>Create Auction
+                        <i class="fas fa-gavel mr-2" aria-hidden="true"></i>Create Auction
                     </button>
                 </form>
             </div>
         </div>
 
         <!-- My Bids Tab -->
-        <div id="myBidsContent" class="tab-content hidden">
+        <div id="myBidsContent" role="tabpanel" aria-labelledby="myBids-tab" class="tab-content hidden">
 
                     <!-- User's bids will be displayed here -->
                 </div>
@@ -1131,16 +1464,16 @@
         </div>
 
         <!-- Advanced Filtering Tab (#106) -->
-        <div id="filterContent" class="tab-content hidden">
+        <div id="filterContent" role="tabpanel" aria-labelledby="filter-tab" class="tab-content hidden">
             <div class="glass-effect rounded-xl p-4 sm:p-6 max-w-4xl mx-auto">
-                <h2 class="text-xl sm:text-2xl font-bold mb-6"><i class="fas fa-filter mr-2"></i>Advanced Filtering</h2>
+                <h2 class="text-xl sm:text-2xl font-bold mb-6"><i class="fas fa-filter mr-2" aria-hidden="true"></i>Advanced Filtering</h2>
 
                 <!-- Saved Presets -->
                 <div class="mb-6">
                     <div class="flex items-center justify-between mb-3">
                         <h3 class="font-semibold text-lg">Saved Presets</h3>
                         <button onclick="saveFilterPreset()" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-lg text-sm transition-colors">
-                            <i class="fas fa-save mr-1"></i>Save Current
+                            <i class="fas fa-save mr-1" aria-hidden="true"></i>Save Current
                         </button>
                     </div>
                     <div id="filterPresets" class="flex flex-wrap gap-2">
@@ -1177,9 +1510,9 @@
                     <div>
                         <label class="block font-semibold mb-2">Price Range ($)</label>
                         <div class="flex items-center gap-3">
-                            <input type="number" id="filterPriceMin" placeholder="Min" min="0" class="form-input w-full p-2 rounded-lg border">
+                            <input type="number" id="filterPriceMin" placeholder="Min" min="0" class="form-input w-full p-2 rounded-lg border" aria-label="Min">
                             <span>–</span>
-                            <input type="number" id="filterPriceMax" placeholder="Max" min="0" class="form-input w-full p-2 rounded-lg border">
+                            <input type="number" id="filterPriceMax" placeholder="Max" min="0" class="form-input w-full p-2 rounded-lg border" aria-label="Max">
                         </div>
                         <input type="range" id="filterPriceSlider" min="0" max="100000" step="100" value="100000"
                             class="w-full mt-2 accent-purple-600" oninput="document.getElementById('filterPriceMax').value=this.value">
@@ -1212,10 +1545,10 @@
                 <!-- Actions -->
                 <div class="flex gap-3">
                     <button onclick="applyFilters()" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg transition-colors font-semibold">
-                        <i class="fas fa-search mr-2"></i>Apply Filters
+                        <i class="fas fa-search mr-2" aria-hidden="true"></i>Apply Filters
                     </button>
                     <button onclick="resetFilters()" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg transition-colors">
-                        <i class="fas fa-undo mr-2"></i>Reset
+                        <i class="fas fa-undo mr-2" aria-hidden="true"></i>Reset
                     </button>
                 </div>
 
@@ -1228,18 +1561,18 @@
         </div>
 
         <!-- Map Integration Tab (#107) -->
-        <div id="mapContent" class="tab-content hidden">
+        <div id="mapContent" role="tabpanel" aria-labelledby="map-tab" class="tab-content hidden">
             <div class="glass-effect rounded-xl p-4 sm:p-6">
-                <h2 class="text-xl sm:text-2xl font-bold mb-4"><i class="fas fa-map-marker-alt mr-2"></i>Auction Map</h2>
+                <h2 class="text-xl sm:text-2xl font-bold mb-4"><i class="fas fa-map-marker-alt mr-2" aria-hidden="true"></i>Auction Map</h2>
 
                 <!-- Search & Controls -->
                 <div class="flex flex-col sm:flex-row gap-3 mb-4">
                     <div class="flex-1 relative">
-                        <input type="text" id="mapLocationSearch" placeholder="Search location..." class="form-input w-full p-2 pl-9 rounded-lg border">
-                        <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                        <input type="text" id="mapLocationSearch" placeholder="Search location..." class="form-input w-full p-2 pl-9 rounded-lg border" aria-label="Search location...">
+                        <i class="fas fa-search absolute left-3 top-3 text-gray-400" aria-hidden="true"></i>
                     </div>
                     <button onclick="locateMe()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors whitespace-nowrap">
-                        <i class="fas fa-crosshairs mr-2"></i>My Location
+                        <i class="fas fa-crosshairs mr-2" aria-hidden="true"></i>My Location
                     </button>
                     <select id="mapRadiusFilter" class="form-input p-2 rounded-lg border" onchange="updateMapRadius()">
                         <option value="10">10 km</option>
@@ -1253,7 +1586,7 @@
                 <!-- Map Container -->
                 <div id="mapContainer" class="w-full rounded-xl overflow-hidden border border-white/20 mb-4" style="height:420px; background: linear-gradient(135deg,#1a1a2e,#16213e);">
                     <div class="flex flex-col items-center justify-center h-full text-center p-6">
-                        <i class="fas fa-map text-6xl text-purple-400 mb-4"></i>
+                        <i class="fas fa-map text-6xl text-purple-400 mb-4" aria-hidden="true"></i>
                         <p class="text-lg font-semibold mb-2">Interactive Map</p>
                         <p class="text-gray-400 text-sm mb-4">Click "My Location" to center the map on your position, or search for a location above.</p>
                         <div id="mapStatus" class="text-sm text-purple-300"></div>
@@ -1273,9 +1606,9 @@
         </div>
 
         <!-- Video Streaming Tab (#108) -->
-        <div id="videoContent" class="tab-content hidden">
+        <div id="videoContent" role="tabpanel" aria-labelledby="video-tab" class="tab-content hidden">
             <div class="glass-effect rounded-xl p-4 sm:p-6">
-                <h2 class="text-xl sm:text-2xl font-bold mb-4"><i class="fas fa-video mr-2"></i>Auction Video Previews</h2>
+                <h2 class="text-xl sm:text-2xl font-bold mb-4"><i class="fas fa-video mr-2" aria-hidden="true"></i>Auction Video Previews</h2>
 
                 <!-- Video Player -->
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1285,7 +1618,7 @@
                                 Your browser does not support the video tag.
                             </video>
                             <div id="videoPlaceholder" class="flex flex-col items-center justify-center text-center p-8">
-                                <i class="fas fa-play-circle text-6xl text-purple-400 mb-4"></i>
+                                <i class="fas fa-play-circle text-6xl text-purple-400 mb-4" aria-hidden="true"></i>
                                 <p class="text-lg font-semibold">Select a video to play</p>
                                 <p class="text-gray-400 text-sm mt-2">Choose an auction preview from the list</p>
                             </div>
@@ -1322,7 +1655,7 @@
                             <!-- Populated by JS -->
                         </div>
                         <button onclick="loadVideoPlaylist()" class="mt-3 w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg transition-colors text-sm">
-                            <i class="fas fa-sync mr-2"></i>Refresh Previews
+                            <i class="fas fa-sync mr-2" aria-hidden="true"></i>Refresh Previews
                         </button>
                     </div>
                 </div>
@@ -1338,14 +1671,14 @@
         </div>
 
         <!-- Voice Commands Tab (#109) -->
-        <div id="voiceContent" class="tab-content hidden">
+        <div id="voiceContent" role="tabpanel" aria-labelledby="voice-tab" class="tab-content hidden">
             <div class="glass-effect rounded-xl p-4 sm:p-6 max-w-2xl mx-auto">
-                <h2 class="text-xl sm:text-2xl font-bold mb-4"><i class="fas fa-microphone mr-2"></i>Voice Commands</h2>
+                <h2 class="text-xl sm:text-2xl font-bold mb-4"><i class="fas fa-microphone mr-2" aria-hidden="true"></i>Voice Commands</h2>
 
                 <!-- Microphone Status -->
                 <div class="flex flex-col items-center py-8">
                     <button id="voiceBtn" onclick="toggleVoiceRecognition()" class="w-24 h-24 rounded-full bg-purple-600 hover:bg-purple-700 text-white text-4xl flex items-center justify-center transition-all shadow-lg mb-4" title="Start voice recognition">
-                        <i class="fas fa-microphone"></i>
+                        <i class="fas fa-microphone" aria-hidden="true"></i>
                     </button>
                     <p id="voiceStatus" class="text-lg font-semibold mb-1">Click to start listening</p>
                     <p id="voiceTranscript" class="text-gray-400 text-sm text-center max-w-sm min-h-[2rem]"></p>
@@ -1362,22 +1695,22 @@
                 <div class="mb-6">
                     <h3 class="font-semibold mb-3">Available Commands</h3>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2"></i>"show auctions"</div>
-                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2"></i>"create auction"</div>
-                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2"></i>"my bids"</div>
-                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2"></i>"open filter"</div>
-                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2"></i>"open map"</div>
-                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2"></i>"open video"</div>
-                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2"></i>"scroll down / up"</div>
-                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2"></i>"search [term]"</div>
-                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2"></i>"stop listening"</div>
-                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2"></i>"help"</div>
+                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2" aria-hidden="true"></i>"show auctions"</div>
+                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2" aria-hidden="true"></i>"create auction"</div>
+                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2" aria-hidden="true"></i>"my bids"</div>
+                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2" aria-hidden="true"></i>"open filter"</div>
+                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2" aria-hidden="true"></i>"open map"</div>
+                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2" aria-hidden="true"></i>"open video"</div>
+                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2" aria-hidden="true"></i>"scroll down / up"</div>
+                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2" aria-hidden="true"></i>"search [term]"</div>
+                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2" aria-hidden="true"></i>"stop listening"</div>
+                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2" aria-hidden="true"></i>"help"</div>
                     </div>
                 </div>
 
                 <!-- Privacy Notice -->
                 <div class="p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-sm">
-                    <i class="fas fa-shield-alt text-yellow-400 mr-2"></i>
+                    <i class="fas fa-shield-alt text-yellow-400 mr-2" aria-hidden="true"></i>
                     <strong>Privacy:</strong> Voice recognition runs entirely in your browser. No audio is sent to our servers.
                     <span id="voiceSupportNote" class="block mt-1 text-gray-400"></span>
                 </div>
@@ -1396,10 +1729,10 @@
         </div>
 
         <!-- Network Status Monitor Tab -->
-        <div id="networkContent" class="tab-content hidden">
+        <div id="networkContent" role="tabpanel" aria-labelledby="network-tab" class="tab-content hidden">
             <div class="glass-effect rounded-xl p-4 sm:p-6">
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
-                    <h2 class="text-xl sm:text-2xl font-bold"><i class="fas fa-network-wired mr-2"></i>Network Status Monitor</h2>
+                    <h2 class="text-xl sm:text-2xl font-bold"><i class="fas fa-network-wired mr-2" aria-hidden="true"></i>Network Status Monitor</h2>
                     <div class="flex items-center space-x-3 mt-3 sm:mt-0">
                         <select id="timeRange" class="bg-white/20 border border-white/30 rounded-lg px-3 py-2 text-sm">
                             <option value="1">Last Hour</option>
@@ -1408,7 +1741,7 @@
                             <option value="168">Last Week</option>
                         </select>
                         <button id="refreshNetwork" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium">
-                            <i class="fas fa-sync mr-2"></i>Refresh
+                            <i class="fas fa-sync mr-2" aria-hidden="true"></i>Refresh
                         </button>
                     </div>
                 </div>
@@ -1423,7 +1756,7 @@
                                     <span id="networkHealth" class="status-indicator">Healthy</span>
                                 </p>
                             </div>
-                            <i class="fas fa-heartbeat text-green-400 text-2xl"></i>
+                            <i class="fas fa-heartbeat text-green-400 text-2xl" aria-hidden="true"></i>
                         </div>
                     </div>
                     <div class="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
@@ -1432,7 +1765,7 @@
                                 <p class="text-sm text-blue-400">Block Time</p>
                                 <p class="text-2xl font-bold" id="blockTime">5.0s</p>
                             </div>
-                            <i class="fas fa-clock text-blue-400 text-2xl"></i>
+                            <i class="fas fa-clock text-blue-400 text-2xl" aria-hidden="true"></i>
                         </div>
                     </div>
                     <div class="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
@@ -1443,7 +1776,7 @@
                                     <span id="congestionLevel" class="congestion-indicator low">Low</span>
                                 </p>
                             </div>
-                            <i class="fas fa-traffic-light text-yellow-400 text-2xl"></i>
+                            <i class="fas fa-traffic-light text-yellow-400 text-2xl" aria-hidden="true"></i>
                         </div>
                     </div>
                     <div class="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
@@ -1454,7 +1787,7 @@
                                     <span id="nodeHealth" class="node-health-indicator excellent">100%</span>
                                 </p>
                             </div>
-                            <i class="fas fa-server text-purple-400 text-2xl"></i>
+                            <i class="fas fa-server text-purple-400 text-2xl" aria-hidden="true"></i>
                         </div>
                     </div>
                 </div>
@@ -1516,12 +1849,12 @@
                         <div class="flex justify-between items-center mb-4">
                             <h3 class="text-lg font-semibold">Network Alerts</h3>
                             <button id="clearAlerts" class="text-red-400 hover:text-red-300 text-sm">
-                                <i class="fas fa-trash mr-1"></i>Clear All
+                                <i class="fas fa-trash mr-1" aria-hidden="true"></i>Clear All
                             </button>
                         </div>
                         <div id="alertsList" class="space-y-2 max-h-64 overflow-y-auto">
                             <div class="no-alerts text-center py-8">
-                                <i class="fas fa-check-circle text-green-500 text-2xl mb-2"></i>
+                                <i class="fas fa-check-circle text-green-500 text-2xl mb-2" aria-hidden="true"></i>
                                 <p class="text-gray-400">No active alerts</p>
                             </div>
                         </div>
@@ -1538,10 +1871,145 @@
             </div>
         </div>
 
-        <!-- Admin Dashboard Tab -->
-        <div id="adminContent" class="tab-content hidden">
+        <!-- Cross-Chain Bridge Tab -->
+        <div id="bridgeContent" class="tab-content hidden">
             <div class="glass-effect rounded-xl p-4 sm:p-6">
-                <h2 class="text-xl sm:text-2xl font-bold mb-6"><i class="fas fa-shield-alt mr-2"></i>Admin Dashboard</h2>
+                <h2 class="text-xl sm:text-2xl font-bold mb-6 flex items-center gap-2">
+                    <i class="fas fa-bridge text-purple-500"></i>
+                    Cross-Chain Bridge
+                </h2>
+
+                <!-- Bridge Interface -->
+                <div class="mb-8">
+                    <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                        <i class="fas fa-exchange-alt text-purple-500"></i>
+                        Bridge Assets
+                    </h3>
+
+                    <!-- Chain Selection -->
+                    <div class="grid md:grid-cols-2 gap-8 mb-8">
+                        <!-- Source Chain -->
+                        <div>
+                            <label class="block text-sm font-medium mb-3">From Chain</label>
+                            <div id="bridgeSourceChains" class="space-y-3">
+                                <!-- Chains will be populated by JavaScript -->
+                            </div>
+                        </div>
+
+                        <!-- Bridge Arrow -->
+                        <div class="flex items-center justify-center md:col-span-2">
+                            <button id="bridgeSwapChains" class="text-3xl text-purple-500 hover:text-purple-600 transition-colors">
+                                <i class="fas fa-exchange-alt"></i>
+                            </button>
+                        </div>
+
+                        <!-- Target Chain -->
+                        <div>
+                            <label class="block text-sm font-medium mb-3">To Chain</label>
+                            <div id="bridgeTargetChains" class="space-y-3">
+                                <!-- Chains will be populated by JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Asset Selection -->
+                    <div class="mb-8">
+                        <label class="block text-sm font-medium mb-3">Select Asset</label>
+                        <div class="grid md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">Available Assets</label>
+                                <select id="bridgeAssetSelect" class="w-full p-3 border rounded-lg bg-white/10 border-white/20 text-white">
+                                    <option value="">Select an asset...</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">Amount</label>
+                                <div class="flex gap-2">
+                                    <input type="number" id="bridgeAmountInput" placeholder="0.00" min="0" step="0.01" 
+                                           class="flex-1 p-3 border rounded-lg bg-white/10 border-white/20 text-white">
+                                    <button id="bridgeMaxButton" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors">MAX</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="bridgeBalanceInfo" class="mt-2 text-sm text-gray-400">
+                            <!-- Balance will be shown here -->
+                        </div>
+                    </div>
+
+                    <!-- Fee Estimation -->
+                    <div class="mb-8 p-4 bg-white/5 rounded-lg border border-white/20">
+                        <h3 class="font-medium mb-3 flex items-center gap-2">
+                            <i class="fas fa-calculator text-blue-500"></i>
+                            Fee Estimation
+                        </h3>
+                        <div id="bridgeFeeEstimation" class="space-y-2">
+                            <div class="flex justify-between">
+                                <span>Bridge Fee:</span>
+                                <span id="bridgeFeeAmount" class="font-mono">--</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Network Fee:</span>
+                                <span id="bridgeNetworkFee" class="font-mono">--</span>
+                            </div>
+                            <div class="flex justify-between font-bold border-t border-white/20 pt-2">
+                                <span>Total Fee:</span>
+                                <span id="bridgeTotalFee" class="font-mono">--</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Security Verification -->
+                    <div class="mb-8">
+                        <h3 class="font-medium mb-3 flex items-center gap-2">
+                            <i class="fas fa-shield-alt text-green-500"></i>
+                            Security Verification
+                        </h3>
+                        <div id="bridgeSecurityChecks" class="space-y-2">
+                            <!-- Security checks will be populated here -->
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="flex gap-4">
+                        <button id="bridgeButton" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg transition-colors flex-1 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                            <i class="fas fa-paper-plane mr-2"></i>
+                            Bridge Assets
+                        </button>
+                        <button id="bridgePreviewButton" class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg transition-colors">
+                            <i class="fas fa-eye mr-2"></i>
+                            Preview
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Transfer Tracking -->
+                <div class="mb-8">
+                    <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                        <i class="fas fa-history text-blue-500"></i>
+                        Transfer History
+                    </h3>
+                    <div id="bridgeTransferHistory" class="space-y-4">
+                        <!-- Transfer history will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Bridge Status -->
+                <div>
+                    <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                        <i class="fas fa-info-circle text-purple-500"></i>
+                        Bridge Status
+                    </h3>
+                    <div id="bridgeStatus" class="grid md:grid-cols-3 gap-4">
+                        <!-- Bridge status will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin Dashboard Tab -->
+        <div id="adminContent" role="tabpanel" aria-labelledby="admin-tab" class="tab-content hidden">
+            <div class="glass-effect rounded-xl p-4 sm:p-6">
+                <h2 class="text-xl sm:text-2xl font-bold mb-6"><i class="fas fa-shield-alt mr-2" aria-hidden="true"></i>Admin Dashboard</h2>
                 
                 <!-- Dashboard Stats -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8" id="adminStats">
@@ -1551,7 +2019,7 @@
                                 <p class="text-sm text-blue-400">Total Users</p>
                                 <p class="text-2xl font-bold" id="totalUsers">-</p>
                             </div>
-                            <i class="fas fa-users text-blue-400 text-2xl"></i>
+                            <i class="fas fa-users text-blue-400 text-2xl" aria-hidden="true"></i>
                         </div>
                     </div>
                     <div class="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
@@ -1560,7 +2028,7 @@
                                 <p class="text-sm text-green-400">Active Auctions</p>
                                 <p class="text-2xl font-bold" id="activeAuctions">-</p>
                             </div>
-                            <i class="fas fa-gavel text-green-400 text-2xl"></i>
+                            <i class="fas fa-gavel text-green-400 text-2xl" aria-hidden="true"></i>
                         </div>
                     </div>
                     <div class="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
@@ -1569,7 +2037,7 @@
                                 <p class="text-sm text-yellow-400">Revenue (30d)</p>
                                 <p class="text-2xl font-bold" id="revenue30d">-</p>
                             </div>
-                            <i class="fas fa-dollar-sign text-yellow-400 text-2xl"></i>
+                            <i class="fas fa-dollar-sign text-yellow-400 text-2xl" aria-hidden="true"></i>
                         </div>
                     </div>
                     <div class="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
@@ -1578,7 +2046,7 @@
                                 <p class="text-sm text-red-400">Security Alerts</p>
                                 <p class="text-2xl font-bold" id="securityAlerts">-</p>
                             </div>
-                            <i class="fas fa-exclamation-triangle text-red-400 text-2xl"></i>
+                            <i class="fas fa-exclamation-triangle text-red-400 text-2xl" aria-hidden="true"></i>
                         </div>
                     </div>
                 </div>
@@ -1586,22 +2054,22 @@
                 <!-- Admin Navigation -->
                 <div class="flex flex-wrap gap-2 mb-6">
                     <button onclick="showAdminSection('users')" class="admin-nav-btn bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
-                        <i class="fas fa-users mr-2"></i>Users
+                        <i class="fas fa-users mr-2" aria-hidden="true"></i>Users
                     </button>
                     <button onclick="showAdminSection('auctions')" class="admin-nav-btn bg-transparent text-gray-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/20">
-                        <i class="fas fa-gavel mr-2"></i>Auctions
+                        <i class="fas fa-gavel mr-2" aria-hidden="true"></i>Auctions
                     </button>
                     <button onclick="showAdminSection('revenue')" class="admin-nav-btn bg-transparent text-gray-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/20">
-                        <i class="fas fa-dollar-sign mr-2"></i>Revenue
+                        <i class="fas fa-dollar-sign mr-2" aria-hidden="true"></i>Revenue
                     </button>
                     <button onclick="showAdminSection('security')" class="admin-nav-btn bg-transparent text-gray-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/20">
-                        <i class="fas fa-shield-alt mr-2"></i>Security
+                        <i class="fas fa-shield-alt mr-2" aria-hidden="true"></i>Security
                     </button>
                     <button onclick="showAdminSection('config')" class="admin-nav-btn bg-transparent text-gray-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/20">
-                        <i class="fas fa-cog mr-2"></i>Config
+                        <i class="fas fa-cog mr-2" aria-hidden="true"></i>Config
                     </button>
                     <button onclick="showAdminSection('audit')" class="admin-nav-btn bg-transparent text-gray-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/20">
-                        <i class="fas fa-history mr-2"></i>Audit
+                        <i class="fas fa-history mr-2" aria-hidden="true"></i>Audit
                     </button>
                 </div>
 
@@ -1612,7 +2080,7 @@
                         <div class="flex items-center justify-between mb-4">
                             <h3 class="text-lg font-semibold">User Management</h3>
                             <div class="flex gap-2">
-                                <input type="text" id="userSearch" placeholder="Search users..." class="px-3 py-1 rounded-lg bg-white/10 border border-white/20 text-sm">
+                                <input type="text" id="userSearch" placeholder="Search users..." class="px-3 py-1 rounded-lg bg-white/10 border border-white/20 text-sm" aria-label="Search users...">
                                 <select id="userRoleFilter" class="px-3 py-1 rounded-lg bg-white/10 border border-white/20 text-sm">
                                     <option value="">All Roles</option>
                                     <option value="user">User</option>
@@ -1628,14 +2096,14 @@
                         </div>
                         <div class="overflow-x-auto">
                             <table class="w-full text-sm">
-                                <thead>
+                                <thead scope="col">
                                     <tr class="border-b border-white/10">
-                                        <th class="text-left py-2">Username</th>
-                                        <th class="text-left py-2">Email</th>
-                                        <th class="text-left py-2">Role</th>
-                                        <th class="text-left py-2">Status</th>
-                                        <th class="text-left py-2">Created</th>
-                                        <th class="text-left py-2">Actions</th>
+                                        <th class="text-left py-2" scope="col">Username</th>
+                                        <th class="text-left py-2" scope="col">Email</th>
+                                        <th class="text-left py-2" scope="col">Role</th>
+                                        <th class="text-left py-2" scope="col">Status</th>
+                                        <th class="text-left py-2" scope="col">Created</th>
+                                        <th class="text-left py-2" scope="col">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody id="usersTableBody">
@@ -1658,6 +2126,13 @@
                     <div id="configSection" class="admin-section hidden"></div>
                     <div id="auditSection" class="admin-section hidden"></div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Token Management Tab -->
+        <div id="tokensContent" class="tab-content hidden">
+            <div id="token-management-container">
+                <!-- Token management interface will be loaded here -->
             </div>
         </div>
 
@@ -1702,36 +2177,36 @@
                 <!-- Social Media Buttons -->
                 <div class="grid grid-cols-2 gap-3 mb-6">
                     <button onclick="shareOnSocial('twitter')" class="twitter-btn text-white px-4 py-3 rounded-lg flex items-center justify-center transition-colors">
-                        <i class="fab fa-twitter mr-2"></i>Twitter
+                        <i class="fab fa-twitter mr-2" aria-hidden="true"></i>Twitter
                     </button>
                     <button onclick="shareOnSocial('facebook')" class="facebook-btn text-white px-4 py-3 rounded-lg flex items-center justify-center transition-colors">
-                        <i class="fab fa-facebook mr-2"></i>Facebook
+                        <i class="fab fa-facebook mr-2" aria-hidden="true"></i>Facebook
                     </button>
                     <button onclick="shareOnSocial('linkedin')" class="linkedin-btn text-white px-4 py-3 rounded-lg flex items-center justify-center transition-colors">
-                        <i class="fab fa-linkedin mr-2"></i>LinkedIn
+                        <i class="fab fa-linkedin mr-2" aria-hidden="true"></i>LinkedIn
                     </button>
                     <button onclick="shareOnSocial('whatsapp')" class="whatsapp-btn text-white px-4 py-3 rounded-lg flex items-center justify-center transition-colors">
-                        <i class="fab fa-whatsapp mr-2"></i>WhatsApp
+                        <i class="fab fa-whatsapp mr-2" aria-hidden="true"></i>WhatsApp
                     </button>
                     <button onclick="shareOnSocial('telegram')" class="telegram-btn text-white px-4 py-3 rounded-lg flex items-center justify-center transition-colors">
-                        <i class="fab fa-telegram mr-2"></i>Telegram
+                        <i class="fab fa-telegram mr-2" aria-hidden="true"></i>Telegram
                     </button>
                     <button onclick="shareOnSocial('email')" class="email-btn text-white px-4 py-3 rounded-lg flex items-center justify-center transition-colors">
-                        <i class="fas fa-envelope mr-2"></i>Email
+                        <i class="fas fa-envelope mr-2" aria-hidden="true"></i>Email
                     </button>
                 </div>
 
                 <!-- Copy Link -->
                 <div class="mb-6">
                     <button onclick="shareOnSocial('copy_link')" class="copy-btn text-white w-full px-4 py-3 rounded-lg flex items-center justify-center transition-colors">
-                        <i class="fas fa-link mr-2"></i>Copy Link
+                        <i class="fas fa-link mr-2" aria-hidden="true"></i>Copy Link
                     </button>
                 </div>
 
                 <!-- Mobile Native Sharing -->
                 <div class="mb-6" id="nativeShareContainer" style="display: none;">
                     <button onclick="shareNatively()" class="native-btn text-white w-full px-4 py-3 rounded-lg flex items-center justify-center transition-colors">
-                        <i class="fas fa-share mr-2"></i>Share (Native)
+                        <i class="fas fa-share mr-2" aria-hidden="true"></i>Share (Native)
                     </button>
                 </div>
 
@@ -1776,7 +2251,7 @@
                     <!-- Skip Button -->
                     <div class="flex justify-end mb-4">
                         <button id="skipBtn" class="text-gray-500 hover:text-gray-700 text-sm flex items-center gap-2">
-                            <i class="fas fa-forward"></i>
+                            <i class="fas fa-forward" aria-hidden="true"></i>
                             Skip Tutorial
                         </button>
                     </div>
@@ -1789,36 +2264,102 @@
                     <!-- Navigation Buttons -->
                     <div class="flex justify-between mt-6">
                         <button id="prevBtn" class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-                            <i class="fas fa-arrow-left mr-2"></i>
+                            <i class="fas fa-arrow-left mr-2" aria-hidden="true"></i>
                             Previous
                         </button>
                         <button id="nextBtn" class="px-6 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-lg hover:from-purple-600 hover:to-indigo-700 transition">
                             Next
-                            <i class="fas fa-arrow-right ml-2"></i>
+                            <i class="fas fa-arrow-right ml-2" aria-hidden="true"></i>
                         </button>
                     </div>
                     
                     <!-- Help Resources -->
                     <div class="mt-6 p-4 bg-blue-50 rounded-lg">
                         <h4 class="font-semibold text-blue-900 mb-2">
-                            <i class="fas fa-question-circle mr-2"></i>
+                            <i class="fas fa-question-circle mr-2" aria-hidden="true"></i>
                             Need Help?
                         </h4>
                         <div class="space-y-2 text-sm">
                             <a href="#" class="text-blue-600 hover:text-blue-800 block">
-                                <i class="fas fa-book mr-2"></i>
+                                <i class="fas fa-book mr-2" aria-hidden="true"></i>
                                 Documentation
                             </a>
                             <a href="#" class="text-blue-600 hover:text-blue-800 block">
-                                <i class="fas fa-video mr-2"></i>
+                                <i class="fas fa-video mr-2" aria-hidden="true"></i>
                                 Video Tutorial
                             </a>
                             <a href="#" class="text-blue-600 hover:text-blue-800 block">
-                                <i class="fas fa-comments mr-2"></i>
+                                <i class="fas fa-comments mr-2" aria-hidden="true"></i>
                                 Community Support
                             </a>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- NFT Gallery Tab -->
+        <div id="nftContent" class="tab-content hidden">
+            <div class="glass-effect rounded-xl p-4 sm:p-6">
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+                    <div>
+                        <h2 class="text-xl sm:text-2xl font-bold mb-2"><i class="fas fa-image mr-2"></i>NFT Gallery</h2>
+                        <p class="text-gray-600 dark:text-gray-400">Discover, collect, and trade unique digital assets</p>
+                    </div>
+                    <div class="mt-4 md:mt-0 flex space-x-3">
+                        <button onclick="window.location.href='nft-gallery.html'" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                            <i class="fas fa-external-link-alt mr-2"></i>Open Full Gallery
+                        </button>
+                        <button onclick="nftDisplay.createNFT()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                            <i class="fas fa-plus mr-2"></i>Create NFT
+                        </button>
+                    </div>
+                </div>
+
+                <!-- NFT Stats -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-white/10 rounded-lg p-4 text-center">
+                        <div class="text-2xl font-bold text-blue-400" id="nftTotalCount">0</div>
+                        <div class="text-sm text-gray-400">Total NFTs</div>
+                    </div>
+                    <div class="bg-white/10 rounded-lg p-4 text-center">
+                        <div class="text-2xl font-bold text-green-400" id="nftCollectionCount">0</div>
+                        <div class="text-sm text-gray-400">Collections</div>
+                    </div>
+                    <div class="bg-white/10 rounded-lg p-4 text-center">
+                        <div class="text-2xl font-bold text-purple-400" id="nftUserCount">0</div>
+                        <div class="text-sm text-gray-400">Your NFTs</div>
+                    </div>
+                    <div class="bg-white/10 rounded-lg p-4 text-center">
+                        <div class="text-2xl font-bold text-yellow-400" id="nftTotalValue">$0</div>
+                        <div class="text-sm text-gray-400">Total Value</div>
+                    </div>
+                </div>
+
+                <!-- Quick Filters -->
+                <div class="flex flex-wrap gap-2 mb-6">
+                    <button onclick="filterNFTs('all')" class="px-3 py-1 bg-blue-600 text-white rounded-full text-sm">All</button>
+                    <button onclick="filterNFTs('verified')" class="px-3 py-1 bg-white/20 text-gray-300 rounded-full text-sm hover:bg-white/30">Verified</button>
+                    <button onclick="filterNFTs('art')" class="px-3 py-1 bg-white/20 text-gray-300 rounded-full text-sm hover:bg-white/30">Art</button>
+                    <button onclick="filterNFTs('gaming')" class="px-3 py-1 bg-white/20 text-gray-300 rounded-full text-sm hover:bg-white/30">Gaming</button>
+                    <button onclick="filterNFTs('music')" class="px-3 py-1 bg-white/20 text-gray-300 rounded-full text-sm hover:bg-white/30">Music</button>
+                    <button onclick="filterNFTs('owned')" class="px-3 py-1 bg-white/20 text-gray-300 rounded-full text-sm hover:bg-white/30">Owned</button>
+                </div>
+
+                <!-- NFT Grid Preview -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6" id="nftPreviewGrid">
+                    <!-- NFT preview cards will be loaded here -->
+                    <div class="col-span-full text-center py-8">
+                        <i class="fas fa-image text-4xl text-gray-500 mb-4"></i>
+                        <p class="text-gray-400">Loading NFTs...</p>
+                    </div>
+                </div>
+
+                <!-- View More Button -->
+                <div class="text-center">
+                    <button onclick="window.location.href='nft-gallery.html'" class="px-6 py-3 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-lg hover:from-purple-600 hover:to-indigo-700 transition-all transform hover:scale-105">
+                        <i class="fas fa-th mr-2"></i>View Full Gallery
+                    </button>
                 </div>
             </div>
         </div>
@@ -1828,7 +2369,7 @@
     <div id="tutorialTooltip" class="tutorial-tooltip hidden">
         <div class="flex items-start gap-3">
             <div class="flex-shrink-0">
-                <i class="fas fa-lightbulb text-yellow-500 text-xl"></i>
+                <i class="fas fa-lightbulb text-yellow-500 text-xl" aria-hidden="true"></i>
             </div>
             <div>
                 <h4 id="tooltipTitle" class="font-semibold text-gray-900 mb-1"></h4>
@@ -1849,21 +2390,21 @@
     <div id="rewardModal" class="fixed inset-0 z-50 hidden bg-black bg-opacity-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl p-8 max-w-md w-full text-center reward-badge">
             <div class="w-20 h-20 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                <i class="fas fa-trophy text-white text-3xl"></i>
+                <i class="fas fa-trophy text-white text-3xl" aria-hidden="true"></i>
             </div>
             <h3 class="text-2xl font-bold text-gray-900 mb-2">Congratulations!</h3>
             <p class="text-gray-600 mb-6">You've completed the onboarding tutorial!</p>
             <div class="space-y-3 mb-6">
                 <div class="flex items-center justify-center gap-2 text-yellow-600">
-                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star" aria-hidden="true"></i>
                     <span class="font-semibold">Tutorial Master</span>
                 </div>
                 <div class="flex items-center justify-center gap-2 text-blue-600">
-                    <i class="fas fa-award"></i>
+                    <i class="fas fa-award" aria-hidden="true"></i>
                     <span class="font-semibold">Platform Explorer</span>
                 </div>
                 <div class="flex items-center justify-center gap-2 text-green-600">
-                    <i class="fas fa-check-circle"></i>
+                    <i class="fas fa-check-circle" aria-hidden="true"></i>
                     <span class="font-semibold">Ready to Bid!</span>
                 </div>
             </div>
@@ -1873,13 +2414,23 @@
         </div>
     </div>
 
+    <!-- Error Handling Scripts - Load First -->
+    <script src="error-boundary.js"></script>
+    <script src="network-error-handler.js"></script>
+    <script src="form-validation.js"></script>
+    
+    <!-- Application Scripts -->
     <script src="app.js"></script>
+    <script src="app-error-integration.js"></script>
+    <script src="theme-system.js"></script>
+    <script src="theme-integration.js"></script>
     <script src="ar-preview.js"></script>
     <script src="ai-recommendations.js"></script>
     <script src="blockchain-ui.js"></script>
     <script src="smart-contract-ui.js"></script>
     <script src="gas-fee-optimizer.js"></script>
     <script src="social-sharing.js"></script>
-    <script src="pwa.js"></script>
+    <script src="network-monitor.js"></script>
+    <script src="token-management.js"></script>
 </body>
 </html>

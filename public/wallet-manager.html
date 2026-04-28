@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Wallet Management - Sealed Auction Platform</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <!-- Accessibility Styles -->
+    <link rel="stylesheet" href="accessibility.css">
     <style>
         * {
             margin: 0;
@@ -643,11 +646,15 @@
     </style>
 </head>
 <body>
+    <!-- Skip Navigation Link -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    
+    <main id="main-content" role="main">
     <div class="container">
-        <header>
+        <header role="banner">
             <div class="header-content">
                 <h1>
-                    <i class="fas fa-wallet"></i>
+                    <i class="fas fa-wallet" aria-hidden="true"></i>
                     Wallet Management
                 </h1>
                 <div class="controls">
@@ -656,15 +663,15 @@
                         <label for="auto-refresh-toggle">Auto Refresh</label>
                     </div>
                     <button class="btn btn-secondary" id="refresh-btn">
-                        <i class="fas fa-sync-alt"></i>
+                        <i class="fas fa-sync-alt" aria-hidden="true"></i>
                         Refresh
                     </button>
                     <button class="btn btn-success" id="create-wallet-btn">
-                        <i class="fas fa-plus"></i>
+                        <i class="fas fa-plus" aria-hidden="true"></i>
                         Create Wallet
                     </button>
                     <button class="btn btn-primary" id="import-wallet-btn">
-                        <i class="fas fa-download"></i>
+                        <i class="fas fa-download" aria-hidden="true"></i>
                         Import Wallet
                     </button>
                 </div>
@@ -675,7 +682,7 @@
             <div class="card">
                 <div class="card-header">
                     <h2 class="card-title">
-                        <i class="fas fa-chart-pie"></i>
+                        <i class="fas fa-chart-pie" aria-hidden="true"></i>
                         Wallet Overview
                     </h2>
                 </div>
@@ -702,7 +709,7 @@
             <div class="card">
                 <div class="card-header">
                     <h2 class="card-title">
-                        <i class="fas fa-coins"></i>
+                        <i class="fas fa-coins" aria-hidden="true"></i>
                         Balance Summary
                     </h2>
                 </div>
@@ -729,7 +736,7 @@
             <div class="card">
                 <div class="card-header">
                     <h2 class="card-title">
-                        <i class="fas fa-shield-alt"></i>
+                        <i class="fas fa-shield-alt" aria-hidden="true"></i>
                         Security Status
                     </h2>
                 </div>
@@ -757,16 +764,16 @@
         <div class="wallets-section">
             <div class="section-header">
                 <h2 class="card-title">
-                    <i class="fas fa-list"></i>
+                    <i class="fas fa-list" aria-hidden="true"></i>
                     Your Wallets
                 </h2>
                 <div class="controls">
                     <button class="btn btn-warning" onclick="walletManagerUI.createBackup()">
-                        <i class="fas fa-download"></i>
+                        <i class="fas fa-download" aria-hidden="true"></i>
                         Backup All
                     </button>
                     <button class="btn btn-info" onclick="walletManagerUI.showRestoreModal()">
-                        <i class="fas fa-upload"></i>
+                        <i class="fas fa-upload" aria-hidden="true"></i>
                         Restore
                     </button>
                 </div>
@@ -774,7 +781,7 @@
 
             <div class="wallets-container" id="wallets-container">
                 <div class="empty-state">
-                    <i class="fas fa-wallet"></i>
+                    <i class="fas fa-wallet" aria-hidden="true"></i>
                     <p>No wallets found</p>
                     <p>Create your first wallet to get started</p>
                 </div>
@@ -783,33 +790,33 @@
     </div>
 
     <!-- Create Wallet Modal -->
-    <div class="modal" id="create-wallet-modal">
+    <div class="modal" id="create-wallet-modal" role="dialog" aria-modal="true">
         <!-- Content will be populated dynamically -->
     </div>
 
     <!-- Import Wallet Modal -->
-    <div class="modal" id="import-wallet-modal">
+    <div class="modal" id="import-wallet-modal" role="dialog" aria-modal="true">
         <!-- Content will be populated dynamically -->
     </div>
 
     <!-- Unlock Wallet Modal -->
-    <div class="modal" id="unlock-modal">
+    <div class="modal" id="unlock-modal" role="dialog" aria-modal="true">
         <!-- Content will be populated dynamically -->
     </div>
 
     <!-- Wallet Details Modal -->
-    <div class="modal" id="wallet-details-modal">
+    <div class="modal" id="wallet-details-modal" role="dialog" aria-modal="true">
         <!-- Content will be populated dynamically -->
     </div>
 
     <!-- Restore Backup Modal -->
-    <div class="modal" id="restore-modal">
-        <div class="modal-content">
-            <div class="modal-header">
+    <div class="modal" id="restore-modal" role="dialog" aria-modal="true">
+        <div class="modal-content" role="dialog" aria-modal="true">
+            <div class="modal-header" role="dialog" aria-modal="true">
                 <h3>Restore from Backup</h3>
                 <button class="close-btn" onclick="this.closest('.modal').style.display='none'">&times;</button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body" role="dialog" aria-modal="true">
                 <form id="restore-form" onsubmit="walletManagerUI.handleRestore(event)">
                     <div class="form-group">
                         <label for="backup-data">Backup Data:</label>
@@ -829,6 +836,8 @@
     </div>
 
     <!-- Scripts -->
+</main>
+
     <script src="/socket.io/socket.io.js"></script>
     <script src="wallet-manager-ui.js"></script>
     <script>
@@ -881,5 +890,12 @@
             }
         });
     </script>
+    
+    <!-- ARIA Live Regions -->
+    <div id="aria-live-polite" role="status" aria-live="polite" aria-atomic="true" class="sr-only"></div>
+    <div id="aria-live-assertive" role="alert" aria-live="assertive" aria-atomic="true" class="sr-only"></div>
+    
+    <!-- Accessibility JavaScript -->
+    <script src="accessibility.js"></script>
 </body>
 </html>

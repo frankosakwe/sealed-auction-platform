@@ -39,6 +39,9 @@
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
+    <!-- Accessibility Styles -->
+    <link rel="stylesheet" href="accessibility.css">
+    
     <style>
         .upload-zone {
             border: 2px dashed #cbd5e1;
@@ -126,30 +129,33 @@
     </style>
 </head>
 <body class="bg-gray-50">
+    <!-- Skip Navigation Link -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    
     <!-- Header -->
-    <header class="bg-white shadow-sm border-b border-gray-200">
+    <header role="banner" class="bg-white shadow-sm border-b border-gray-200">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16">
                 <div class="flex items-center">
-                    <i class="fas fa-upload text-blue-600 text-2xl mr-3"></i>
+                    <i class="fas fa-upload text-blue-600 text-2xl mr-3" aria-hidden="true"></i>
                     <h1 class="text-xl font-semibold text-gray-900">File Upload System</h1>
                 </div>
                 <div class="flex items-center space-x-4">
                     <button id="clearAllBtn" class="text-gray-500 hover:text-gray-700 transition">
-                        <i class="fas fa-trash-alt mr-2"></i>Clear All
+                        <i class="fas fa-trash-alt mr-2" aria-hidden="true"></i>Clear All
                     </button>
                     <button id="retryAllBtn" class="text-blue-600 hover:text-blue-700 transition">
-                        <i class="fas fa-redo mr-2"></i>Retry Failed
+                        <i class="fas fa-redo mr-2" aria-hidden="true"></i>Retry Failed
                     </button>
                     <button id="uploadAllBtn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
-                        <i class="fas fa-cloud-upload-alt mr-2"></i>Upload All
+                        <i class="fas fa-cloud-upload-alt mr-2" aria-hidden="true"></i>Upload All
                     </button>
                 </div>
             </div>
         </div>
     </header>
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <main id="main-content" role="main" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <!-- Upload Statistics -->
         <div class="upload-stats text-white rounded-lg p-6 mb-8">
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -175,7 +181,7 @@
         <!-- Upload Zone -->
         <div id="uploadZone" class="upload-zone bg-white rounded-lg p-12 text-center mb-8 cursor-pointer">
             <div class="max-w-md mx-auto">
-                <i class="fas fa-cloud-upload-alt text-6xl text-gray-400 mb-4"></i>
+                <i class="fas fa-cloud-upload-alt text-6xl text-gray-400 mb-4" aria-hidden="true"></i>
                 <h2 class="text-2xl font-semibold text-gray-900 mb-2">
                     Drop files here or click to browse
                 </h2>
@@ -183,7 +189,7 @@
                     Support for images, documents, and archives. Maximum file size: 10MB per file.
                 </p>
                 <button id="browseBtn" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition">
-                    <i class="fas fa-folder-open mr-2"></i>Choose Files
+                    <i class="fas fa-folder-open mr-2" aria-hidden="true"></i>Choose Files
                 </button>
                 <input type="file" id="fileInput" multiple class="hidden" accept="image/*,.pdf,.doc,.docx,.txt,.zip,.rar">
             </div>
@@ -194,7 +200,7 @@
             <div class="px-6 py-4 border-b border-gray-200">
                 <div class="flex justify-between items-center">
                     <h3 class="text-lg font-semibold text-gray-900">
-                        <i class="fas fa-list mr-2"></i>Upload Queue
+                        <i class="fas fa-list mr-2" aria-hidden="true"></i>Upload Queue
                     </h3>
                     <div class="flex items-center space-x-4">
                         <select id="filterSelect" class="border border-gray-300 rounded-md px-3 py-1 text-sm">
@@ -205,7 +211,7 @@
                             <option value="failed">Failed</option>
                         </select>
                         <button id="pauseBtn" class="text-gray-500 hover:text-gray-700 transition">
-                            <i class="fas fa-pause mr-1"></i>Pause
+                            <i class="fas fa-pause mr-1" aria-hidden="true"></i>Pause
                         </button>
                     </div>
                 </div>
@@ -214,7 +220,7 @@
             <div id="fileQueue" class="divide-y divide-gray-200 max-h-96 overflow-y-auto">
                 <!-- File items will be added here -->
                 <div class="p-8 text-center text-gray-500">
-                    <i class="fas fa-inbox text-4xl mb-3"></i>
+                    <i class="fas fa-inbox text-4xl mb-3" aria-hidden="true"></i>
                     <p>No files in queue. Drop files above to get started.</p>
                 </div>
             </div>
@@ -224,7 +230,7 @@
         <div class="bg-white rounded-lg shadow mt-8">
             <div class="px-6 py-4 border-b border-gray-200">
                 <h3 class="text-lg font-semibold text-gray-900">
-                    <i class="fas fa-cog mr-2"></i>Upload Settings
+                    <i class="fas fa-cog mr-2" aria-hidden="true"></i>Upload Settings
                 </h3>
             </div>
             <div class="p-6">
@@ -284,5 +290,12 @@
 
     <script src="file-upload.js"></script>
     <script src="pwa.js"></script>
+    
+    <!-- ARIA Live Regions -->
+    <div id="aria-live-polite" role="status" aria-live="polite" aria-atomic="true" class="sr-only"></div>
+    <div id="aria-live-assertive" role="alert" aria-live="assertive" aria-atomic="true" class="sr-only"></div>
+    
+    <!-- Accessibility JavaScript -->
+    <script src="accessibility.js"></script>
 </body>
 </html>

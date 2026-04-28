@@ -22,6 +22,8 @@ const { v4: uuidv4 } = require('uuid');
 const { Horizon, Keypair, TransactionBuilder, Networks, BASE_FEE, Asset } = require('@stellar/stellar-sdk');
 const session = require('express-session');
 const passport = require('passport');
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const GitHubStrategy = require('passport-github2').Strategy;
 const AuctionDatabase = require('./database');
 const { ApplicationMetrics, createMetricsMiddleware } = require('./utils/metrics');
 const NetworkMonitor = require('./utils/network-monitor');
@@ -107,6 +109,67 @@ function logError(message, error, context = {}) {
   console.error(message, error);
   trackError(error, { message, ...context });
 }
+
+// Error reporting endpoints
+app.post('/api/errors/report', (req, res) => {
+  try {
+    const errorData = req.body;
+    console.error('Client error reported:', errorData);
+    
+    // Track error
+    trackError(new Error(errorData.message), {
+      type: 'client',
+      ...errorData
+    });
+    
+    res.json({ success: true, message: 'Error reported successfully' });
+  } catch (error) {
+    console.error('Failed to process error report:', error);
+    res.status(500).json({ error: 'Failed to process error report' });
+  }
+});
+
+app.post('/api/errors/404', (req, res) => {
+  try {
+    const errorData = req.body;
+    console.warn('404 error:', errorData);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to log 404 error' });
+  }
+});
+
+app.post('/api/errors/500', (req, res) => {
+  try {
+    const errorData = req.body;
+    console.error('500 error:', errorData);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to log 500 error' });
+  }
+});
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  try {
+    // Check database connection
+    const dbHealthy = db && db.db;
+    
+    res.json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      services: {
+        database: dbHealthy ? 'healthy' : 'unhealthy',
+        server: 'healthy'
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+});
 
 // Security middleware
 app.use(helmet());
@@ -225,9 +288,165 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
+// Configure Passport strategies
+passport.serializeUser((user, done) => {
+  done(null, user.id);
+});
+
+passport.deserializeUser((id, done) => {
+  try {
+    const user = db.getUserById(id);
+    done(null, user);
+  } catch (error) {
+    done(error, null);
+  }
+});
+
+// Google OAuth Strategy
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  passport.use(new GoogleStrategy({
+    clientID: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    callbackURL: "/auth/google/callback",
+    scope: ['profile', 'email']
+  }, async (accessToken, refreshToken, profile, done) => {
+    try {
+      // Extract user profile information
+      const profileData = {
+        id: profile.id,
+        email: profile.emails[0]?.value,
+        name: profile.displayName,
+        firstName: profile.name?.givenName,
+        lastName: profile.name?.familyName,
+        photo: profile.photos[0]?.value,
+        provider: 'google',
+        providerId: profile.id
+      };
+
+      // Find or create user
+      let user = db.getUserByOAuthProvider('google', profile.id);
+      
+      if (!user) {
+        // Check if user exists with same email (account linking)
+        const existingUser = db.getUserByEmail(profileData.email);
+        if (existingUser) {
+          // Link OAuth account to existing user
+          db.linkOAuthAccount(existingUser.id, 'google', profile.id, profileData);
+          user = existingUser;
+        } else {
+          // Create new user
+          user = db.createOAuthUser(profileData);
+        }
+      } else {
+        // Update user profile data
+        db.updateOAuthUserProfile(user.id, profileData);
+      }
+
+      return done(null, user);
+    } catch (error) {
+      console.error('Google OAuth error:', error);
+      return done(error, null);
+    }
+  }));
+}
+
+// GitHub OAuth Strategy
+if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
+  passport.use(new GitHubStrategy({
+    clientID: process.env.GITHUB_CLIENT_ID,
+    clientSecret: process.env.GITHUB_CLIENT_SECRET,
+    callbackURL: "/auth/github/callback",
+    scope: ['user:email']
+  }, async (accessToken, refreshToken, profile, done) => {
+    try {
+      // Extract user profile information
+      const profileData = {
+        id: profile.id,
+        email: profile.emails?.[0]?.value || `${profile.username}@github.local`,
+        name: profile.displayName || profile.username,
+        username: profile.username,
+        photo: profile.photos?.[0]?.value,
+        provider: 'github',
+        providerId: profile.id,
+        bio: profile._json?.bio
+      };
+
+      // Find or create user
+      let user = db.getUserByOAuthProvider('github', profile.id);
+      
+      if (!user) {
+        // Check if user exists with same email (account linking)
+        const existingUser = db.getUserByEmail(profileData.email);
+        if (existingUser && profileData.email !== `${profile.username}@github.local`) {
+          // Link OAuth account to existing user
+          db.linkOAuthAccount(existingUser.id, 'github', profile.id, profileData);
+          user = existingUser;
+        } else {
+          // Create new user
+          user = db.createOAuthUser(profileData);
+        }
+      } else {
+        // Update user profile data
+        db.updateOAuthUserProfile(user.id, profileData);
+      }
+
+      return done(null, user);
+    } catch (error) {
+      console.error('GitHub OAuth error:', error);
+      return done(error, null);
+    }
+  }));
+}
+
 // Rate limiting configuration
 const JWT_SECRET = process.env.JWT_SECRET || 'your-jwt-secret-change-in-production';
+const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || 'your-refresh-token-secret-change-in-production';
 const tokenBlacklist = new Set();
+
+// Helper function to generate device fingerprint
+function generateDeviceFingerprint(req) {
+  const user_agent = req.headers['user-agent'] || '';
+  const ip = req.ip || req.connection.remoteAddress || '';
+  const accept_language = req.headers['accept-language'] || '';
+  const accept_encoding = req.headers['accept-encoding'] || '';
+  
+  return crypto.createHash('sha256')
+    .update(user_agent + ip + accept_language + accept_encoding)
+    .digest('hex');
+}
+
+// Helper function to generate refresh token
+function generateRefreshToken() {
+  return crypto.randomBytes(64).toString('hex');
+}
+
+// Helper function to hash refresh token
+function hashRefreshToken(token) {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+// Helper function to get device info from request
+function getDeviceInfo(req) {
+  const user_agent = req.headers['user-agent'] || 'Unknown';
+  const ip = req.ip || req.connection.remoteAddress || 'Unknown';
+  
+  // Parse user agent to get browser and OS info
+  let browser = 'Unknown';
+  let os = 'Unknown';
+  
+  if (user_agent.includes('Chrome')) browser = 'Chrome';
+  else if (user_agent.includes('Firefox')) browser = 'Firefox';
+  else if (user_agent.includes('Safari')) browser = 'Safari';
+  else if (user_agent.includes('Edge')) browser = 'Edge';
+  
+  if (user_agent.includes('Windows')) os = 'Windows';
+  else if (user_agent.includes('Mac')) os = 'macOS';
+  else if (user_agent.includes('Linux')) os = 'Linux';
+  else if (user_agent.includes('Android')) os = 'Android';
+  else if (user_agent.includes('iOS')) os = 'iOS';
+  
+  return `${browser} on ${os}`;
+}
 
 // Import validation middleware
 const { validateRequest } = require('./utils/validation');
@@ -971,6 +1190,36 @@ app.post('/api/auth/login',
     db.resetFailedLoginAttempts(username);
     const token = generateToken(user);
     
+    // Generate refresh token
+    const refreshTokenValue = generateRefreshToken();
+    const refreshTokenHash = hashRefreshToken(refreshTokenValue);
+    const refreshTokenId = uuidv4();
+    const deviceId = generateDeviceFingerprint(req);
+    const deviceInfo = getDeviceInfo(req);
+    const ipAddress = req.ip || req.connection.remoteAddress || 'Unknown';
+    const userAgent = req.headers['user-agent'] || 'Unknown';
+    
+    // Create refresh token (7 days expiration)
+    const refreshTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    db.createRefreshToken({
+      id: refreshTokenId,
+      user_id: user.id,
+      token_hash: refreshTokenHash,
+      device_info: deviceInfo,
+      ip_address: ipAddress,
+      user_agent: userAgent,
+      expires_at: refreshTokenExpiresAt
+    });
+    
+    // Create user session
+    const sessionId = uuidv4();
+    db.createUserSession({
+      id: sessionId,
+      user_id: user.id,
+      refresh_token_id: refreshTokenId,
+      device_fingerprint: deviceId
+    });
+    
     res.sendData({ 
       id: user.id, 
       userId: user.id,
@@ -978,8 +1227,14 @@ app.post('/api/auth/login',
       role: user.role,
       token: token,
       expiresIn: '24h',
+      refreshToken: refreshTokenValue,
+      refreshTokenExpiresIn: '7d',
+      sessionId: sessionId,
+      deviceInfo: deviceInfo,
       _links: {
         verify: { href: '/api/auth/verify', method: 'GET' },
+        refresh: { href: '/api/auth/refresh', method: 'POST' },
+        sessions: { href: '/api/auth/sessions', method: 'GET' },
         auctions: { href: '/api/auctions', method: 'GET' }
       }
     }, 'loginResponse');
@@ -994,18 +1249,37 @@ app.post('/api/auth/logout', authenticateToken, (req, res) => {
   try {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
+    const { refreshToken, sessionId, logoutAll = false } = req.body;
     
+    // Blacklist the access token
     if (token) {
       tokenBlacklist.add(token);
     }
     
+    // Handle refresh token revocation
+    if (refreshToken) {
+      const refreshTokenHash = hashRefreshToken(refreshToken);
+      db.revokeRefreshToken(refreshTokenHash);
+    }
+    
+    // Handle session deactivation
+    if (sessionId && !logoutAll) {
+      db.deactivateSession(sessionId);
+    } else if (logoutAll) {
+      // Logout from all devices
+      db.revokeAllUserRefreshTokens(req.user.userId);
+      db.deactivateAllUserSessions(req.user.userId);
+    }
+    
     res.sendData({ 
-      message: 'Logged out successfully',
+      message: logoutAll ? 'Logged out from all devices successfully' : 'Logged out successfully',
+      loggedOutFromAllDevices: logoutAll,
       _links: {
         login: { href: '/api/auth/login', method: 'POST' }
       }
     }, 'logoutResponse');
   } catch (error) {
+    logError('Error during logout:', error, { endpoint: '/api/auth/logout', method: 'POST' });
     res.status(500).sendData({ error: 'Failed to logout' });
   }
 });
@@ -1023,6 +1297,149 @@ app.get('/api/auth/verify', authenticateToken, (req, res) => {
       logout: { href: '/api/auth/logout', method: 'POST' }
     }
   }, 'verifyResponse');
+});
+
+// Refresh token endpoint for token rotation
+app.post('/api/auth/refresh', 
+  authLimiter,
+  validateRequest.body({
+    refreshToken: { type: 'string', required: true },
+    sessionId: { type: 'string', required: true }
+  }),
+  async (req, res) => {
+  try {
+    const { refreshToken, sessionId } = req.sanitizedBody;
+    
+    if (!refreshToken || !sessionId) {
+      return res.status(400).sendData({ error: 'Refresh token and session ID are required' });
+    }
+    
+    // Hash the refresh token to look up in database
+    const refreshTokenHash = hashRefreshToken(refreshToken);
+    const storedToken = db.getRefreshToken(refreshTokenHash);
+    
+    if (!storedToken) {
+      return res.status(401).sendData({ error: 'Invalid or expired refresh token' });
+    }
+    
+    // Get user information
+    const user = {
+      id: storedToken.user_id,
+      username: storedToken.username,
+      role: storedToken.role || 'user'
+    };
+    
+    // Update last used timestamp
+    db.updateRefreshTokenLastUsed(storedToken.id);
+    db.updateSessionActivity(sessionId);
+    
+    // Revoke the old refresh token (token rotation)
+    db.revokeRefreshToken(refreshTokenHash);
+    
+    // Generate new access token
+    const newAccessToken = generateToken(user);
+    
+    // Generate new refresh token
+    const newRefreshTokenValue = generateRefreshToken();
+    const newRefreshTokenHash = hashRefreshToken(newRefreshTokenValue);
+    const newRefreshTokenId = uuidv4();
+    
+    // Create new refresh token
+    const refreshTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    db.createRefreshToken({
+      id: newRefreshTokenId,
+      user_id: user.id,
+      token_hash: newRefreshTokenHash,
+      device_info: storedToken.device_info,
+      ip_address: req.ip || req.connection.remoteAddress || 'Unknown',
+      user_agent: req.headers['user-agent'] || 'Unknown',
+      expires_at: refreshTokenExpiresAt
+    });
+    
+    // Update session with new refresh token
+    const updateSessionStmt = db.prepare(`
+      UPDATE user_sessions SET refresh_token_id = ?, last_activity_at = datetime('now') WHERE id = ?
+    `);
+    updateSessionStmt.run(newRefreshTokenId, sessionId);
+    
+    res.sendData({
+      token: newAccessToken,
+      refreshToken: newRefreshTokenValue,
+      expiresIn: '24h',
+      refreshTokenExpiresIn: '7d',
+      _links: {
+        verify: { href: '/api/auth/verify', method: 'GET' },
+        sessions: { href: '/api/auth/sessions', method: 'GET' },
+        logout: { href: '/api/auth/logout', method: 'POST' }
+      }
+    }, 'tokenRefreshResponse');
+    
+  } catch (error) {
+    logError('Error refreshing token:', error, { endpoint: '/api/auth/refresh', method: 'POST' });
+    res.status(500).sendData({ error: 'Failed to refresh token' });
+  }
+});
+
+// Get user sessions endpoint for multi-device support
+app.get('/api/auth/sessions', authenticateToken, (req, res) => {
+  try {
+    const sessions = db.getUserSessions(req.user.userId);
+    
+    res.sendData({
+      sessions: sessions.map(session => ({
+        id: session.id,
+        deviceInfo: session.device_info,
+        ipAddress: session.ip_address,
+        createdAt: session.created_at,
+        lastActivityAt: session.last_activity_at,
+        tokenCreatedAt: session.token_created_at,
+        lastUsedAt: session.last_used_at,
+        expiresAt: session.expires_at,
+        isActive: session.is_active
+      })),
+      totalSessions: sessions.length,
+      _links: {
+        self: { href: '/api/auth/sessions', method: 'GET' },
+        logout: { href: '/api/auth/logout', method: 'POST' },
+        refresh: { href: '/api/auth/refresh', method: 'POST' }
+      }
+    }, 'sessionsResponse');
+    
+  } catch (error) {
+    logError('Error getting user sessions:', error, { endpoint: '/api/auth/sessions', method: 'GET' });
+    res.status(500).sendData({ error: 'Failed to get sessions' });
+  }
+});
+
+// Revoke specific session endpoint
+app.delete('/api/auth/sessions/:sessionId', authenticateToken, (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    
+    // Get the session to verify it belongs to the current user
+    const sessions = db.getUserSessions(req.user.userId);
+    const session = sessions.find(s => s.id === sessionId);
+    
+    if (!session) {
+      return res.status(404).sendData({ error: 'Session not found' });
+    }
+    
+    // Revoke the refresh token and deactivate the session
+    db.revokeRefreshToken(session.refresh_token_id);
+    db.deactivateSession(sessionId);
+    
+    res.sendData({
+      message: 'Session revoked successfully',
+      revokedSessionId: sessionId,
+      _links: {
+        sessions: { href: '/api/auth/sessions', method: 'GET' }
+      }
+    }, 'sessionRevokedResponse');
+    
+  } catch (error) {
+    logError('Error revoking session:', error, { endpoint: `/api/auth/sessions/${req.params.sessionId}`, method: 'DELETE' });
+    res.status(500).sendData({ error: 'Failed to revoke session' });
+  }
 });
 
 // Account lockout status endpoint
@@ -1058,37 +1475,197 @@ app.get('/api/users/lockout-status',
   }
 });
 
-// OAuth Routes (requires passport configuration)
-app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
-
-app.get('/auth/google/callback', 
-  passport.authenticate('google', { failureRedirect: '/login' }),
-  (req, res) => {
-    const token = generateToken(req.user);
-    res.redirect(`/?token=${token}&username=${req.user.username}`);
+// OAuth Routes with comprehensive error handling
+app.get('/auth/google', (req, res, next) => {
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+    return res.status(503).json({ 
+      error: 'Google OAuth is not configured',
+      message: 'Please contact the administrator to set up Google OAuth'
+    });
   }
-);
+  next();
+}, passport.authenticate('google', { 
+  scope: ['profile', 'email'],
+  accessType: 'offline',
+  prompt: 'consent'
+}));
 
-app.get('/auth/github', passport.authenticate('github', { scope: ['user:email'] }));
+app.get('/auth/google/callback', (req, res, next) => {
+  passport.authenticate('google', (err, user, info) => {
+    if (err) {
+      console.error('Google OAuth callback error:', err);
+      return res.redirect(`/login?error=oauth_failed&message=${encodeURIComponent(err.message)}`);
+    }
+    if (!user) {
+      return res.redirect(`/login?error=oauth_failed&message=${encodeURIComponent(info?.message || 'Authentication failed')}`);
+    }
+    
+    try {
+      const token = generateToken(user);
+      res.redirect(`/?token=${token}&username=${user.username}&auth=oauth&provider=google`);
+    } catch (error) {
+      console.error('Token generation error:', error);
+      res.redirect(`/login?error=token_failed&message=${encodeURIComponent('Failed to generate authentication token')}`);
+    }
+  })(req, res, next);
+});
 
-app.get('/auth/github/callback',
-  passport.authenticate('github', { failureRedirect: '/login' }),
-  (req, res) => {
-    const token = generateToken(req.user);
-    res.redirect(`/?token=${token}&username=${req.user.username}`);
+app.get('/auth/github', (req, res, next) => {
+  if (!process.env.GITHUB_CLIENT_ID || !process.env.GITHUB_CLIENT_SECRET) {
+    return res.status(503).json({ 
+      error: 'GitHub OAuth is not configured',
+      message: 'Please contact the administrator to set up GitHub OAuth'
+    });
   }
-);
+  next();
+}, passport.authenticate('github', { 
+  scope: ['user:email'],
+  prompt: 'consent'
+}));
+
+app.get('/auth/github/callback', (req, res, next) => {
+  passport.authenticate('github', (err, user, info) => {
+    if (err) {
+      console.error('GitHub OAuth callback error:', err);
+      return res.redirect(`/login?error=oauth_failed&message=${encodeURIComponent(err.message)}`);
+    }
+    if (!user) {
+      return res.redirect(`/login?error=oauth_failed&message=${encodeURIComponent(info?.message || 'Authentication failed')}`);
+    }
+    
+    try {
+      const token = generateToken(user);
+      res.redirect(`/?token=${token}&username=${user.username}&auth=oauth&provider=github`);
+    } catch (error) {
+      console.error('Token generation error:', error);
+      res.redirect(`/login?error=token_failed&message=${encodeURIComponent('Failed to generate authentication token')}`);
+    }
+  })(req, res, next);
+});
 
 // OAuth status endpoint
 app.get('/api/auth/status', (req, res) => {
-  res.json({
-    google: !!process.env.GOOGLE_CLIENT_ID,
-    github: !!process.env.GITHUB_CLIENT_ID,
-    _links: {
-      self: { href: '/api/auth/status' },
-      login: { href: '/api/auth/login', method: 'POST' }
+  try {
+    res.json({
+      google: !!process.env.GOOGLE_CLIENT_ID,
+      github: !!process.env.GITHUB_CLIENT_ID,
+      configured: {
+        google: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
+        github: !!(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET)
+      },
+      _links: {
+        self: { href: '/api/auth/status' },
+        login: { href: '/api/auth/login', method: 'POST' },
+        google: { href: '/auth/google', method: 'GET' },
+        github: { href: '/auth/github', method: 'GET' }
+      }
+    });
+  } catch (error) {
+    logError('Error checking OAuth status:', error, { endpoint: '/api/auth/status' });
+    res.status(500).json({ error: 'Failed to check OAuth status' });
+  }
+});
+
+// OAuth account management endpoints
+app.get('/api/user/oauth-accounts', authenticateToken, (req, res) => {
+  try {
+    const oauthAccounts = db.getUserOAuthAccounts(req.user.id);
+    res.json({
+      oauthAccounts: oauthAccounts.map(account => ({
+        provider: account.provider,
+        providerId: account.provider_id,
+        profileData: JSON.parse(account.profile_data || '{}'),
+        linkedAt: account.created_at
+      })),
+      _links: {
+        self: { href: '/api/user/oauth-accounts' },
+        unlink: { href: '/api/user/oauth-accounts/{provider}', method: 'DELETE' }
+      }
+    });
+  } catch (error) {
+    logError('Error fetching OAuth accounts:', error, { endpoint: '/api/user/oauth-accounts', userId: req.user.id });
+    res.status(500).json({ error: 'Failed to fetch OAuth accounts' });
+  }
+});
+
+app.delete('/api/user/oauth-accounts/:provider', authenticateToken, (req, res) => {
+  try {
+    const { provider } = req.params;
+    const validProviders = ['google', 'github'];
+    
+    if (!validProviders.includes(provider)) {
+      return res.status(400).json({ error: 'Invalid OAuth provider' });
     }
-  });
+    
+    const user = db.getUserById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Check if user has password auth (to prevent locking themselves out)
+    if (user.auth_type === 'oauth') {
+      const oauthAccounts = db.getUserOAuthAccounts(req.user.id);
+      if (oauthAccounts.length <= 1) {
+        return res.status(400).json({ 
+          error: 'Cannot unlink last OAuth account. Please set a password first.',
+          code: 'LAST_OAUTH_ACCOUNT'
+        });
+      }
+    }
+    
+    const result = db.unlinkOAuthAccount(req.user.id, provider);
+    
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'OAuth account not found' });
+    }
+    
+    res.json({ 
+      message: 'OAuth account unlinked successfully',
+      provider: provider
+    });
+  } catch (error) {
+    logError('Error unlinking OAuth account:', error, { 
+      endpoint: '/api/user/oauth-accounts/:provider', 
+      userId: req.user.id, 
+      provider: req.params.provider 
+    });
+    res.status(500).json({ error: 'Failed to unlink OAuth account' });
+  }
+});
+
+// Enhanced token management with OAuth support
+app.post('/api/auth/refresh', authenticateToken, (req, res) => {
+  try {
+    const user = db.getUserById(req.user.id);
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+    
+    // Blacklist old token
+    const authHeader = req.headers['authorization'];
+    const oldToken = authHeader && authHeader.split(' ')[1];
+    if (oldToken) {
+      tokenBlacklist.add(oldToken);
+    }
+    
+    // Generate new token
+    const newToken = generateToken(user);
+    
+    res.json({
+      token: newToken,
+      expiresIn: '24h',
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        authType: user.auth_type
+      }
+    });
+  } catch (error) {
+    logError('Error refreshing token:', error, { endpoint: '/api/auth/refresh', userId: req.user.id });
+    res.status(500).json({ error: 'Failed to refresh token' });
+  }
 });
 
 // Admin Dashboard API endpoints
@@ -2913,6 +3490,364 @@ app.get('/api/network/congestion', async (req, res) => {
   }
 });
 
+// Token Management API Endpoints
+
+// Middleware to verify JWT token for protected routes
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Access token required' });
+  }
+
+  jwt.verify(token, process.env.JWT_SECRET || 'default-secret', (err, user) => {
+    if (err) {
+      return res.status(403).json({ error: 'Invalid or expired token' });
+    }
+    req.user = user;
+    next();
+  });
+}
+
+// Create a new token
+app.post('/api/tokens', authenticateToken, async (req, res) => {
+  try {
+    const { name, symbol, description, totalSupply, assetCode, assetIssuer, decimals = 7 } = req.body;
+    const tokenId = uuidv4();
+    const creatorId = req.user.id;
+
+    // Validate inputs
+    if (!name || !symbol || !totalSupply || totalSupply <= 0) {
+      return res.status(400).json({ error: 'Name, symbol, and positive total supply are required' });
+    }
+
+    // Check if symbol already exists
+    const existingToken = db.getTokenBySymbol(symbol);
+    if (existingToken) {
+      return res.status(409).json({ error: 'Token symbol already exists' });
+    }
+
+    // Create token
+    const result = db.createToken(tokenId, name, symbol, description, totalSupply, creatorId, assetCode, assetIssuer, decimals);
+    
+    // Mint initial supply to creator
+    await db.updateTokenBalance(tokenId, creatorId, totalSupply, true);
+
+    res.status(201).json({
+      message: 'Token created successfully',
+      token: db.getToken(tokenId)
+    });
+  } catch (error) {
+    logError('Error creating token:', error, { endpoint: '/api/tokens', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to create token' });
+  }
+});
+
+// Get all tokens (with optional filtering)
+app.get('/api/tokens', (req, res) => {
+  try {
+    const { userId, status, page = 1, limit = 20 } = req.query;
+    const offset = (page - 1) * limit;
+    
+    const tokens = db.getAllTokens(userId, status);
+    const paginatedTokens = tokens.slice(offset, offset + parseInt(limit));
+    
+    res.json({
+      tokens: paginatedTokens,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: tokens.length,
+        totalPages: Math.ceil(tokens.length / limit)
+      }
+    });
+  } catch (error) {
+    logError('Error getting tokens:', error, { endpoint: '/api/tokens' });
+    res.status(500).json({ error: 'Failed to get tokens' });
+  }
+});
+
+// Get specific token details
+app.get('/api/tokens/:tokenId', (req, res) => {
+  try {
+    const { tokenId } = req.params;
+    const token = db.getToken(tokenId);
+    
+    if (!token) {
+      return res.status(404).json({ error: 'Token not found' });
+    }
+
+    // Get token statistics
+    const stats = db.getTokenStats(tokenId);
+    
+    res.json({
+      token,
+      stats
+    });
+  } catch (error) {
+    logError('Error getting token details:', error, { endpoint: '/api/tokens/:tokenId' });
+    res.status(500).json({ error: 'Failed to get token details' });
+  }
+});
+
+// Get user's token portfolio
+app.get('/api/tokens/portfolio', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const portfolio = db.getUserTokenPortfolio(userId);
+    
+    res.json({
+      portfolio,
+      totalValue: portfolio.reduce((sum, token) => sum + token.balance, 0)
+    });
+  } catch (error) {
+    logError('Error getting user portfolio:', error, { endpoint: '/api/tokens/portfolio', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to get portfolio' });
+  }
+});
+
+// Get token balance for a user
+app.get('/api/tokens/:tokenId/balance', authenticateToken, (req, res) => {
+  try {
+    const { tokenId } = req.params;
+    const userId = req.user.id;
+    
+    const token = db.getToken(tokenId);
+    if (!token) {
+      return res.status(404).json({ error: 'Token not found' });
+    }
+    
+    const balance = db.getTokenBalance(tokenId, userId);
+    
+    res.json({
+      tokenId,
+      balance: balance ? balance.balance : 0,
+      frozenBalance: balance ? balance.frozen_balance : 0
+    });
+  } catch (error) {
+    logError('Error getting token balance:', error, { endpoint: '/api/tokens/:tokenId/balance', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to get token balance' });
+  }
+});
+
+// Transfer tokens between users
+app.post('/api/tokens/:tokenId/transfer', authenticateToken, async (req, res) => {
+  try {
+    const { tokenId } = req.params;
+    const { toUserId, amount, memo } = req.body;
+    const fromUserId = req.user.id;
+
+    // Validate inputs
+    if (!toUserId || !amount || amount <= 0) {
+      return res.status(400).json({ error: 'Recipient user ID and positive amount are required' });
+    }
+
+    // Check if token exists
+    const token = db.getToken(tokenId);
+    if (!token) {
+      return res.status(404).json({ error: 'Token not found' });
+    }
+
+    // Check sender's balance
+    const senderBalance = db.getTokenBalance(tokenId, fromUserId);
+    if (!senderBalance || senderBalance.balance < amount) {
+      return res.status(400).json({ error: 'Insufficient balance' });
+    }
+
+    // Create transfer record
+    const transferResult = db.createTokenTransfer(tokenId, fromUserId, toUserId, amount, memo);
+
+    // Update balances
+    await db.updateTokenBalance(tokenId, fromUserId, -amount);
+    await db.updateTokenBalance(tokenId, toUserId, amount);
+
+    // Update transfer status to completed
+    await db.updateTokenTransferStatus(transferResult.lastInsertRowid, 'completed', null, 0);
+
+    // Record history
+    db.recordTokenHistory(tokenId, fromUserId, 'transferred', amount, fromUserId, toUserId, null, `Transferred ${amount} ${token.symbol} to user ${toUserId}`);
+    db.recordTokenHistory(tokenId, toUserId, 'received', amount, fromUserId, toUserId, null, `Received ${amount} ${token.symbol} from user ${fromUserId}`);
+
+    res.json({
+      message: 'Transfer completed successfully',
+      transferId: transferResult.lastInsertRowid
+    });
+  } catch (error) {
+    logError('Error transferring tokens:', error, { endpoint: '/api/tokens/:tokenId/transfer', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to transfer tokens' });
+  }
+});
+
+// Get token transfer history
+app.get('/api/tokens/:tokenId/transfers', (req, res) => {
+  try {
+    const { tokenId } = req.params;
+    const { userId, status, page = 1, limit = 50 } = req.query;
+    const offset = (page - 1) * limit;
+
+    const token = db.getToken(tokenId);
+    if (!token) {
+      return res.status(404).json({ error: 'Token not found' });
+    }
+
+    const transfers = db.getTokenTransfers(tokenId, userId, status, parseInt(limit), offset);
+    
+    res.json({
+      transfers,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: transfers.length,
+        totalPages: Math.ceil(transfers.length / limit)
+      }
+    });
+  } catch (error) {
+    logError('Error getting token transfers:', error, { endpoint: '/api/tokens/:tokenId/transfers' });
+    res.status(500).json({ error: 'Failed to get token transfers' });
+  }
+});
+
+// Approve token spending
+app.post('/api/tokens/:tokenId/approve', authenticateToken, async (req, res) => {
+  try {
+    const { tokenId } = req.params;
+    const { spenderId, allowance, expiresAt } = req.body;
+    const ownerId = req.user.id;
+
+    // Validate inputs
+    if (!spenderId || !allowance || allowance < 0) {
+      return res.status(400).json({ error: 'Spender ID and non-negative allowance are required' });
+    }
+
+    // Check if token exists
+    const token = db.getToken(tokenId);
+    if (!token) {
+      return res.status(404).json({ error: 'Token not found' });
+    }
+
+    // Create approval
+    const result = db.createTokenApproval(tokenId, ownerId, spenderId, allowance, expiresAt);
+
+    // Record history
+    db.recordTokenHistory(tokenId, ownerId, 'approved', allowance, ownerId, spenderId, null, `Approved ${allowance} ${token.symbol} for user ${spenderId}`);
+
+    res.status(201).json({
+      message: 'Token approval created successfully',
+      approvalId: result.lastInsertRowid
+    });
+  } catch (error) {
+    logError('Error creating token approval:', error, { endpoint: '/api/tokens/:tokenId/approve', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to create token approval' });
+  }
+});
+
+// Get token approval
+app.get('/api/tokens/:tokenId/approval/:spenderId', authenticateToken, (req, res) => {
+  try {
+    const { tokenId, spenderId } = req.params;
+    const ownerId = req.user.id;
+
+    const token = db.getToken(tokenId);
+    if (!token) {
+      return res.status(404).json({ error: 'Token not found' });
+    }
+
+    const approval = db.getTokenApproval(tokenId, ownerId, spenderId);
+    
+    res.json({
+      approval: approval || null
+    });
+  } catch (error) {
+    logError('Error getting token approval:', error, { endpoint: '/api/tokens/:tokenId/approval/:spenderId', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to get token approval' });
+  }
+});
+
+// Revoke token approval
+app.delete('/api/tokens/:tokenId/approval/:spenderId', authenticateToken, (req, res) => {
+  try {
+    const { tokenId, spenderId } = req.params;
+    const ownerId = req.user.id;
+
+    const token = db.getToken(tokenId);
+    if (!token) {
+      return res.status(404).json({ error: 'Token not found' });
+    }
+
+    const result = db.revokeTokenApproval(tokenId, ownerId, spenderId);
+    
+    if (result.changes > 0) {
+      // Record history
+      db.recordTokenHistory(tokenId, ownerId, 'revoked', 0, ownerId, spenderId, null, `Revoked approval for user ${spenderId}`);
+      
+      res.json({ message: 'Token approval revoked successfully' });
+    } else {
+      res.status(404).json({ error: 'No active approval found' });
+    }
+  } catch (error) {
+    logError('Error revoking token approval:', error, { endpoint: '/api/tokens/:tokenId/approval/:spenderId', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to revoke token approval' });
+  }
+});
+
+// Get token history
+app.get('/api/tokens/:tokenId/history', (req, res) => {
+  try {
+    const { tokenId } = req.params;
+    const { userId, actionType, page = 1, limit = 100 } = req.query;
+    const offset = (page - 1) * limit;
+
+    const token = db.getToken(tokenId);
+    if (!token) {
+      return res.status(404).json({ error: 'Token not found' });
+    }
+
+    const history = db.getTokenHistory(tokenId, userId, actionType, parseInt(limit), offset);
+    
+    res.json({
+      history,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: history.length,
+        totalPages: Math.ceil(history.length / limit)
+      }
+    });
+  } catch (error) {
+    logError('Error getting token history:', error, { endpoint: '/api/tokens/:tokenId/history' });
+    res.status(500).json({ error: 'Failed to get token history' });
+  }
+});
+
+// Update token status (admin only)
+app.patch('/api/tokens/:tokenId/status', authenticateToken, async (req, res) => {
+  try {
+    const { tokenId } = req.params;
+    const { status } = req.body;
+
+    // Check if user is admin (you may want to add proper admin role checking)
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    if (!['active', 'inactive', 'suspended'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status. Must be active, inactive, or suspended' });
+    }
+
+    const result = db.updateTokenStatus(tokenId, status);
+    
+    if (result) {
+      res.json({ message: 'Token status updated successfully' });
+    } else {
+      res.status(404).json({ error: 'Token not found' });
+    }
+  } catch (error) {
+    logError('Error updating token status:', error, { endpoint: '/api/tokens/:tokenId/status', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to update token status' });
+  }
+});
+
 // Schedule regular backups
 const BACKUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
 setInterval(backupData, BACKUP_INTERVAL);
@@ -3013,6 +3948,912 @@ app.get('/api/export-bid-history', authenticateToken, (req, res) => {
   } catch (error) {
     logError('Error exporting bid history:', error, { endpoint: '/api/export-bid-history', userId: req.user?.id });
     res.status(500).json({ error: 'Failed to export bid history' });
+  }
+});
+
+// ========== DeFi API Endpoints ==========
+
+const RiskAssessmentEngine = require('./utils/risk-assessment');
+const riskEngine = new RiskAssessmentEngine(db);
+
+// Get user portfolio
+app.get('/api/defi/portfolio', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // Get or create portfolio
+    let portfolio = db.getUserPortfolio(userId);
+    if (!portfolio) {
+      db.createOrUpdatePortfolio(userId);
+      portfolio = db.getUserPortfolio(userId);
+    }
+    
+    // Calculate current portfolio value
+    portfolio = db.calculatePortfolioValue(userId);
+    
+    // Get liquidity positions
+    const liquidityPositions = db.getUserLiquidityPositions(userId);
+    
+    // Get staking positions
+    const stakingPositions = db.getUserStakes(userId);
+    
+    // Get recent events
+    const recentSwaps = db.getUserSwapEvents(userId, 10);
+    const recentRewards = db.getUserRewardEvents(userId, 10);
+    
+    res.json({
+      portfolio,
+      liquidityPositions,
+      stakingPositions,
+      recentSwaps,
+      recentRewards
+    });
+  } catch (error) {
+    logError('Error getting portfolio:', error, { endpoint: '/api/defi/portfolio', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to get portfolio' });
+  }
+});
+
+// Get all liquidity pools
+app.get('/api/defi/pools', async (req, res) => {
+  try {
+    const pools = db.getAllLiquidityPools();
+    
+    // Add token information
+    const poolsWithTokenInfo = pools.map(pool => {
+      const tokenAPrice = db.getTokenPrice(pool.token_a);
+      const tokenBPrice = db.getTokenPrice(pool.token_b);
+      
+      return {
+        ...pool,
+        token_a_price: tokenAPrice?.price_usd || 0,
+        token_b_price: tokenBPrice?.price_usd || 0,
+        total_liquidity_usd: (pool.reserve_a * (tokenAPrice?.price_usd || 0)) + (pool.reserve_b * (tokenBPrice?.price_usd || 0))
+      };
+    });
+    
+    res.json(poolsWithTokenInfo);
+  } catch (error) {
+    logError('Error getting pools:', error, { endpoint: '/api/defi/pools' });
+    res.status(500).json({ error: 'Failed to get pools' });
+  }
+});
+
+// Get all yield farms
+app.get('/api/defi/farms', async (req, res) => {
+  try {
+    const farms = db.getAllYieldFarms();
+    
+    // Add APR calculations and token information
+    const farmsWithInfo = farms.map(farm => {
+      const stakingTokenPrice = db.getTokenPrice(farm.staking_token);
+      const rewardTokenPrice = db.getTokenPrice(farm.reward_token);
+      
+      // Calculate APR (simplified)
+      const apr = farm.reward_rate > 0 && farm.total_staked > 0 
+        ? ((farm.reward_rate * 86400 * 365 * (rewardTokenPrice?.price_usd || 0)) / (farm.total_staked * (stakingTokenPrice?.price_usd || 1))) * 100
+        : 0;
+      
+      return {
+        ...farm,
+        apr,
+        staking_token_price: stakingTokenPrice?.price_usd || 0,
+        reward_token_price: rewardTokenPrice?.price_usd || 0,
+        total_staked_usd: farm.total_staked * (stakingTokenPrice?.price_usd || 0)
+      };
+    });
+    
+    res.json(farmsWithInfo);
+  } catch (error) {
+    logError('Error getting farms:', error, { endpoint: '/api/defi/farms' });
+    res.status(500).json({ error: 'Failed to get farms' });
+  }
+});
+
+// Add liquidity to pool
+app.post('/api/defi/add-liquidity', authenticateToken, async (req, res) => {
+  try {
+    const { poolId, tokenAAmount, tokenBAmount, minLPAmount } = req.body;
+    const userId = req.user.id;
+    
+    if (!poolId || !tokenAAmount || !tokenBAmount || !minLPAmount) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    
+    // Get pool information
+    const pool = db.getLiquidityPool(poolId);
+    if (!pool) {
+      return res.status(404).json({ error: 'Pool not found' });
+    }
+    
+    if (pool.status !== 'active') {
+      return res.status(400).json({ error: 'Pool is not active' });
+    }
+    
+    // In a real implementation, this would interact with the blockchain
+    // For now, we'll simulate the operation
+    
+    // Calculate LP tokens (simplified)
+    const lpTokens = Math.sqrt(tokenAAmount * tokenBAmount);
+    
+    // Create liquidity position
+    const positionData = {
+      positionId: Date.now(),
+      userId,
+      poolId,
+      lpAmount: lpTokens,
+      tokenAAmount,
+      tokenBAmount
+    };
+    
+    db.createLiquidityPosition(positionData);
+    
+    // Update pool reserves
+    db.updateLiquidityPool(poolId, {
+      reserve_a: pool.reserve_a + tokenAAmount,
+      reserve_b: pool.reserve_b + tokenBAmount,
+      lp_token_supply: pool.lp_token_supply + lpTokens
+    });
+    
+    // Record swap event (as liquidity addition)
+    db.createSwapEvent({
+      eventId: Date.now(),
+      userId,
+      poolId,
+      tokenIn: pool.token_a,
+      tokenOut: pool.token_b,
+      amountIn: tokenAAmount,
+      amountOut: tokenBAmount,
+      fee: 0
+    });
+    
+    res.json({ 
+      success: true, 
+      lpTokens: lpTokens,
+      message: 'Liquidity added successfully' 
+    });
+  } catch (error) {
+    logError('Error adding liquidity:', error, { endpoint: '/api/defi/add-liquidity', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to add liquidity' });
+  }
+});
+
+// Remove liquidity from pool
+app.post('/api/defi/remove-liquidity', authenticateToken, async (req, res) => {
+  try {
+    const { positionId, lpAmount, minAmountA, minAmountB } = req.body;
+    const userId = req.user.id;
+    
+    if (!positionId || !lpAmount) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    
+    // Get position information
+    const positions = db.getUserLiquidityPositions(userId);
+    const position = positions.find(p => p.position_id == positionId);
+    
+    if (!position) {
+      return res.status(404).json({ error: 'Position not found' });
+    }
+    
+    if (position.lp_amount < lpAmount) {
+      return res.status(400).json({ error: 'Insufficient LP tokens' });
+    }
+    
+    // Get pool information
+    const pool = db.getLiquidityPool(position.pool_id);
+    if (!pool) {
+      return res.status(404).json({ error: 'Pool not found' });
+    }
+    
+    // Calculate token amounts to return (simplified)
+    const proportion = lpAmount / position.lp_amount;
+    const amountA = position.token_a_amount * proportion;
+    const amountB = position.token_b_amount * proportion;
+    
+    if (amountA < minAmountA || amountB < minAmountB) {
+      return res.status(400).json({ error: 'Amount below minimum' });
+    }
+    
+    // Update position
+    if (position.lp_amount == lpAmount) {
+      // Remove entire position
+      // In a real implementation, you'd delete the position
+    } else {
+      db.updateLiquidityPosition(positionId, {
+        lp_amount: position.lp_amount - lpAmount,
+        token_a_amount: position.token_a_amount - amountA,
+        token_b_amount: position.token_b_amount - amountB
+      });
+    }
+    
+    // Update pool reserves
+    db.updateLiquidityPool(position.pool_id, {
+      reserve_a: pool.reserve_a - amountA,
+      reserve_b: pool.reserve_b - amountB,
+      lp_token_supply: pool.lp_token_supply - lpAmount
+    });
+    
+    res.json({ 
+      success: true, 
+      amountA, 
+      amountB,
+      message: 'Liquidity removed successfully' 
+    });
+  } catch (error) {
+    logError('Error removing liquidity:', error, { endpoint: '/api/defi/remove-liquidity', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to remove liquidity' });
+  }
+});
+
+// Stake tokens in farm
+app.post('/api/defi/stake', authenticateToken, async (req, res) => {
+  try {
+    const { farmId, amount } = req.body;
+    const userId = req.user.id;
+    
+    if (!farmId || !amount) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    
+    // Get farm information
+    const farm = db.getYieldFarm(farmId);
+    if (!farm) {
+      return res.status(404).json({ error: 'Farm not found' });
+    }
+    
+    if (farm.status !== 'active') {
+      return res.status(400).json({ error: 'Farm is not active' });
+    }
+    
+    // Create stake
+    const stakeData = {
+      stakeId: Date.now(),
+      userId,
+      farmId,
+      amount,
+      rewardDebt: 0
+    };
+    
+    db.createUserStake(stakeData);
+    
+    // Update farm
+    db.updateYieldFarm(farmId, {
+      total_staked: farm.total_staked + amount
+    });
+    
+    res.json({ 
+      success: true, 
+      stakeId: stakeData.stakeId,
+      message: 'Tokens staked successfully' 
+    });
+  } catch (error) {
+    logError('Error staking tokens:', error, { endpoint: '/api/defi/stake', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to stake tokens' });
+  }
+});
+
+// Unstake tokens from farm
+app.post('/api/defi/unstake', authenticateToken, async (req, res) => {
+  try {
+    const { stakeId, amount } = req.body;
+    const userId = req.user.id;
+    
+    if (!stakeId || !amount) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    
+    // Get stake information
+    const stakes = db.getUserStakes(userId);
+    const stake = stakes.find(s => s.stake_id == stakeId);
+    
+    if (!stake) {
+      return res.status(404).json({ error: 'Stake not found' });
+    }
+    
+    if (stake.amount < amount) {
+      return res.status(400).json({ error: 'Insufficient staked amount' });
+    }
+    
+    // Get farm information
+    const farm = db.getYieldFarm(stake.farm_id);
+    if (!farm) {
+      return res.status(404).json({ error: 'Farm not found' });
+    }
+    
+    // Calculate pending rewards (simplified)
+    const pendingRewards = amount * 0.01; // Mock calculation
+    
+    // Update stake
+    if (stake.amount == amount) {
+      // Remove entire stake
+      // In a real implementation, you'd delete the stake
+    } else {
+      db.updateUserStake(stakeId, {
+        amount: stake.amount - amount
+      });
+    }
+    
+    // Update farm
+    db.updateYieldFarm(stake.farm_id, {
+      total_staked: farm.total_staked - amount
+    });
+    
+    // Record reward event
+    if (pendingRewards > 0) {
+      db.createRewardEvent({
+        eventId: Date.now(),
+        userId,
+        farmId: stake.farm_id,
+        amount: pendingRewards
+      });
+    }
+    
+    res.json({ 
+      success: true, 
+      amount,
+      pendingRewards,
+      message: 'Tokens unstaked successfully' 
+    });
+  } catch (error) {
+    logError('Error unstaking tokens:', error, { endpoint: '/api/defi/unstake', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to unstake tokens' });
+  }
+});
+
+// Claim rewards
+app.post('/api/defi/claim-rewards', authenticateToken, async (req, res) => {
+  try {
+    const { stakeId } = req.body;
+    const userId = req.user.id;
+    
+    if (!stakeId) {
+      return res.status(400).json({ error: 'Missing stake ID' });
+    }
+    
+    // Get stake information
+    const stakes = db.getUserStakes(userId);
+    const stake = stakes.find(s => s.stake_id == stakeId);
+    
+    if (!stake) {
+      return res.status(404).json({ error: 'Stake not found' });
+    }
+    
+    // Calculate pending rewards (simplified)
+    const pendingRewards = stake.amount * 0.05; // Mock calculation
+    
+    if (pendingRewards <= 0) {
+      return res.status(400).json({ error: 'No rewards to claim' });
+    }
+    
+    // Record reward event
+    db.createRewardEvent({
+      eventId: Date.now(),
+      userId,
+      farmId: stake.farm_id,
+      amount: pendingRewards
+    });
+    
+    // Update last claimed time
+    db.updateUserStake(stakeId, {
+      last_claimed: new Date().toISOString()
+    });
+    
+    res.json({ 
+      success: true, 
+      amount: pendingRewards,
+      message: 'Rewards claimed successfully' 
+    });
+  } catch (error) {
+    logError('Error claiming rewards:', error, { endpoint: '/api/defi/claim-rewards', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to claim rewards' });
+  }
+});
+
+// Get token prices
+app.get('/api/defi/prices', async (req, res) => {
+  try {
+    const prices = db.getAllTokenPrices();
+    res.json(prices);
+  } catch (error) {
+    logError('Error getting prices:', error, { endpoint: '/api/defi/prices' });
+    res.status(500).json({ error: 'Failed to get prices' });
+  }
+});
+
+// Update token prices (would be called by price oracle)
+app.post('/api/defi/update-prices', async (req, res) => {
+  try {
+    const { prices } = req.body;
+    
+    if (!Array.isArray(prices)) {
+      return res.status(400).json({ error: 'Prices must be an array' });
+    }
+    
+    for (const priceData of prices) {
+      db.updateTokenPrice(priceData);
+    }
+    
+    res.json({ success: true, message: 'Prices updated successfully' });
+  } catch (error) {
+    logError('Error updating prices:', error, { endpoint: '/api/defi/update-prices' });
+    res.status(500).json({ error: 'Failed to update prices' });
+  }
+});
+
+// Get risk assessment
+app.get('/api/defi/risk-assessment', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // Get user's positions
+    const liquidityPositions = db.getUserLiquidityPositions(userId);
+    const stakingPositions = db.getUserStakes(userId);
+    
+    const assessments = [];
+    
+    // Assess risk for each pool
+    for (const position of liquidityPositions) {
+      const assessment = await riskEngine.assessPoolRisk(position.pool_id);
+      assessments.push({
+        type: 'liquidity',
+        name: `Pool #${position.pool_id}`,
+        ...assessment
+      });
+    }
+    
+    // Assess risk for each farm
+    for (const stake of stakingPositions) {
+      const assessment = await riskEngine.assessFarmRisk(stake.farm_id);
+      assessments.push({
+        type: 'staking',
+        name: `Farm #${stake.farm_id}`,
+        ...assessment
+      });
+    }
+    
+    res.json({ assessments });
+  } catch (error) {
+    logError('Error getting risk assessment:', error, { endpoint: '/api/defi/risk-assessment', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to get risk assessment' });
+  }
+});
+
+// Get analytics data
+app.get('/api/defi/analytics', async (req, res) => {
+  try {
+    const { metricType, poolId, farmId, timeRange } = req.query;
+    
+    const metrics = db.getAnalyticsMetrics(
+      metricType, 
+      poolId ? parseInt(poolId) : null, 
+      farmId ? parseInt(farmId) : null, 
+      timeRange ? parseInt(timeRange) : 24
+    );
+    
+    res.json(metrics);
+  } catch (error) {
+    logError('Error getting analytics:', error, { endpoint: '/api/defi/analytics' });
+    res.status(500).json({ error: 'Failed to get analytics' });
+  }
+});
+
+// Generate comprehensive risk report
+app.get('/api/defi/risk-report', async (req, res) => {
+  try {
+    const report = await riskEngine.generateRiskReport();
+    res.json(report);
+  } catch (error) {
+    logError('Error generating risk report:', error, { endpoint: '/api/defi/risk-report' });
+    res.status(500).json({ error: 'Failed to generate risk report' });
+  }
+});
+
+if (sentryEnabled) {
+  app.use(Sentry.Handlers.errorHandler());
+}
+
+// Get NFT collection with pagination and filtering
+app.get('/api/nft/collection', (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 12;
+    const category = req.query.category || 'all';
+    const verification = req.query.verification || 'all';
+    const minPrice = parseFloat(req.query.minPrice) || 0;
+    const maxPrice = parseFloat(req.query.maxPrice) || Infinity;
+    const search = req.query.search || '';
+    const sortBy = req.query.sortBy || 'created_at';
+    const sortOrder = req.query.sortOrder || 'desc';
+
+    const nfts = db.getNFTCollection({
+      page,
+      limit,
+      category,
+      verification,
+      minPrice,
+      maxPrice,
+      search,
+      sortBy,
+      sortOrder
+    });
+
+    res.json({
+      nfts: nfts.data,
+      pagination: {
+        page,
+        limit,
+        total: nfts.total,
+        totalPages: Math.ceil(nfts.total / limit),
+        hasMore: page * limit < nfts.total
+      }
+    });
+  } catch (error) {
+    logError('Error fetching NFT collection:', error, { endpoint: '/api/nft/collection' });
+    res.status(500).json({ error: 'Failed to fetch NFT collection' });
+  }
+});
+
+// Get NFT details by ID
+app.get('/api/nft/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const nft = db.getNFTById(id);
+    
+    if (!nft) {
+      return res.status(404).json({ error: 'NFT not found' });
+    }
+
+    res.json(nft);
+  } catch (error) {
+    logError('Error fetching NFT details:', error, { endpoint: '/api/nft/:id', nftId: req.params.id });
+    res.status(500).json({ error: 'Failed to fetch NFT details' });
+  }
+});
+
+// Get NFT transaction history
+app.get('/api/nft/:id/transactions', (req, res) => {
+  try {
+    const { id } = req.params;
+    const transactions = db.getNFTTransactionHistory(id);
+    res.json(transactions);
+  } catch (error) {
+    logError('Error fetching NFT transactions:', error, { endpoint: '/api/nft/:id/transactions', nftId: req.params.id });
+    res.status(500).json({ error: 'Failed to fetch transaction history' });
+  }
+});
+
+// Get NFT collections
+app.get('/api/nft/collections', (req, res) => {
+  try {
+    const collections = db.getNFTCollections();
+    res.json(collections);
+  } catch (error) {
+    logError('Error fetching NFT collections:', error, { endpoint: '/api/nft/collections' });
+    res.status(500).json({ error: 'Failed to fetch collections' });
+  }
+});
+
+// Create new NFT collection
+app.post('/api/nft/collections', authenticateToken, (req, res) => {
+  try {
+    const { name, description, blockchain = 'stellar' } = req.body;
+    const userId = req.user.id;
+
+    if (!name) {
+      return res.status(400).json({ error: 'Collection name is required' });
+    }
+
+    const collection = db.createNFTCollection({
+      name,
+      description,
+      creator_id: userId,
+      blockchain
+    });
+
+    res.status(201).json(collection);
+  } catch (error) {
+    logError('Error creating NFT collection:', error, { endpoint: '/api/nft/collections', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to create collection' });
+  }
+});
+
+// Create new NFT
+app.post('/api/nft', authenticateToken, upload.single('image'), (req, res) => {
+  try {
+    const {
+      name,
+      description,
+      collection_id,
+      attributes,
+      blockchain = 'stellar'
+    } = req.body;
+
+    const userId = req.user.id;
+    const imagePath = req.file ? `/uploads/nft/${req.file.filename}` : null;
+
+    if (!name) {
+      return res.status(400).json({ error: 'NFT name is required' });
+    }
+
+    const nft = db.createNFT({
+      name,
+      description,
+      collection_id,
+      creator_id: userId,
+      image_url: imagePath,
+      attributes: attributes ? JSON.stringify(attributes) : null,
+      blockchain
+    });
+
+    // Create ownership record
+    db.createNFTOwnership({
+      nft_id: nft.id,
+      owner_id: userId,
+      ownership_type: 'owned'
+    });
+
+    // Create mint transaction record
+    db.createNFTTransfer({
+      nft_id: nft.id,
+      to_owner_id: userId,
+      transfer_type: 'mint'
+    });
+
+    res.status(201).json(nft);
+  } catch (error) {
+    logError('Error creating NFT:', error, { endpoint: '/api/nft', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to create NFT' });
+  }
+});
+
+// List NFT for sale
+app.post('/api/nft/:id/list', authenticateToken, (req, res) => {
+  try {
+    const { id } = req.params;
+    const { price, currency = 'USD', listing_type = 'sale', auction_end_time, reserve_price } = req.body;
+    const userId = req.user.id;
+
+    // Verify ownership
+    const ownership = db.getNFTOwnership(id, userId);
+    if (!ownership || !ownership.is_active) {
+      return res.status(403).json({ error: 'You do not own this NFT' });
+    }
+
+    const listing = db.createNFTListing({
+      nft_id: id,
+      seller_id: userId,
+      price,
+      currency,
+      listing_type,
+      auction_end_time,
+      reserve_price
+    });
+
+    // Update ownership type
+    db.updateNFTOwnership(id, userId, { ownership_type: 'listed' });
+
+    res.status(201).json(listing);
+  } catch (error) {
+    logError('Error listing NFT for sale:', error, { endpoint: '/api/nft/:id/list', userId: req.user?.id, nftId: req.params.id });
+    res.status(500).json({ error: 'Failed to list NFT for sale' });
+  }
+});
+
+// Get marketplace listings
+app.get('/api/nft/marketplace/listings', (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 12;
+    const status = req.query.status || 'active';
+    const listing_type = req.query.listing_type || 'all';
+    const sortBy = req.query.sortBy || 'created_at';
+    const sortOrder = req.query.sortOrder || 'desc';
+
+    const listings = db.getMarketplaceListings({
+      page,
+      limit,
+      status,
+      listing_type,
+      sortBy,
+      sortOrder
+    });
+
+    res.json({
+      listings: listings.data,
+      pagination: {
+        page,
+        limit,
+        total: listings.total,
+        totalPages: Math.ceil(listings.total / limit),
+        hasMore: page * limit < listings.total
+      }
+    });
+  } catch (error) {
+    logError('Error fetching marketplace listings:', error, { endpoint: '/api/nft/marketplace/listings' });
+    res.status(500).json({ error: 'Failed to fetch marketplace listings' });
+  }
+});
+
+// Make offer on NFT
+app.post('/api/nft/:id/offer', authenticateToken, (req, res) => {
+  try {
+    const { id } = req.params;
+    const { price, currency = 'USD', expires_at } = req.body;
+    const userId = req.user.id;
+
+    // Verify NFT exists and is not owned by the user
+    const nft = db.getNFTById(id);
+    if (!nft) {
+      return res.status(404).json({ error: 'NFT not found' });
+    }
+
+    const ownership = db.getNFTOwnership(id, userId);
+    if (ownership && ownership.is_active) {
+      return res.status(403).json({ error: 'You cannot make an offer on your own NFT' });
+    }
+
+    const offer = db.createNFTOffer({
+      nft_id: id,
+      offerer_id: userId,
+      price,
+      currency,
+      expires_at
+    });
+
+    res.status(201).json(offer);
+  } catch (error) {
+    logError('Error making NFT offer:', error, { endpoint: '/api/nft/:id/offer', userId: req.user?.id, nftId: req.params.id });
+    res.status(500).json({ error: 'Failed to make offer' });
+  }
+});
+
+// Accept NFT offer
+app.post('/api/nft/offer/:offerId/accept', authenticateToken, (req, res) => {
+  try {
+    const { offerId } = req.params;
+    const userId = req.user.id;
+
+    const offer = db.getNFTOfferById(offerId);
+    if (!offer) {
+      return res.status(404).json({ error: 'Offer not found' });
+    }
+
+    // Verify user owns the NFT
+    const ownership = db.getNFTOwnership(offer.nft_id, userId);
+    if (!ownership || !ownership.is_active) {
+      return res.status(403).json({ error: 'You do not own this NFT' });
+    }
+
+    // Process the transfer
+    const transfer = db.processNFTTransfer(offer.nft_id, userId, offer.offerer_id, 'sale', offer.price);
+
+    // Update ownership records
+    db.updateNFTOwnership(offer.nft_id, userId, { is_active: 0 });
+    db.createNFTOwnership({
+      nft_id: offer.nft_id,
+      owner_id: offer.offerer_id,
+      ownership_type: 'owned',
+      acquisition_price: offer.price
+    });
+
+    // Mark offer as accepted
+    db.updateNFTOffer(offerId, { status: 'accepted' });
+
+    res.json(transfer);
+  } catch (error) {
+    logError('Error accepting NFT offer:', error, { endpoint: '/api/nft/offer/:offerId/accept', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to accept offer' });
+  }
+});
+
+// Transfer NFT
+app.post('/api/nft/:id/transfer', authenticateToken, (req, res) => {
+  try {
+    const { id } = req.params;
+    const { to_address, transfer_type = 'gift' } = req.body;
+    const userId = req.user.id;
+
+    // Verify ownership
+    const ownership = db.getNFTOwnership(id, userId);
+    if (!ownership || !ownership.is_active) {
+      return res.status(403).json({ error: 'You do not own this NFT' });
+    }
+
+    // Find recipient user by wallet address
+    const recipient = db.getUserByWalletAddress(to_address);
+    if (!recipient) {
+      return res.status(404).json({ error: 'Recipient not found' });
+    }
+
+    // Process the transfer
+    const transfer = db.processNFTTransfer(id, userId, recipient.id, transfer_type);
+
+    // Update ownership records
+    db.updateNFTOwnership(id, userId, { is_active: 0 });
+    db.createNFTOwnership({
+      nft_id: id,
+      owner_id: recipient.id,
+      ownership_type: 'owned'
+    });
+
+    res.json(transfer);
+  } catch (error) {
+    logError('Error transferring NFT:', error, { endpoint: '/api/nft/:id/transfer', userId: req.user?.id, nftId: req.params.id });
+    res.status(500).json({ error: 'Failed to transfer NFT' });
+  }
+});
+
+// Verify NFT ownership
+app.post('/api/nft/:id/verify', authenticateToken, (req, res) => {
+  try {
+    const { id } = req.params;
+    const { verification_type = 'ownership' } = req.body;
+    const userId = req.user.id;
+
+    // Create verification request
+    const verification = db.createNFTVerification({
+      nft_id: id,
+      verification_type,
+      status: 'pending'
+    });
+
+    // In a real implementation, this would trigger blockchain verification
+    // For now, we'll simulate the verification process
+    setTimeout(() => {
+      const nft = db.getNFTById(id);
+      const isVerified = Math.random() > 0.3; // 70% success rate for demo
+      
+      db.updateNFTVerification(verification.id, {
+        status: isVerified ? 'verified' : 'rejected',
+        verified_by: 'system',
+        verification_data: JSON.stringify({
+          blockchain_signature: '0x' + Math.random().toString(16).substr(2, 64),
+          verified_at: new Date().toISOString()
+        })
+      });
+    }, 5000);
+
+    res.status(201).json(verification);
+  } catch (error) {
+    logError('Error verifying NFT:', error, { endpoint: '/api/nft/:id/verify', userId: req.user?.id, nftId: req.params.id });
+    res.status(500).json({ error: 'Failed to verify NFT' });
+  }
+});
+
+// Get NFT verification status
+app.get('/api/nft/:id/verification', (req, res) => {
+  try {
+    const { id } = req.params;
+    const verification = db.getNFTVerification(id);
+    res.json(verification);
+  } catch (error) {
+    logError('Error fetching NFT verification:', error, { endpoint: '/api/nft/:id/verification', nftId: req.params.id });
+    res.status(500).json({ error: 'Failed to fetch verification status' });
+  }
+});
+
+// Get user's NFT portfolio
+app.get('/api/user/nft/portfolio', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const portfolio = db.getUserNFTPortfolio(userId);
+    res.json(portfolio);
+  } catch (error) {
+    logError('Error fetching user NFT portfolio:', error, { endpoint: '/api/user/nft/portfolio', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to fetch portfolio' });
+  }
+});
+
+// Get NFT market statistics
+app.get('/api/nft/market/stats', (req, res) => {
+  try {
+    const period = req.query.period || '30d';
+    const stats = db.getNFTMarketStats(period);
+    res.json(stats);
+  } catch (error) {
+    logError('Error fetching NFT market stats:', error, { endpoint: '/api/nft/market/stats' });
+    res.status(500).json({ error: 'Failed to fetch market statistics' });
   }
 });
 
@@ -3386,6 +5227,9 @@ app.post('/api/watchlist/check-alerts', async (req, res) => {
 });
 
 // ==================== TRANSACTION QUEUE MANAGEMENT API ENDPOINTS ====================
+if (sentryEnabled) {
+  app.use(Sentry.Handlers.errorHandler());
+}
 
 // Get queue status and metrics
 app.get('/api/queue/status', authenticateToken, (req, res) => {
@@ -4437,6 +6281,41 @@ app.use((err, req, res, next) => {
   });
 });
 
+// 404 Handler - Must be after all other routes
+app.use((req, res, next) => {
+  res.status(404).sendFile(__dirname + '/public/404.html');
+});
+
+// Global Error Handler - Must be last
+app.use((err, req, res, next) => {
+  logError('Express error handler:', err, {
+    url: req.url,
+    method: req.method,
+    ip: req.ip
+  });
+
+  // Don't expose error details in production
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  
+  res.status(err.status || 500);
+  
+  // Send HTML error page for browser requests
+  if (req.accepts('html')) {
+    res.sendFile(__dirname + '/public/500.html');
+  } else {
+    // Send JSON for API requests
+    res.json({
+      error: isDevelopment ? err.message : 'Internal server error',
+      ...(isDevelopment && { stack: err.stack })
+    });
+  }
+});
+
+// Sentry error handler (must be after routes but before other error handlers)
+if (sentryEnabled) {
+  app.use(Sentry.Handlers.errorHandler());
+}
+
 process.on('unhandledRejection', (reason) => {
   const rejectionError = reason instanceof Error ? reason : new Error(String(reason));
   logError('Unhandled Promise Rejection:', rejectionError);
@@ -4447,7 +6326,19 @@ process.on('uncaughtException', (error) => {
   setTimeout(() => process.exit(1), 200);
 });
 
+// Cleanup job for expired tokens and sessions
+setInterval(() => {
+  try {
+    db.cleanupExpiredTokens();
+    db.cleanupExpiredRefreshTokens();
+    console.log('[CLEANUP] Cleaned up expired tokens and sessions');
+  } catch (error) {
+    logError('Error during cleanup:', error, { task: 'token_cleanup' });
+  }
+}, 60 * 60 * 1000); // Run every hour
+
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
   console.log(`Sealed-Bid Auction server running on port ${PORT}`);
+  console.log('[SECURITY] Enhanced authentication system with JWT tokens, refresh token rotation, and session management enabled');
 });

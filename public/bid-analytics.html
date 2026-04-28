@@ -9,6 +9,9 @@
     <script src="https://unpkg.com/stellar-sdk@11.0.0/dist/stellar-sdk.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Accessibility Styles -->
+    <link rel="stylesheet" href="accessibility.css">
     <style>
         :root {
             --bg-primary: #ffffff;
@@ -169,23 +172,26 @@
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
+    <!-- Skip Navigation Link -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    
     <!-- Header -->
-    <header class="gradient-bg text-white shadow-lg">
+    <header role="banner" class="gradient-bg text-white shadow-lg">
         <div class="container mx-auto px-4 py-4">
             <div class="flex justify-between items-center">
                 <div class="flex items-center space-x-4">
-                    <i class="fas fa-chart-line text-2xl"></i>
+                    <i class="fas fa-chart-line text-2xl" aria-hidden="true"></i>
                     <h1 class="text-2xl font-bold">Bid History Analytics</h1>
                 </div>
                 <div class="flex items-center space-x-4">
                     <button onclick="exportData('json')" class="bg-white text-purple-600 px-4 py-2 rounded-lg hover:bg-gray-100 transition">
-                        <i class="fas fa-download mr-2"></i>Export JSON
+                        <i class="fas fa-download mr-2" aria-hidden="true"></i>Export JSON
                     </button>
                     <button onclick="exportData('csv')" class="bg-white text-purple-600 px-4 py-2 rounded-lg hover:bg-gray-100 transition">
-                        <i class="fas fa-file-csv mr-2"></i>Export CSV
+                        <i class="fas fa-file-csv mr-2" aria-hidden="true"></i>Export CSV
                     </button>
                     <a href="index.html" class="bg-purple-700 text-white px-4 py-2 rounded-lg hover:bg-purple-800 transition">
-                        <i class="fas fa-arrow-left mr-2"></i>Back
+                        <i class="fas fa-arrow-left mr-2" aria-hidden="true"></i>Back
                     </a>
                 </div>
             </div>
@@ -193,7 +199,7 @@
     </header>
 
     <!-- Main Content -->
-    <main class="container mx-auto px-4 py-8">
+    <main id="main-content" role="main" class="container mx-auto px-4 py-8">
         <!-- Filters Section -->
         <section class="bg-white rounded-lg shadow-md p-6 mb-8">
             <h2 class="text-xl font-semibold mb-4">Filters</h2>
@@ -226,10 +232,10 @@
             </div>
             <div class="mt-4 flex justify-end">
                 <button onclick="applyFilters()" class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition">
-                    <i class="fas fa-filter mr-2"></i>Apply Filters
+                    <i class="fas fa-filter mr-2" aria-hidden="true"></i>Apply Filters
                 </button>
                 <button onclick="resetFilters()" class="ml-2 bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition">
-                    <i class="fas fa-undo mr-2"></i>Reset
+                    <i class="fas fa-undo mr-2" aria-hidden="true"></i>Reset
                 </button>
             </div>
         </section>
@@ -243,7 +249,7 @@
                         <p class="text-2xl font-bold text-gray-800" id="totalBids">-</p>
                     </div>
                     <div class="bg-purple-100 p-3 rounded-full">
-                        <i class="fas fa-gavel text-purple-600 text-xl"></i>
+                        <i class="fas fa-gavel text-purple-600 text-xl" aria-hidden="true"></i>
                     </div>
                 </div>
             </div>
@@ -254,7 +260,7 @@
                         <p class="text-2xl font-bold text-gray-800" id="totalSpent">-</p>
                     </div>
                     <div class="bg-green-100 p-3 rounded-full">
-                        <i class="fas fa-dollar-sign text-green-600 text-xl"></i>
+                        <i class="fas fa-dollar-sign text-green-600 text-xl" aria-hidden="true"></i>
                     </div>
                 </div>
             </div>
@@ -265,7 +271,7 @@
                         <p class="text-2xl font-bold text-gray-800" id="wonAuctions">-</p>
                     </div>
                     <div class="bg-blue-100 p-3 rounded-full">
-                        <i class="fas fa-trophy text-blue-600 text-xl"></i>
+                        <i class="fas fa-trophy text-blue-600 text-xl" aria-hidden="true"></i>
                     </div>
                 </div>
             </div>
@@ -276,7 +282,7 @@
                         <p class="text-2xl font-bold text-gray-800" id="winRate">-</p>
                     </div>
                     <div class="bg-yellow-100 p-3 rounded-full">
-                        <i class="fas fa-percentage text-yellow-600 text-xl"></i>
+                        <i class="fas fa-percentage text-yellow-600 text-xl" aria-hidden="true"></i>
                     </div>
                 </div>
             </div>
@@ -322,7 +328,7 @@
             </div>
             <div class="mt-6 text-center">
                 <button onclick="loadMoreTimeline()" class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition">
-                    <i class="fas fa-plus mr-2"></i>Load More
+                    <i class="fas fa-plus mr-2" aria-hidden="true"></i>Load More
                 </button>
             </div>
         </section>
@@ -336,5 +342,12 @@
     </footer>
 
     <script src="bid-analytics.js"></script>
+    
+    <!-- ARIA Live Regions -->
+    <div id="aria-live-polite" role="status" aria-live="polite" aria-atomic="true" class="sr-only"></div>
+    <div id="aria-live-assertive" role="alert" aria-live="assertive" aria-atomic="true" class="sr-only"></div>
+    
+    <!-- Accessibility JavaScript -->
+    <script src="accessibility.js"></script>
 </body>
 </html>

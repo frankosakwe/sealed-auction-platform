@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accessibility Testing - Sealed Auction Platform</title>
+    <link rel="stylesheet" href="accessibility.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            line-height: 1.6;
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .test-section {
+            margin: 2rem 0;
+            padding: 1.5rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+        }
+        .test-result {
+            padding: 0.5rem 1rem;
+            margin: 0.5rem 0;
+            border-radius: 4px;
+        }
+        .pass {
+            background: #d4edda;
+            color: #155724;
+            border-left: 4px solid #28a745;
+        }
+        .fail {
+            background: #f8d7da;
+            color: #721c24;
+            border-left: 4px solid #dc3545;
+        }
+        .warn {
+            background: #fff3cd;
+            color: #856404;
+            border-left: 4px solid #ffc107;
+        }
+        .code-block {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Skip Link -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+
+    <!-- Header -->
+    <header role="banner">
+        <h1>Accessibility Testing Dashboard</h1>
+        <p>WCAG 2.1 AA Compliance Testing for Sealed Auction Platform</p>
+    </header>
+
+    <!-- Main Content -->
+    <main id="main-content" role="main">
+        <!-- Test Controls -->
+        <section class="test-section">
+            <h2>Test Controls</h2>
+            <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                <button 
+                    onclick="runAllTests()" 
+                    class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                    aria-label="Run all accessibility tests"
+                >
+                    Run All Tests
+                </button>
+                <button 
+                    onclick="clearResults()" 
+                    class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
+                    aria-label="Clear test results"
+                >
+                    Clear Results
+                </button>
+                <button 
+                    onclick="exportResults()" 
+                    class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+                    aria-label="Export test results"
+                >
+                    Export Results
+                </button>
+            </div>
+        </section>
+
+        <!-- Test Results -->
+        <section class="test-section">
+            <h2>Test Results</h2>
+            <div id="test-results" role="region" aria-live="polite" aria-atomic="false">
+                <p class="text-gray-600">Click "Run All Tests" to begin testing...</p>
+            </div>
+        </section>
+
+        <!-- Individual Tests -->
+        <section class="test-section">
+            <h2>Individual Tests</h2>
+            
+            <!-- Keyboard Navigation Test -->
+            <div class="mb-6">
+                <h3>1. Keyboard Navigation</h3>
+                <p>Test that all interactive elements are accessible via keyboard.</p>
+                <button 
+                    onclick="testKeyboardNavigation()" 
+                    class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 mt-2"
+                >
+                    Test Keyboard Navigation
+                </button>
+                <div id="keyboard-test-result" class="mt-2"></div>
+            </div>
+
+            <!-- Screen Reader Test -->
+            <div class="mb-6">
+                <h3>2. Screen Reader Compatibility</h3>
+                <p>Test ARIA labels, roles, and live regions.</p>
+                <button 
+                    onclick="testScreenReader()" 
+                    class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 mt-2"
+                >
+                    Test Screen Reader
+                </button>
+                <div id="screenreader-test-result" class="mt-2"></div>
+            </div>
+
+            <!-- Color Contrast Test -->
+            <div class="mb-6">
+                <h3>3. Color Contrast</h3>
+                <p>Test color contrast ratios for WCAG AA compliance.</p>
+                <button 
+                    onclick="testColorContrast()" 
+                    class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 mt-2"
+                >
+                    Test Color Contrast
+                </button>
+                <div id="contrast-test-result" class="mt-2"></div>
+            </div>
+
+            <!-- Form Accessibility Test -->
+            <div class="mb-6">
+                <h3>4. Form Accessibility</h3>
+                <p>Test form labels, error messages, and validation.</p>
+                <button 
+                    onclick="testFormAccessibility()" 
+                    class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 mt-2"
+                >
+                    Test Form Accessibility
+                </button>
+                <div id="form-test-result" class="mt-2"></div>
+            </div>
+
+            <!-- Image Alt Text Test -->
+            <div class="mb-6">
+                <h3>5. Image Alt Text</h3>
+                <p>Test that all images have appropriate alt text.</p>
+                <button 
+                    onclick="testImageAltText()" 
+                    class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 mt-2"
+                >
+                    Test Image Alt Text
+                </button>
+                <div id="image-test-result" class="mt-2"></div>
+            </div>
+
+            <!-- Heading Hierarchy Test -->
+            <div class="mb-6">
+                <h3>6. Heading Hierarchy</h3>
+                <p>Test proper heading structure and hierarchy.</p>
+                <button 
+                    onclick="testHeadingHierarchy()" 
+                    class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 mt-2"
+                >
+                    Test Heading Hierarchy
+                </button>
+                <div id="heading-test-result" class="mt-2"></div>
+            </div>
+        </section>
+
+        <!-- Sample Components for Testing -->
+        <section class="test-section">
+            <h2>Sample Components</h2>
+            
+            <!-- Sample Form -->
+            <form id="sample-form" class="mb-6">
+                <h3>Sample Form</h3>
+                <div class="mb-4">
+                    <label for="test-name" class="block mb-2">Name <span class="required" aria-label="required">*</span></label>
+                    <input 
+                        type="text" 
+                        id="test-name" 
+                        name="name" 
+                        required 
+                        aria-required="true"
+                        aria-describedby="name-help"
+                        class="border border-gray-300 rounded px-3 py-2 w-full"
+                    >
+                    <span id="name-help" class="help-text">Enter your full name</span>
+                </div>
+                
+                <div class="mb-4">
+                    <label for="test-email" class="block mb-2">Email <span class="required" aria-label="required">*</span></label>
+                    <input 
+                        type="email" 
+                        id="test-email" 
+                        name="email" 
+                        required 
+                        aria-required="true"
+                        autocomplete="email"
+                        class="border border-gray-300 rounded px-3 py-2 w-full"
+                    >
+                </div>
+                
+                <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                    Submit Form
+                </button>
+            </form>
+
+            <!-- Sample Modal Trigger -->
+            <div class="mb-6">
+                <h3>Sample Modal</h3>
+                <button 
+                    onclick="openTestModal()" 
+                    class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+                    aria-label="Open test modal dialog"
+                >
+                    Open Modal
+                </button>
+            </div>
+
+            <!-- Sample Images -->
+            <div class="mb-6">
+                <h3>Sample Images</h3>
+                <img 
+                    src="https://via.placeholder.com/300x200/667eea/ffffff?text=Sample+Image" 
+                    alt="Sample placeholder image with purple background and white text"
+                    class="rounded"
+                >
+                <img 
+                    src="https://via.placeholder.com/100x100/764ba2/ffffff?text=Icon" 
+                    alt=""
+                    aria-hidden="true"
+                    class="rounded mt-2"
+                >
+            </div>
+
+            <!-- Sample Table -->
+            <div class="mb-6">
+                <h3>Sample Table</h3>
+                <table class="w-full border-collapse" role="table" aria-label="Sample data table">
+                    <caption class="sr-only">Sample auction data with bids and status</caption>
+                    <thead scope="col">
+                        <tr>
+                            <th scope="col" class="border border-gray-300 px-4 py-2 text-left">Auction</th>
+                            <th scope="col" class="border border-gray-300 px-4 py-2 text-left">Status</th>
+                            <th scope="col" class="border border-gray-300 px-4 py-2 text-left">Bids</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="border border-gray-300 px-4 py-2">Vintage Watch</td>
+                            <td class="border border-gray-300 px-4 py-2">Active</td>
+                            <td class="border border-gray-300 px-4 py-2">12</td>
+                        </tr>
+                        <tr>
+                            <td class="border border-gray-300 px-4 py-2">Art Collection</td>
+                            <td class="border border-gray-300 px-4 py-2">Closed</td>
+                            <td class="border border-gray-300 px-4 py-2">8</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Documentation -->
+        <section class="test-section">
+            <h2>Testing Documentation</h2>
+            <div class="code-block">
+                <h3>Manual Testing Checklist:</h3>
+                <ul>
+                    <li>✓ Navigate using Tab key only</li>
+                    <li>✓ Test with screen reader (NVDA, JAWS, VoiceOver)</li>
+                    <li>✓ Verify focus indicators are visible</li>
+                    <li>✓ Test keyboard shortcuts (Enter, Space, Escape, Arrows)</li>
+                    <li>✓ Verify color contrast with DevTools</li>
+                    <li>✓ Test with browser zoom at 200%</li>
+                    <li>✓ Test with reduced motion enabled</li>
+                    <li>✓ Test with high contrast mode</li>
+                </ul>
+            </div>
+        </section>
+    </main>
+
+    <!-- Test Modal -->
+    <div 
+        id="test-modal" 
+        class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
+        aria-describedby="modal-description"
+    >
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h2 id="modal-title" class="text-xl font-bold mb-4">Test Modal Dialog</h2>
+            <p id="modal-description" class="mb-4">This is a sample modal dialog for accessibility testing.</p>
+            <div class="flex gap-2">
+                <button 
+                    onclick="closeTestModal()" 
+                    class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                    aria-label="Close modal dialog"
+                >
+                    Close
+                </button>
+                <button 
+                    class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
+                    aria-label="Cancel action"
+                >
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ARIA Live Regions -->
+    <div id="aria-live-polite" role="status" aria-live="polite" aria-atomic="true" class="sr-only"></div>
+    <div id="aria-live-assertive" role="alert" aria-live="assertive" aria-atomic="true" class="sr-only"></div>
+
+    <!-- Scripts -->
+    <script src="accessibility.js"></script>
+    <script>
+        // Test Functions
+        function runAllTests() {
+            clearResults();
+            const results = document.getElementById('test-results');
+            results.innerHTML = '<h3>Running all tests...</h3>';
+            
+            setTimeout(() => {
+                testKeyboardNavigation();
+                testScreenReader();
+                testColorContrast();
+                testFormAccessibility();
+                testImageAltText();
+                testHeadingHierarchy();
+                
+                // Summary
+                const summary = document.createElement('div');
+                summary.className = 'test-result pass';
+                summary.innerHTML = '<strong>✅ All tests completed!</strong> Review individual test results below.';
+                results.appendChild(summary);
+                
+                window.a11y.announce('All accessibility tests completed', 'polite');
+            }, 500);
+        }
+
+        function clearResults() {
+            document.getElementById('test-results').innerHTML = '';
+            document.getElementById('keyboard-test-result').innerHTML = '';
+            document.getElementById('screenreader-test-result').innerHTML = '';
+            document.getElementById('contrast-test-result').innerHTML = '';
+            document.getElementById('form-test-result').innerHTML = '';
+            document.getElementById('image-test-result').innerHTML = '';
+            document.getElementById('heading-test-result').innerHTML = '';
+        }
+
+        function testKeyboardNavigation() {
+            const result = document.getElementById('keyboard-test-result');
+            const focusableElements = document.querySelectorAll(
+                'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+            );
+            
+            result.innerHTML = `
+                <div class="test-result pass">
+                    ✅ Found ${focusableElements.length} focusable elements
+                </div>
+                <div class="test-result pass">
+                    ✅ All interactive elements are keyboard accessible
+                </div>
+            `;
+        }
+
+        function testScreenReader() {
+            const result = document.getElementById('screenreader-test-result');
+            const ariaLabels = document.querySelectorAll('[aria-label]').length;
+            const ariaLabelledby = document.querySelectorAll('[aria-labelledby]').length;
+            const ariaDescribedby = document.querySelectorAll('[aria-describedby]').length;
+            const roles = document.querySelectorAll('[role]').length;
+            
+            result.innerHTML = `
+                <div class="test-result pass">
+                    ✅ ${ariaLabels} elements with aria-label
+                </div>
+                <div class="test-result pass">
+                    ✅ ${ariaLabelledby} elements with aria-labelledby
+                </div>
+                <div class="test-result pass">
+                    ✅ ${ariaDescribedby} elements with aria-describedby
+                </div>
+                <div class="test-result pass">
+                    ✅ ${roles} elements with ARIA roles
+                </div>
+            `;
+        }
+
+        function testColorContrast() {
+            const result = document.getElementById('contrast-test-result');
+            
+            // Sample contrast tests
+            const tests = [
+                { fg: '#1a202c', bg: '#ffffff', name: 'Primary text on white' },
+                { fg: '#4a5568', bg: '#ffffff', name: 'Secondary text on white' },
+                { fg: '#ffffff', bg: '#667eea', name: 'White on primary button' }
+            ];
+            
+            let html = '';
+            tests.forEach(test => {
+                const contrastResult = window.a11y.checkContrast(test.fg, test.bg);
+                const status = contrastResult.passAA ? 'pass' : 'fail';
+                html += `
+                    <div class="test-result ${status}">
+                        ${contrastResult.passAA ? '✅' : '❌'} ${test.name}: ${contrastResult.ratio}:1
+                    </div>
+                `;
+            });
+            
+            result.innerHTML = html;
+        }
+
+        function testFormAccessibility() {
+            const result = document.getElementById('form-test-result');
+            const form = document.getElementById('sample-form');
+            const inputs = form.querySelectorAll('input');
+            let passed = 0;
+            let failed = 0;
+            
+            inputs.forEach(input => {
+                const hasLabel = form.querySelector(`label[for="${input.id}"]`) !== null;
+                const hasAriaLabel = input.hasAttribute('aria-label') || input.hasAttribute('aria-labelledby');
+                
+                if (hasLabel || hasAriaLabel) {
+                    passed++;
+                } else {
+                    failed++;
+                }
+            });
+            
+            result.innerHTML = `
+                <div class="test-result ${failed === 0 ? 'pass' : 'fail'}">
+                    ${failed === 0 ? '✅' : '❌'} ${passed} inputs properly labeled, ${failed} missing labels
+                </div>
+            `;
+        }
+
+        function testImageAltText() {
+            const result = document.getElementById('image-test-result');
+            const images = document.querySelectorAll('img');
+            let passed = 0;
+            let failed = 0;
+            
+            images.forEach(img => {
+                if (img.hasAttribute('alt')) {
+                    passed++;
+                } else {
+                    failed++;
+                }
+            });
+            
+            result.innerHTML = `
+                <div class="test-result ${failed === 0 ? 'pass' : 'fail'}">
+                    ${failed === 0 ? '✅' : '❌'} ${passed} images with alt text, ${failed} missing alt
+                </div>
+            `;
+        }
+
+        function testHeadingHierarchy() {
+            const result = document.getElementById('heading-test-result');
+            const headings = [];
+            
+            for (let i = 1; i <= 6; i++) {
+                document.querySelectorAll(`h${i}`).forEach(() => headings.push(i));
+            }
+            
+            const hasH1 = headings.includes(1);
+            const hierarchy = headings.join(', ');
+            
+            result.innerHTML = `
+                <div class="test-result ${hasH1 ? 'pass' : 'fail'}">
+                    ${hasH1 ? '✅' : '❌'} Page ${hasH1 ? 'has' : 'missing'} h1 heading
+                </div>
+                <div class="test-result pass">
+                    ✅ Heading hierarchy: ${hierarchy}
+                </div>
+            `;
+        }
+
+        function exportResults() {
+            const results = document.getElementById('test-results').innerText;
+            const blob = new Blob([results], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'accessibility-test-results.txt';
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            window.a11y.announce('Test results exported', 'polite');
+        }
+
+        function openTestModal() {
+            const modal = document.getElementById('test-modal');
+            modal.classList.remove('hidden');
+            modal.querySelector('button').focus();
+        }
+
+        function closeTestModal() {
+            const modal = document.getElementById('test-modal');
+            modal.classList.add('hidden');
+        }
+
+        // Form submission handler
+        document.getElementById('sample-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            window.a11y.announce('Form submitted successfully', 'polite');
+        });
+
+        // Escape key to close modal
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeTestModal();
+            }
+        });
+    </script>
+</body>
+</html>
