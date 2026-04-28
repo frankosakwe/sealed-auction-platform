@@ -115,6 +115,20 @@ class AuctionDatabase {
       )
     `);
 
+    // Create auction views tracking table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS auction_views (
+        id TEXT PRIMARY KEY,
+        auction_id TEXT NOT NULL,
+        user_id TEXT,
+        ip_address TEXT,
+        user_agent TEXT,
+        viewed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (auction_id) REFERENCES auctions(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+      )
+    `);
+
     // Create admin-related tables
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS system_logs (
@@ -666,6 +680,224 @@ class AuctionDatabase {
         hasMore: offset + auctions.length < totalResult.total
       }
     };
+  }
+
+  getFilteredAuctions(page = 1, limit = 10, filters = {}) {
+    // Validate pagination parameters
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    
+    if (isNaN(pageNum) || pageNum < 1) {
+      throw new Error('Invalid page number');
+    }
+    
+    if (isNaN(limitNum) || limitNum < 1 || limitNum > 100) {
+      throw new Error('Limit must be between 1 and 100');
+    }
+
+    const offset = (pageNum - 1) * limitNum;
+    const params = [];
+    const countParams = [];
+    
+    let query = `
+      SELECT a.*, 
+             COUNT(DISTINCT b.id) as bid_count,
+             (SELECT COUNT(*) FROM auction_views WHERE auction_id = a.id) as view_count
+      FROM auctions a
+      LEFT JOIN bids b ON a.id = b.auction_id
+      WHERE 1=1
+    `;
+    
+    let countQuery = `
+      SELECT COUNT(DISTINCT a.id) as total
+      FROM auctions a
+      LEFT JOIN bids b ON a.id = b.auction_id
+      WHERE 1=1
+    `;
+
+    // Status filter
+    if (filters.status && filters.status !== 'all') {
+      const statusValidation = this.securityLayer.validateInput(filters.status);
+      if (!statusValidation.valid) {
+        throw new Error('Invalid status value');
+      }
+      query += ' AND a.status = ?';
+      countQuery += ' AND a.status = ?';
+      params.push(filters.status);
+      countParams.push(filters.status);
+    }
+
+    // Category filter
+    if (filters.category && filters.category !== 'all') {
+      const categoryValidation = this.securityLayer.validateInput(filters.category);
+      if (!categoryValidation.valid) {
+        throw new Error('Invalid category value');
+      }
+      query += ' AND a.category = ?';
+      countQuery += ' AND a.category = ?';
+      params.push(filters.category);
+      countParams.push(filters.category);
+    }
+
+    // Price range filter
+    if (filters.minPrice !== undefined && filters.minPrice !== null) {
+      const minPrice = parseFloat(filters.minPrice);
+      if (isNaN(minPrice)) {
+        throw new Error('Invalid minimum price');
+      }
+      query += ' AND a.current_highest_bid >= ?';
+      countQuery += ' AND a.current_highest_bid >= ?';
+      params.push(minPrice);
+      countParams.push(minPrice);
+    }
+
+    if (filters.maxPrice !== undefined && filters.maxPrice !== null) {
+      const maxPrice = parseFloat(filters.maxPrice);
+      if (isNaN(maxPrice)) {
+        throw new Error('Invalid maximum price');
+      }
+      query += ' AND a.current_highest_bid <= ?';
+      countQuery += ' AND a.current_highest_bid <= ?';
+      params.push(maxPrice);
+      countParams.push(maxPrice);
+    }
+
+    // Ending soon filter (within 24 hours)
+    if (filters.endingSoon === true) {
+      const oneDayFromNow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      const now = new Date().toISOString();
+      query += ' AND a.end_time BETWEEN ? AND ? AND a.status = "active"';
+      countQuery += ' AND a.end_time BETWEEN ? AND ? AND a.status = "active"';
+      params.push(now, oneDayFromNow);
+      countParams.push(now, oneDayFromNow);
+    }
+
+    // Search query filter
+    if (filters.search && filters.search.trim() !== '') {
+      const searchValidation = this.securityLayer.validateInput(filters.search);
+      if (!searchValidation.valid) {
+        throw new Error('Invalid search query');
+      }
+      const searchTerm = `%${filters.search.trim()}%`;
+      query += ' AND (a.title LIKE ? OR a.description LIKE ?)';
+      countQuery += ' AND (a.title LIKE ? OR a.description LIKE ?)';
+      params.push(searchTerm, searchTerm);
+      countParams.push(searchTerm, searchTerm);
+    }
+
+    // Add GROUP BY clause for counting distinct auctions
+    query += ' GROUP BY a.id';
+
+    // Sorting
+    const validSortOptions = ['price_asc', 'price_desc', 'time_asc', 'time_desc', 'popularity_desc', 'newest'];
+    const sortBy = filters.sortBy && validSortOptions.includes(filters.sortBy) ? filters.sortBy : 'newest';
+    
+    switch (sortBy) {
+      case 'price_asc':
+        query += ' ORDER BY a.current_highest_bid ASC';
+        break;
+      case 'price_desc':
+        query += ' ORDER BY a.current_highest_bid DESC';
+        break;
+      case 'time_asc':
+        query += ' ORDER BY a.end_time ASC';
+        break;
+      case 'time_desc':
+        query += ' ORDER BY a.end_time DESC';
+        break;
+      case 'popularity_desc':
+        query += ' ORDER BY bid_count DESC';
+        break;
+      case 'newest':
+      default:
+        query += ' ORDER BY a.created_at DESC';
+        break;
+    }
+
+    query += ' LIMIT ? OFFSET ?';
+    params.push(limitNum, offset);
+
+    const countStmt = this.securityLayer.prepare(countQuery);
+    const auctionsStmt = this.securityLayer.prepare(query);
+
+    const totalResult = countStmt.get(...countParams);
+    const auctions = auctionsStmt.all(...params);
+
+    return {
+      auctions,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total: totalResult.total,
+        totalPages: Math.ceil(totalResult.total / limitNum),
+        hasMore: offset + auctions.length < totalResult.total
+      }
+    };
+  }
+
+  getAuctionCategories() {
+    const stmt = this.securityLayer.prepare('SELECT DISTINCT category FROM auctions WHERE category IS NOT NULL ORDER BY category');
+    return stmt.all();
+  }
+
+  searchAuctions(query, limit = 20) {
+    const queryValidation = this.securityLayer.validateInput(query);
+    if (!queryValidation.valid) {
+      throw new Error('Invalid search query');
+    }
+
+    const searchTerm = `%${query.trim()}%`;
+    const stmt = this.securityLayer.prepare(`
+      SELECT id, title, description, current_highest_bid, category, status
+      FROM auctions
+      WHERE (title LIKE ? OR description LIKE ?)
+      AND status = 'active'
+      ORDER BY created_at DESC
+      LIMIT ?
+    `);
+    
+    return stmt.all(searchTerm, searchTerm, limit);
+  }
+
+  recordAuctionView(auctionId, userId = null, ipAddress = null, userAgent = null) {
+    try {
+      const idValidation = this.securityLayer.validateInput(auctionId);
+      if (!idValidation.valid) {
+        throw new Error('Invalid auction ID');
+      }
+
+      const viewId = require('uuid').v4();
+      const stmt = this.securityLayer.prepare(`
+        INSERT INTO auction_views (id, auction_id, user_id, ip_address, user_agent)
+        VALUES (?, ?, ?, ?, ?)
+      `);
+
+      stmt.run(viewId, auctionId, userId || null, ipAddress || null, userAgent || null);
+      return { id: viewId, success: true };
+    } catch (error) {
+      // View recording failure should not break the app
+      console.warn('Failed to record auction view:', error);
+      return { success: false };
+    }
+  }
+
+  getAuctionViewCount(auctionId) {
+    try {
+      const idValidation = this.securityLayer.validateInput(auctionId);
+      if (!idValidation.valid) {
+        throw new Error('Invalid auction ID');
+      }
+
+      const stmt = this.securityLayer.prepare(`
+        SELECT COUNT(*) as view_count FROM auction_views WHERE auction_id = ?
+      `);
+
+      const result = stmt.get(auctionId);
+      return result.view_count || 0;
+    } catch (error) {
+      console.warn('Failed to get auction view count:', error);
+      return 0;
+    }
   }
 
   updateAuction(id, updates) {
