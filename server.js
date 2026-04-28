@@ -3246,6 +3246,364 @@ app.get('/api/network/congestion', async (req, res) => {
   }
 });
 
+// Token Management API Endpoints
+
+// Middleware to verify JWT token for protected routes
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Access token required' });
+  }
+
+  jwt.verify(token, process.env.JWT_SECRET || 'default-secret', (err, user) => {
+    if (err) {
+      return res.status(403).json({ error: 'Invalid or expired token' });
+    }
+    req.user = user;
+    next();
+  });
+}
+
+// Create a new token
+app.post('/api/tokens', authenticateToken, async (req, res) => {
+  try {
+    const { name, symbol, description, totalSupply, assetCode, assetIssuer, decimals = 7 } = req.body;
+    const tokenId = uuidv4();
+    const creatorId = req.user.id;
+
+    // Validate inputs
+    if (!name || !symbol || !totalSupply || totalSupply <= 0) {
+      return res.status(400).json({ error: 'Name, symbol, and positive total supply are required' });
+    }
+
+    // Check if symbol already exists
+    const existingToken = db.getTokenBySymbol(symbol);
+    if (existingToken) {
+      return res.status(409).json({ error: 'Token symbol already exists' });
+    }
+
+    // Create token
+    const result = db.createToken(tokenId, name, symbol, description, totalSupply, creatorId, assetCode, assetIssuer, decimals);
+    
+    // Mint initial supply to creator
+    await db.updateTokenBalance(tokenId, creatorId, totalSupply, true);
+
+    res.status(201).json({
+      message: 'Token created successfully',
+      token: db.getToken(tokenId)
+    });
+  } catch (error) {
+    logError('Error creating token:', error, { endpoint: '/api/tokens', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to create token' });
+  }
+});
+
+// Get all tokens (with optional filtering)
+app.get('/api/tokens', (req, res) => {
+  try {
+    const { userId, status, page = 1, limit = 20 } = req.query;
+    const offset = (page - 1) * limit;
+    
+    const tokens = db.getAllTokens(userId, status);
+    const paginatedTokens = tokens.slice(offset, offset + parseInt(limit));
+    
+    res.json({
+      tokens: paginatedTokens,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: tokens.length,
+        totalPages: Math.ceil(tokens.length / limit)
+      }
+    });
+  } catch (error) {
+    logError('Error getting tokens:', error, { endpoint: '/api/tokens' });
+    res.status(500).json({ error: 'Failed to get tokens' });
+  }
+});
+
+// Get specific token details
+app.get('/api/tokens/:tokenId', (req, res) => {
+  try {
+    const { tokenId } = req.params;
+    const token = db.getToken(tokenId);
+    
+    if (!token) {
+      return res.status(404).json({ error: 'Token not found' });
+    }
+
+    // Get token statistics
+    const stats = db.getTokenStats(tokenId);
+    
+    res.json({
+      token,
+      stats
+    });
+  } catch (error) {
+    logError('Error getting token details:', error, { endpoint: '/api/tokens/:tokenId' });
+    res.status(500).json({ error: 'Failed to get token details' });
+  }
+});
+
+// Get user's token portfolio
+app.get('/api/tokens/portfolio', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const portfolio = db.getUserTokenPortfolio(userId);
+    
+    res.json({
+      portfolio,
+      totalValue: portfolio.reduce((sum, token) => sum + token.balance, 0)
+    });
+  } catch (error) {
+    logError('Error getting user portfolio:', error, { endpoint: '/api/tokens/portfolio', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to get portfolio' });
+  }
+});
+
+// Get token balance for a user
+app.get('/api/tokens/:tokenId/balance', authenticateToken, (req, res) => {
+  try {
+    const { tokenId } = req.params;
+    const userId = req.user.id;
+    
+    const token = db.getToken(tokenId);
+    if (!token) {
+      return res.status(404).json({ error: 'Token not found' });
+    }
+    
+    const balance = db.getTokenBalance(tokenId, userId);
+    
+    res.json({
+      tokenId,
+      balance: balance ? balance.balance : 0,
+      frozenBalance: balance ? balance.frozen_balance : 0
+    });
+  } catch (error) {
+    logError('Error getting token balance:', error, { endpoint: '/api/tokens/:tokenId/balance', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to get token balance' });
+  }
+});
+
+// Transfer tokens between users
+app.post('/api/tokens/:tokenId/transfer', authenticateToken, async (req, res) => {
+  try {
+    const { tokenId } = req.params;
+    const { toUserId, amount, memo } = req.body;
+    const fromUserId = req.user.id;
+
+    // Validate inputs
+    if (!toUserId || !amount || amount <= 0) {
+      return res.status(400).json({ error: 'Recipient user ID and positive amount are required' });
+    }
+
+    // Check if token exists
+    const token = db.getToken(tokenId);
+    if (!token) {
+      return res.status(404).json({ error: 'Token not found' });
+    }
+
+    // Check sender's balance
+    const senderBalance = db.getTokenBalance(tokenId, fromUserId);
+    if (!senderBalance || senderBalance.balance < amount) {
+      return res.status(400).json({ error: 'Insufficient balance' });
+    }
+
+    // Create transfer record
+    const transferResult = db.createTokenTransfer(tokenId, fromUserId, toUserId, amount, memo);
+
+    // Update balances
+    await db.updateTokenBalance(tokenId, fromUserId, -amount);
+    await db.updateTokenBalance(tokenId, toUserId, amount);
+
+    // Update transfer status to completed
+    await db.updateTokenTransferStatus(transferResult.lastInsertRowid, 'completed', null, 0);
+
+    // Record history
+    db.recordTokenHistory(tokenId, fromUserId, 'transferred', amount, fromUserId, toUserId, null, `Transferred ${amount} ${token.symbol} to user ${toUserId}`);
+    db.recordTokenHistory(tokenId, toUserId, 'received', amount, fromUserId, toUserId, null, `Received ${amount} ${token.symbol} from user ${fromUserId}`);
+
+    res.json({
+      message: 'Transfer completed successfully',
+      transferId: transferResult.lastInsertRowid
+    });
+  } catch (error) {
+    logError('Error transferring tokens:', error, { endpoint: '/api/tokens/:tokenId/transfer', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to transfer tokens' });
+  }
+});
+
+// Get token transfer history
+app.get('/api/tokens/:tokenId/transfers', (req, res) => {
+  try {
+    const { tokenId } = req.params;
+    const { userId, status, page = 1, limit = 50 } = req.query;
+    const offset = (page - 1) * limit;
+
+    const token = db.getToken(tokenId);
+    if (!token) {
+      return res.status(404).json({ error: 'Token not found' });
+    }
+
+    const transfers = db.getTokenTransfers(tokenId, userId, status, parseInt(limit), offset);
+    
+    res.json({
+      transfers,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: transfers.length,
+        totalPages: Math.ceil(transfers.length / limit)
+      }
+    });
+  } catch (error) {
+    logError('Error getting token transfers:', error, { endpoint: '/api/tokens/:tokenId/transfers' });
+    res.status(500).json({ error: 'Failed to get token transfers' });
+  }
+});
+
+// Approve token spending
+app.post('/api/tokens/:tokenId/approve', authenticateToken, async (req, res) => {
+  try {
+    const { tokenId } = req.params;
+    const { spenderId, allowance, expiresAt } = req.body;
+    const ownerId = req.user.id;
+
+    // Validate inputs
+    if (!spenderId || !allowance || allowance < 0) {
+      return res.status(400).json({ error: 'Spender ID and non-negative allowance are required' });
+    }
+
+    // Check if token exists
+    const token = db.getToken(tokenId);
+    if (!token) {
+      return res.status(404).json({ error: 'Token not found' });
+    }
+
+    // Create approval
+    const result = db.createTokenApproval(tokenId, ownerId, spenderId, allowance, expiresAt);
+
+    // Record history
+    db.recordTokenHistory(tokenId, ownerId, 'approved', allowance, ownerId, spenderId, null, `Approved ${allowance} ${token.symbol} for user ${spenderId}`);
+
+    res.status(201).json({
+      message: 'Token approval created successfully',
+      approvalId: result.lastInsertRowid
+    });
+  } catch (error) {
+    logError('Error creating token approval:', error, { endpoint: '/api/tokens/:tokenId/approve', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to create token approval' });
+  }
+});
+
+// Get token approval
+app.get('/api/tokens/:tokenId/approval/:spenderId', authenticateToken, (req, res) => {
+  try {
+    const { tokenId, spenderId } = req.params;
+    const ownerId = req.user.id;
+
+    const token = db.getToken(tokenId);
+    if (!token) {
+      return res.status(404).json({ error: 'Token not found' });
+    }
+
+    const approval = db.getTokenApproval(tokenId, ownerId, spenderId);
+    
+    res.json({
+      approval: approval || null
+    });
+  } catch (error) {
+    logError('Error getting token approval:', error, { endpoint: '/api/tokens/:tokenId/approval/:spenderId', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to get token approval' });
+  }
+});
+
+// Revoke token approval
+app.delete('/api/tokens/:tokenId/approval/:spenderId', authenticateToken, (req, res) => {
+  try {
+    const { tokenId, spenderId } = req.params;
+    const ownerId = req.user.id;
+
+    const token = db.getToken(tokenId);
+    if (!token) {
+      return res.status(404).json({ error: 'Token not found' });
+    }
+
+    const result = db.revokeTokenApproval(tokenId, ownerId, spenderId);
+    
+    if (result.changes > 0) {
+      // Record history
+      db.recordTokenHistory(tokenId, ownerId, 'revoked', 0, ownerId, spenderId, null, `Revoked approval for user ${spenderId}`);
+      
+      res.json({ message: 'Token approval revoked successfully' });
+    } else {
+      res.status(404).json({ error: 'No active approval found' });
+    }
+  } catch (error) {
+    logError('Error revoking token approval:', error, { endpoint: '/api/tokens/:tokenId/approval/:spenderId', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to revoke token approval' });
+  }
+});
+
+// Get token history
+app.get('/api/tokens/:tokenId/history', (req, res) => {
+  try {
+    const { tokenId } = req.params;
+    const { userId, actionType, page = 1, limit = 100 } = req.query;
+    const offset = (page - 1) * limit;
+
+    const token = db.getToken(tokenId);
+    if (!token) {
+      return res.status(404).json({ error: 'Token not found' });
+    }
+
+    const history = db.getTokenHistory(tokenId, userId, actionType, parseInt(limit), offset);
+    
+    res.json({
+      history,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: history.length,
+        totalPages: Math.ceil(history.length / limit)
+      }
+    });
+  } catch (error) {
+    logError('Error getting token history:', error, { endpoint: '/api/tokens/:tokenId/history' });
+    res.status(500).json({ error: 'Failed to get token history' });
+  }
+});
+
+// Update token status (admin only)
+app.patch('/api/tokens/:tokenId/status', authenticateToken, async (req, res) => {
+  try {
+    const { tokenId } = req.params;
+    const { status } = req.body;
+
+    // Check if user is admin (you may want to add proper admin role checking)
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    if (!['active', 'inactive', 'suspended'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status. Must be active, inactive, or suspended' });
+    }
+
+    const result = db.updateTokenStatus(tokenId, status);
+    
+    if (result) {
+      res.json({ message: 'Token status updated successfully' });
+    } else {
+      res.status(404).json({ error: 'Token not found' });
+    }
+  } catch (error) {
+    logError('Error updating token status:', error, { endpoint: '/api/tokens/:tokenId/status', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to update token status' });
+  }
+});
+
 // Schedule regular backups
 const BACKUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
 setInterval(backupData, BACKUP_INTERVAL);

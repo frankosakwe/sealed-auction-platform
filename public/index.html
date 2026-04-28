@@ -1419,8 +1419,8 @@
                 <button data-tab="network" onclick="switchTab('network')" class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20">
                     <i class="fas fa-network-wired mr-2"></i>Network
                 </button>
-                <button data-tab="nft" onclick="switchTab('nft')" class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20">
-                    <i class="fas fa-image mr-2"></i>NFT Gallery
+                <button data-tab="tokens" onclick="switchTab('tokens')" class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20">
+                    <i class="fas fa-coins mr-2"></i>Tokens
                 </button>
                 <button data-tab="admin" onclick="switchTab('admin')" class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20" id="adminTab" style="display: none;">
                     <i class="fas fa-shield-alt mr-2"></i>Admin
@@ -2126,6 +2126,13 @@
             </div>
         </div>
 
+        <!-- Token Management Tab -->
+        <div id="tokensContent" class="tab-content hidden">
+            <div id="token-management-container">
+                <!-- Token management interface will be loaded here -->
+            </div>
+        </div>
+
         <!-- Bid Modal -->
         <div id="bidModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
             <div class="glass-effect rounded-xl p-6 sm:p-8 max-w-md w-full max-h-[90vh] overflow-y-auto">
@@ -2420,9 +2427,7 @@
     <script src="smart-contract-ui.js"></script>
     <script src="gas-fee-optimizer.js"></script>
     <script src="social-sharing.js"></script>
-    <script src="cross-chain-bridge.js"></script>
-    <script src="pwa.js"></script>
-    <script src="vr-auction-hall.js"></script>
-    <script src="vr-integration.js"></script>
+    <script src="network-monitor.js"></script>
+    <script src="token-management.js"></script>
 </body>
 </html>
