@@ -4,13 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>500 - Server Error | Auction Platform</title>
-</main>
-
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- Accessibility Styles -->
-    <link rel="stylesheet" href="accessibility.css">
     <style>
         body {
             background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
@@ -145,13 +140,10 @@
     </style>
 </head>
 <body>
-    <!-- Skip Navigation Link -->
-    <a href="#main-content" class="skip-link">Skip to main content</a>
-    
     <div class="error-container">
         <div class="glass-effect">
             <div class="error-icon">
-                <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
+                <i class="fas fa-exclamation-triangle"></i>
             </div>
             <div class="error-code">500</div>
             <h1 class="text-3xl font-bold mb-4">Server Error</h1>
@@ -161,15 +153,15 @@
 
             <div class="flex flex-wrap justify-center mb-6">
                 <button onclick="retryNow()" class="btn btn-primary">
-                    <i class="fas fa-redo" aria-hidden="true"></i>
+                    <i class="fas fa-redo"></i>
                     Retry Now
                 </button>
                 <a href="/" class="btn btn-secondary">
-                    <i class="fas fa-home" aria-hidden="true"></i>
+                    <i class="fas fa-home"></i>
                     Go Home
                 </button>
                 <button onclick="checkStatus()" class="btn btn-secondary">
-                    <i class="fas fa-heartbeat" aria-hidden="true"></i>
+                    <i class="fas fa-heartbeat"></i>
                     Check Status
                 </button>
             </div>
@@ -284,12 +276,5 @@
             startCountdown();
         }, 2000);
     </script>
-    
-    <!-- ARIA Live Regions -->
-    <div id="aria-live-polite" role="status" aria-live="polite" aria-atomic="true" class="sr-only"></div>
-    <div id="aria-live-assertive" role="alert" aria-live="assertive" aria-atomic="true" class="sr-only"></div>
-    
-    <!-- Accessibility JavaScript -->
-    <script src="accessibility.js"></script>
 </body>
 </html>

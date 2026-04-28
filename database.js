@@ -47,6 +47,38 @@ class AuctionDatabase {
       )
     `);
 
+    // Create refresh tokens table for token rotation
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS refresh_tokens (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        token_hash TEXT NOT NULL,
+        device_info TEXT,
+        ip_address TEXT,
+        user_agent TEXT,
+        is_revoked INTEGER DEFAULT 0,
+        expires_at DATETIME NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        last_used_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Create user sessions table for multi-device support
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS user_sessions (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        refresh_token_id TEXT NOT NULL,
+        device_fingerprint TEXT,
+        is_active INTEGER DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        last_activity_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (refresh_token_id) REFERENCES refresh_tokens(id) ON DELETE CASCADE
+      )
+    `);
+
     // Create auctions table
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS auctions (
@@ -776,6 +808,191 @@ class AuctionDatabase {
       DELETE FROM password_reset_tokens WHERE expires_at <= datetime('now')
     `);
     return stmt.run();
+  }
+
+  // ==================== REFRESH TOKEN OPERATIONS ====================
+
+  createRefreshToken(refreshToken) {
+    const validation = this.securityLayer.validateInputs({
+      id: refreshToken.id,
+      user_id: refreshToken.user_id,
+      token_hash: refreshToken.token_hash,
+      device_info: refreshToken.device_info,
+      ip_address: refreshToken.ip_address,
+      user_agent: refreshToken.user_agent,
+      expires_at: refreshToken.expires_at
+    });
+    
+    if (!validation.valid) {
+      throw new Error(validation.errors.join(', '));
+    }
+    
+    const stmt = this.securityLayer.prepare(`
+      INSERT INTO refresh_tokens (id, user_id, token_hash, device_info, ip_address, user_agent, expires_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+    
+    return stmt.run(
+      validation.sanitized.id,
+      validation.sanitized.user_id,
+      validation.sanitized.token_hash,
+      validation.sanitized.device_info,
+      validation.sanitized.ip_address,
+      validation.sanitized.user_agent,
+      validation.sanitized.expires_at
+    );
+  }
+
+  getRefreshToken(tokenHash) {
+    const validation = this.securityLayer.validateInput(tokenHash);
+    if (!validation.valid) {
+      console.warn('[SECURITY] Invalid refresh token hash format:', tokenHash);
+      return null;
+    }
+    
+    const stmt = this.securityLayer.prepare(`
+      SELECT rt.*, u.username, u.email 
+      FROM refresh_tokens rt 
+      JOIN users u ON rt.user_id = u.id 
+      WHERE rt.token_hash = ? AND rt.is_revoked = 0 AND rt.expires_at > datetime('now')
+    `);
+    return stmt.get(validation.sanitized);
+  }
+
+  revokeRefreshToken(tokenHash) {
+    const validation = this.securityLayer.validateInput(tokenHash);
+    if (!validation.valid) {
+      console.warn('[SECURITY] Invalid refresh token hash format:', tokenHash);
+      return false;
+    }
+    
+    const stmt = this.securityLayer.prepare(`
+      UPDATE refresh_tokens SET is_revoked = 1 WHERE token_hash = ?
+    `);
+    const result = stmt.run(validation.sanitized);
+    return result.changes > 0;
+  }
+
+  revokeAllUserRefreshTokens(userId) {
+    const validation = this.securityLayer.validateInput(userId);
+    if (!validation.valid) {
+      console.warn('[SECURITY] Invalid user ID format:', userId);
+      return false;
+    }
+    
+    const stmt = this.securityLayer.prepare(`
+      UPDATE refresh_tokens SET is_revoked = 1 WHERE user_id = ? AND is_revoked = 0
+    `);
+    const result = stmt.run(validation.sanitized);
+    return result.changes > 0;
+  }
+
+  updateRefreshTokenLastUsed(tokenId) {
+    const validation = this.securityLayer.validateInput(tokenId);
+    if (!validation.valid) {
+      console.warn('[SECURITY] Invalid refresh token ID format:', tokenId);
+      return false;
+    }
+    
+    const stmt = this.securityLayer.prepare(`
+      UPDATE refresh_tokens SET last_used_at = datetime('now') WHERE id = ?
+    `);
+    const result = stmt.run(validation.sanitized);
+    return result.changes > 0;
+  }
+
+  cleanupExpiredRefreshTokens() {
+    const stmt = this.securityLayer.prepare(`
+      DELETE FROM refresh_tokens WHERE expires_at <= datetime('now') OR is_revoked = 1
+    `);
+    return stmt.run();
+  }
+
+  // ==================== SESSION MANAGEMENT OPERATIONS ====================
+
+  createUserSession(session) {
+    const validation = this.securityLayer.validateInputs({
+      id: session.id,
+      user_id: session.user_id,
+      refresh_token_id: session.refresh_token_id,
+      device_fingerprint: session.device_fingerprint
+    });
+    
+    if (!validation.valid) {
+      throw new Error(validation.errors.join(', '));
+    }
+    
+    const stmt = this.securityLayer.prepare(`
+      INSERT INTO user_sessions (id, user_id, refresh_token_id, device_fingerprint)
+      VALUES (?, ?, ?, ?)
+    `);
+    
+    return stmt.run(
+      validation.sanitized.id,
+      validation.sanitized.user_id,
+      validation.sanitized.refresh_token_id,
+      validation.sanitized.device_fingerprint
+    );
+  }
+
+  getUserSessions(userId) {
+    const validation = this.securityLayer.validateInput(userId);
+    if (!validation.valid) {
+      console.warn('[SECURITY] Invalid user ID format:', userId);
+      return [];
+    }
+    
+    const stmt = this.securityLayer.prepare(`
+      SELECT us.*, rt.device_info, rt.ip_address, rt.created_at as token_created_at,
+             rt.last_used_at, rt.expires_at
+      FROM user_sessions us 
+      JOIN refresh_tokens rt ON us.refresh_token_id = rt.id 
+      WHERE us.user_id = ? AND us.is_active = 1 AND rt.is_revoked = 0
+      ORDER BY us.last_activity_at DESC
+    `);
+    return stmt.all(validation.sanitized);
+  }
+
+  deactivateSession(sessionId) {
+    const validation = this.securityLayer.validateInput(sessionId);
+    if (!validation.valid) {
+      console.warn('[SECURITY] Invalid session ID format:', sessionId);
+      return false;
+    }
+    
+    const stmt = this.securityLayer.prepare(`
+      UPDATE user_sessions SET is_active = 0 WHERE id = ?
+    `);
+    const result = stmt.run(validation.sanitized);
+    return result.changes > 0;
+  }
+
+  updateSessionActivity(sessionId) {
+    const validation = this.securityLayer.validateInput(sessionId);
+    if (!validation.valid) {
+      console.warn('[SECURITY] Invalid session ID format:', sessionId);
+      return false;
+    }
+    
+    const stmt = this.securityLayer.prepare(`
+      UPDATE user_sessions SET last_activity_at = datetime('now') WHERE id = ?
+    `);
+    const result = stmt.run(validation.sanitized);
+    return result.changes > 0;
+  }
+
+  deactivateAllUserSessions(userId) {
+    const validation = this.securityLayer.validateInput(userId);
+    if (!validation.valid) {
+      console.warn('[SECURITY] Invalid user ID format:', userId);
+      return false;
+    }
+    
+    const stmt = this.securityLayer.prepare(`
+      UPDATE user_sessions SET is_active = 0 WHERE user_id = ?
+    `);
+    const result = stmt.run(validation.sanitized);
+    return result.changes > 0;
   }
 
   // Admin methods
