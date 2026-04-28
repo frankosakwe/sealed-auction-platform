@@ -19,18 +19,49 @@ const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
-const { Server, Keypair, TransactionBuilder, Networks, BASE_FEE, Asset } = require('stellar-sdk');
+const { Horizon, Keypair, TransactionBuilder, Networks, BASE_FEE, Asset } = require('@stellar/stellar-sdk');
 const session = require('express-session');
 const passport = require('passport');
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const GitHubStrategy = require('passport-github2').Strategy;
 const AuctionDatabase = require('./database');
 const { ApplicationMetrics, createMetricsMiddleware } = require('./utils/metrics');
 const NetworkMonitor = require('./utils/network-monitor');
+const { TransactionQueue, PRIORITY, STATUS } = require('./utils/transaction-queue');
+const { WalletManager, SECURITY_LEVELS, WALLET_TYPES } = require('./utils/wallet-manager');
+const { BlockchainAnalytics, AGGREGATION_INTERVALS, METRIC_TYPES } = require('./utils/blockchain-analytics');
 
 // Initialize database
 const db = new AuctionDatabase();
 
 // Initialize network monitor
 const networkMonitor = new NetworkMonitor();
+
+// Initialize transaction queue
+const transactionQueue = new TransactionQueue({
+  networkMonitor: networkMonitor,
+  maxQueueSize: 10000,
+  batchSize: 10,
+  batchTimeout: 5000,
+  maxRetries: 3,
+  gasOptimization: true
+});
+
+// Initialize wallet manager
+const walletManager = new WalletManager({
+  maxWallets: 50,
+  defaultSecurityLevel: SECURITY_LEVELS.STANDARD,
+  autoLockTimeout: 300000,
+  autoBackup: true,
+  backupInterval: 86400000
+});
+
+// Initialize blockchain analytics
+const blockchainAnalytics = new BlockchainAnalytics({
+  cacheTimeout: 300000,
+  batchSize: 1000,
+  maxCacheSize: 10000
+});
 
 const app = express();
 const server = http.createServer(app);
@@ -78,6 +109,67 @@ function logError(message, error, context = {}) {
   console.error(message, error);
   trackError(error, { message, ...context });
 }
+
+// Error reporting endpoints
+app.post('/api/errors/report', (req, res) => {
+  try {
+    const errorData = req.body;
+    console.error('Client error reported:', errorData);
+    
+    // Track error
+    trackError(new Error(errorData.message), {
+      type: 'client',
+      ...errorData
+    });
+    
+    res.json({ success: true, message: 'Error reported successfully' });
+  } catch (error) {
+    console.error('Failed to process error report:', error);
+    res.status(500).json({ error: 'Failed to process error report' });
+  }
+});
+
+app.post('/api/errors/404', (req, res) => {
+  try {
+    const errorData = req.body;
+    console.warn('404 error:', errorData);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to log 404 error' });
+  }
+});
+
+app.post('/api/errors/500', (req, res) => {
+  try {
+    const errorData = req.body;
+    console.error('500 error:', errorData);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to log 500 error' });
+  }
+});
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  try {
+    // Check database connection
+    const dbHealthy = db && db.db;
+    
+    res.json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      services: {
+        database: dbHealthy ? 'healthy' : 'unhealthy',
+        server: 'healthy'
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+});
 
 // Security middleware
 app.use(helmet());
@@ -151,7 +243,38 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.use(express.json());
-app.use(express.static('public'));
+
+// Performance optimization middleware
+const compression = require('compression');
+app.use(compression({
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) {
+      return false;
+    }
+    return compression.filter(req, res);
+  },
+  level: 6,
+  threshold: 1024
+}));
+
+// Enhanced static file serving with caching
+app.use(express.static('public', {
+  maxAge: process.env.NODE_ENV === 'production' ? '1y' : '1d',
+  etag: true,
+  lastModified: true,
+  setHeaders: (res, path) => {
+    // Set different cache durations for different file types
+    if (path.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'public, max-age=3600, must-revalidate');
+    } else if (path.endsWith('.js') || path.endsWith('.css')) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    } else if (path.match(/\.(jpg|jpeg|png|gif|webp|svg|ico)$/)) {
+      res.setHeader('Cache-Control', 'public, max-age=2592000, immutable');
+    } else if (path.endsWith('.woff') || path.endsWith('.woff2')) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    }
+  }
+}));
 
 // Session middleware for OAuth
 app.use(session({
@@ -164,6 +287,116 @@ app.use(session({
 // Initialize Passport
 app.use(passport.initialize());
 app.use(passport.session());
+
+// Configure Passport strategies
+passport.serializeUser((user, done) => {
+  done(null, user.id);
+});
+
+passport.deserializeUser((id, done) => {
+  try {
+    const user = db.getUserById(id);
+    done(null, user);
+  } catch (error) {
+    done(error, null);
+  }
+});
+
+// Google OAuth Strategy
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  passport.use(new GoogleStrategy({
+    clientID: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    callbackURL: "/auth/google/callback",
+    scope: ['profile', 'email']
+  }, async (accessToken, refreshToken, profile, done) => {
+    try {
+      // Extract user profile information
+      const profileData = {
+        id: profile.id,
+        email: profile.emails[0]?.value,
+        name: profile.displayName,
+        firstName: profile.name?.givenName,
+        lastName: profile.name?.familyName,
+        photo: profile.photos[0]?.value,
+        provider: 'google',
+        providerId: profile.id
+      };
+
+      // Find or create user
+      let user = db.getUserByOAuthProvider('google', profile.id);
+      
+      if (!user) {
+        // Check if user exists with same email (account linking)
+        const existingUser = db.getUserByEmail(profileData.email);
+        if (existingUser) {
+          // Link OAuth account to existing user
+          db.linkOAuthAccount(existingUser.id, 'google', profile.id, profileData);
+          user = existingUser;
+        } else {
+          // Create new user
+          user = db.createOAuthUser(profileData);
+        }
+      } else {
+        // Update user profile data
+        db.updateOAuthUserProfile(user.id, profileData);
+      }
+
+      return done(null, user);
+    } catch (error) {
+      console.error('Google OAuth error:', error);
+      return done(error, null);
+    }
+  }));
+}
+
+// GitHub OAuth Strategy
+if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
+  passport.use(new GitHubStrategy({
+    clientID: process.env.GITHUB_CLIENT_ID,
+    clientSecret: process.env.GITHUB_CLIENT_SECRET,
+    callbackURL: "/auth/github/callback",
+    scope: ['user:email']
+  }, async (accessToken, refreshToken, profile, done) => {
+    try {
+      // Extract user profile information
+      const profileData = {
+        id: profile.id,
+        email: profile.emails?.[0]?.value || `${profile.username}@github.local`,
+        name: profile.displayName || profile.username,
+        username: profile.username,
+        photo: profile.photos?.[0]?.value,
+        provider: 'github',
+        providerId: profile.id,
+        bio: profile._json?.bio
+      };
+
+      // Find or create user
+      let user = db.getUserByOAuthProvider('github', profile.id);
+      
+      if (!user) {
+        // Check if user exists with same email (account linking)
+        const existingUser = db.getUserByEmail(profileData.email);
+        if (existingUser && profileData.email !== `${profile.username}@github.local`) {
+          // Link OAuth account to existing user
+          db.linkOAuthAccount(existingUser.id, 'github', profile.id, profileData);
+          user = existingUser;
+        } else {
+          // Create new user
+          user = db.createOAuthUser(profileData);
+        }
+      } else {
+        // Update user profile data
+        db.updateOAuthUserProfile(user.id, profileData);
+      }
+
+      return done(null, user);
+    } catch (error) {
+      console.error('GitHub OAuth error:', error);
+      return done(error, null);
+    }
+  }));
+}
 
 // Rate limiting configuration
 const JWT_SECRET = process.env.JWT_SECRET || 'your-jwt-secret-change-in-production';
@@ -998,37 +1231,197 @@ app.get('/api/users/lockout-status',
   }
 });
 
-// OAuth Routes (requires passport configuration)
-app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
-
-app.get('/auth/google/callback', 
-  passport.authenticate('google', { failureRedirect: '/login' }),
-  (req, res) => {
-    const token = generateToken(req.user);
-    res.redirect(`/?token=${token}&username=${req.user.username}`);
+// OAuth Routes with comprehensive error handling
+app.get('/auth/google', (req, res, next) => {
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+    return res.status(503).json({ 
+      error: 'Google OAuth is not configured',
+      message: 'Please contact the administrator to set up Google OAuth'
+    });
   }
-);
+  next();
+}, passport.authenticate('google', { 
+  scope: ['profile', 'email'],
+  accessType: 'offline',
+  prompt: 'consent'
+}));
 
-app.get('/auth/github', passport.authenticate('github', { scope: ['user:email'] }));
+app.get('/auth/google/callback', (req, res, next) => {
+  passport.authenticate('google', (err, user, info) => {
+    if (err) {
+      console.error('Google OAuth callback error:', err);
+      return res.redirect(`/login?error=oauth_failed&message=${encodeURIComponent(err.message)}`);
+    }
+    if (!user) {
+      return res.redirect(`/login?error=oauth_failed&message=${encodeURIComponent(info?.message || 'Authentication failed')}`);
+    }
+    
+    try {
+      const token = generateToken(user);
+      res.redirect(`/?token=${token}&username=${user.username}&auth=oauth&provider=google`);
+    } catch (error) {
+      console.error('Token generation error:', error);
+      res.redirect(`/login?error=token_failed&message=${encodeURIComponent('Failed to generate authentication token')}`);
+    }
+  })(req, res, next);
+});
 
-app.get('/auth/github/callback',
-  passport.authenticate('github', { failureRedirect: '/login' }),
-  (req, res) => {
-    const token = generateToken(req.user);
-    res.redirect(`/?token=${token}&username=${req.user.username}`);
+app.get('/auth/github', (req, res, next) => {
+  if (!process.env.GITHUB_CLIENT_ID || !process.env.GITHUB_CLIENT_SECRET) {
+    return res.status(503).json({ 
+      error: 'GitHub OAuth is not configured',
+      message: 'Please contact the administrator to set up GitHub OAuth'
+    });
   }
-);
+  next();
+}, passport.authenticate('github', { 
+  scope: ['user:email'],
+  prompt: 'consent'
+}));
+
+app.get('/auth/github/callback', (req, res, next) => {
+  passport.authenticate('github', (err, user, info) => {
+    if (err) {
+      console.error('GitHub OAuth callback error:', err);
+      return res.redirect(`/login?error=oauth_failed&message=${encodeURIComponent(err.message)}`);
+    }
+    if (!user) {
+      return res.redirect(`/login?error=oauth_failed&message=${encodeURIComponent(info?.message || 'Authentication failed')}`);
+    }
+    
+    try {
+      const token = generateToken(user);
+      res.redirect(`/?token=${token}&username=${user.username}&auth=oauth&provider=github`);
+    } catch (error) {
+      console.error('Token generation error:', error);
+      res.redirect(`/login?error=token_failed&message=${encodeURIComponent('Failed to generate authentication token')}`);
+    }
+  })(req, res, next);
+});
 
 // OAuth status endpoint
 app.get('/api/auth/status', (req, res) => {
-  res.json({
-    google: !!process.env.GOOGLE_CLIENT_ID,
-    github: !!process.env.GITHUB_CLIENT_ID,
-    _links: {
-      self: { href: '/api/auth/status' },
-      login: { href: '/api/auth/login', method: 'POST' }
+  try {
+    res.json({
+      google: !!process.env.GOOGLE_CLIENT_ID,
+      github: !!process.env.GITHUB_CLIENT_ID,
+      configured: {
+        google: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
+        github: !!(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET)
+      },
+      _links: {
+        self: { href: '/api/auth/status' },
+        login: { href: '/api/auth/login', method: 'POST' },
+        google: { href: '/auth/google', method: 'GET' },
+        github: { href: '/auth/github', method: 'GET' }
+      }
+    });
+  } catch (error) {
+    logError('Error checking OAuth status:', error, { endpoint: '/api/auth/status' });
+    res.status(500).json({ error: 'Failed to check OAuth status' });
+  }
+});
+
+// OAuth account management endpoints
+app.get('/api/user/oauth-accounts', authenticateToken, (req, res) => {
+  try {
+    const oauthAccounts = db.getUserOAuthAccounts(req.user.id);
+    res.json({
+      oauthAccounts: oauthAccounts.map(account => ({
+        provider: account.provider,
+        providerId: account.provider_id,
+        profileData: JSON.parse(account.profile_data || '{}'),
+        linkedAt: account.created_at
+      })),
+      _links: {
+        self: { href: '/api/user/oauth-accounts' },
+        unlink: { href: '/api/user/oauth-accounts/{provider}', method: 'DELETE' }
+      }
+    });
+  } catch (error) {
+    logError('Error fetching OAuth accounts:', error, { endpoint: '/api/user/oauth-accounts', userId: req.user.id });
+    res.status(500).json({ error: 'Failed to fetch OAuth accounts' });
+  }
+});
+
+app.delete('/api/user/oauth-accounts/:provider', authenticateToken, (req, res) => {
+  try {
+    const { provider } = req.params;
+    const validProviders = ['google', 'github'];
+    
+    if (!validProviders.includes(provider)) {
+      return res.status(400).json({ error: 'Invalid OAuth provider' });
     }
-  });
+    
+    const user = db.getUserById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Check if user has password auth (to prevent locking themselves out)
+    if (user.auth_type === 'oauth') {
+      const oauthAccounts = db.getUserOAuthAccounts(req.user.id);
+      if (oauthAccounts.length <= 1) {
+        return res.status(400).json({ 
+          error: 'Cannot unlink last OAuth account. Please set a password first.',
+          code: 'LAST_OAUTH_ACCOUNT'
+        });
+      }
+    }
+    
+    const result = db.unlinkOAuthAccount(req.user.id, provider);
+    
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'OAuth account not found' });
+    }
+    
+    res.json({ 
+      message: 'OAuth account unlinked successfully',
+      provider: provider
+    });
+  } catch (error) {
+    logError('Error unlinking OAuth account:', error, { 
+      endpoint: '/api/user/oauth-accounts/:provider', 
+      userId: req.user.id, 
+      provider: req.params.provider 
+    });
+    res.status(500).json({ error: 'Failed to unlink OAuth account' });
+  }
+});
+
+// Enhanced token management with OAuth support
+app.post('/api/auth/refresh', authenticateToken, (req, res) => {
+  try {
+    const user = db.getUserById(req.user.id);
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+    
+    // Blacklist old token
+    const authHeader = req.headers['authorization'];
+    const oldToken = authHeader && authHeader.split(' ')[1];
+    if (oldToken) {
+      tokenBlacklist.add(oldToken);
+    }
+    
+    // Generate new token
+    const newToken = generateToken(user);
+    
+    res.json({
+      token: newToken,
+      expiresIn: '24h',
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        authType: user.auth_type
+      }
+    });
+  } catch (error) {
+    logError('Error refreshing token:', error, { endpoint: '/api/auth/refresh', userId: req.user.id });
+    res.status(500).json({ error: 'Failed to refresh token' });
+  }
 });
 
 // Admin Dashboard API endpoints
@@ -2835,7 +3228,7 @@ app.get('/api/network/recommendations', (req, res) => {
 });
 
 // Get congestion information
-app.get('/api/network/congestion', (req, res) => {
+app.get('/api/network/congestion', async (req, res) => {
   try {
     await networkMonitor.checkCongestion();
     const status = networkMonitor.getNetworkStatus();
@@ -3458,6 +3851,1448 @@ if (sentryEnabled) {
   app.use(Sentry.Handlers.errorHandler());
 }
 
+// Get NFT collection with pagination and filtering
+app.get('/api/nft/collection', (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 12;
+    const category = req.query.category || 'all';
+    const verification = req.query.verification || 'all';
+    const minPrice = parseFloat(req.query.minPrice) || 0;
+    const maxPrice = parseFloat(req.query.maxPrice) || Infinity;
+    const search = req.query.search || '';
+    const sortBy = req.query.sortBy || 'created_at';
+    const sortOrder = req.query.sortOrder || 'desc';
+
+    const nfts = db.getNFTCollection({
+      page,
+      limit,
+      category,
+      verification,
+      minPrice,
+      maxPrice,
+      search,
+      sortBy,
+      sortOrder
+    });
+
+    res.json({
+      nfts: nfts.data,
+      pagination: {
+        page,
+        limit,
+        total: nfts.total,
+        totalPages: Math.ceil(nfts.total / limit),
+        hasMore: page * limit < nfts.total
+      }
+    });
+  } catch (error) {
+    logError('Error fetching NFT collection:', error, { endpoint: '/api/nft/collection' });
+    res.status(500).json({ error: 'Failed to fetch NFT collection' });
+  }
+});
+
+// Get NFT details by ID
+app.get('/api/nft/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const nft = db.getNFTById(id);
+    
+    if (!nft) {
+      return res.status(404).json({ error: 'NFT not found' });
+    }
+
+    res.json(nft);
+  } catch (error) {
+    logError('Error fetching NFT details:', error, { endpoint: '/api/nft/:id', nftId: req.params.id });
+    res.status(500).json({ error: 'Failed to fetch NFT details' });
+  }
+});
+
+// Get NFT transaction history
+app.get('/api/nft/:id/transactions', (req, res) => {
+  try {
+    const { id } = req.params;
+    const transactions = db.getNFTTransactionHistory(id);
+    res.json(transactions);
+  } catch (error) {
+    logError('Error fetching NFT transactions:', error, { endpoint: '/api/nft/:id/transactions', nftId: req.params.id });
+    res.status(500).json({ error: 'Failed to fetch transaction history' });
+  }
+});
+
+// Get NFT collections
+app.get('/api/nft/collections', (req, res) => {
+  try {
+    const collections = db.getNFTCollections();
+    res.json(collections);
+  } catch (error) {
+    logError('Error fetching NFT collections:', error, { endpoint: '/api/nft/collections' });
+    res.status(500).json({ error: 'Failed to fetch collections' });
+  }
+});
+
+// Create new NFT collection
+app.post('/api/nft/collections', authenticateToken, (req, res) => {
+  try {
+    const { name, description, blockchain = 'stellar' } = req.body;
+    const userId = req.user.id;
+
+    if (!name) {
+      return res.status(400).json({ error: 'Collection name is required' });
+    }
+
+    const collection = db.createNFTCollection({
+      name,
+      description,
+      creator_id: userId,
+      blockchain
+    });
+
+    res.status(201).json(collection);
+  } catch (error) {
+    logError('Error creating NFT collection:', error, { endpoint: '/api/nft/collections', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to create collection' });
+  }
+});
+
+// Create new NFT
+app.post('/api/nft', authenticateToken, upload.single('image'), (req, res) => {
+  try {
+    const {
+      name,
+      description,
+      collection_id,
+      attributes,
+      blockchain = 'stellar'
+    } = req.body;
+
+    const userId = req.user.id;
+    const imagePath = req.file ? `/uploads/nft/${req.file.filename}` : null;
+
+    if (!name) {
+      return res.status(400).json({ error: 'NFT name is required' });
+    }
+
+    const nft = db.createNFT({
+      name,
+      description,
+      collection_id,
+      creator_id: userId,
+      image_url: imagePath,
+      attributes: attributes ? JSON.stringify(attributes) : null,
+      blockchain
+    });
+
+    // Create ownership record
+    db.createNFTOwnership({
+      nft_id: nft.id,
+      owner_id: userId,
+      ownership_type: 'owned'
+    });
+
+    // Create mint transaction record
+    db.createNFTTransfer({
+      nft_id: nft.id,
+      to_owner_id: userId,
+      transfer_type: 'mint'
+    });
+
+    res.status(201).json(nft);
+  } catch (error) {
+    logError('Error creating NFT:', error, { endpoint: '/api/nft', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to create NFT' });
+  }
+});
+
+// List NFT for sale
+app.post('/api/nft/:id/list', authenticateToken, (req, res) => {
+  try {
+    const { id } = req.params;
+    const { price, currency = 'USD', listing_type = 'sale', auction_end_time, reserve_price } = req.body;
+    const userId = req.user.id;
+
+    // Verify ownership
+    const ownership = db.getNFTOwnership(id, userId);
+    if (!ownership || !ownership.is_active) {
+      return res.status(403).json({ error: 'You do not own this NFT' });
+    }
+
+    const listing = db.createNFTListing({
+      nft_id: id,
+      seller_id: userId,
+      price,
+      currency,
+      listing_type,
+      auction_end_time,
+      reserve_price
+    });
+
+    // Update ownership type
+    db.updateNFTOwnership(id, userId, { ownership_type: 'listed' });
+
+    res.status(201).json(listing);
+  } catch (error) {
+    logError('Error listing NFT for sale:', error, { endpoint: '/api/nft/:id/list', userId: req.user?.id, nftId: req.params.id });
+    res.status(500).json({ error: 'Failed to list NFT for sale' });
+  }
+});
+
+// Get marketplace listings
+app.get('/api/nft/marketplace/listings', (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 12;
+    const status = req.query.status || 'active';
+    const listing_type = req.query.listing_type || 'all';
+    const sortBy = req.query.sortBy || 'created_at';
+    const sortOrder = req.query.sortOrder || 'desc';
+
+    const listings = db.getMarketplaceListings({
+      page,
+      limit,
+      status,
+      listing_type,
+      sortBy,
+      sortOrder
+    });
+
+    res.json({
+      listings: listings.data,
+      pagination: {
+        page,
+        limit,
+        total: listings.total,
+        totalPages: Math.ceil(listings.total / limit),
+        hasMore: page * limit < listings.total
+      }
+    });
+  } catch (error) {
+    logError('Error fetching marketplace listings:', error, { endpoint: '/api/nft/marketplace/listings' });
+    res.status(500).json({ error: 'Failed to fetch marketplace listings' });
+  }
+});
+
+// Make offer on NFT
+app.post('/api/nft/:id/offer', authenticateToken, (req, res) => {
+  try {
+    const { id } = req.params;
+    const { price, currency = 'USD', expires_at } = req.body;
+    const userId = req.user.id;
+
+    // Verify NFT exists and is not owned by the user
+    const nft = db.getNFTById(id);
+    if (!nft) {
+      return res.status(404).json({ error: 'NFT not found' });
+    }
+
+    const ownership = db.getNFTOwnership(id, userId);
+    if (ownership && ownership.is_active) {
+      return res.status(403).json({ error: 'You cannot make an offer on your own NFT' });
+    }
+
+    const offer = db.createNFTOffer({
+      nft_id: id,
+      offerer_id: userId,
+      price,
+      currency,
+      expires_at
+    });
+
+    res.status(201).json(offer);
+  } catch (error) {
+    logError('Error making NFT offer:', error, { endpoint: '/api/nft/:id/offer', userId: req.user?.id, nftId: req.params.id });
+    res.status(500).json({ error: 'Failed to make offer' });
+  }
+});
+
+// Accept NFT offer
+app.post('/api/nft/offer/:offerId/accept', authenticateToken, (req, res) => {
+  try {
+    const { offerId } = req.params;
+    const userId = req.user.id;
+
+    const offer = db.getNFTOfferById(offerId);
+    if (!offer) {
+      return res.status(404).json({ error: 'Offer not found' });
+    }
+
+    // Verify user owns the NFT
+    const ownership = db.getNFTOwnership(offer.nft_id, userId);
+    if (!ownership || !ownership.is_active) {
+      return res.status(403).json({ error: 'You do not own this NFT' });
+    }
+
+    // Process the transfer
+    const transfer = db.processNFTTransfer(offer.nft_id, userId, offer.offerer_id, 'sale', offer.price);
+
+    // Update ownership records
+    db.updateNFTOwnership(offer.nft_id, userId, { is_active: 0 });
+    db.createNFTOwnership({
+      nft_id: offer.nft_id,
+      owner_id: offer.offerer_id,
+      ownership_type: 'owned',
+      acquisition_price: offer.price
+    });
+
+    // Mark offer as accepted
+    db.updateNFTOffer(offerId, { status: 'accepted' });
+
+    res.json(transfer);
+  } catch (error) {
+    logError('Error accepting NFT offer:', error, { endpoint: '/api/nft/offer/:offerId/accept', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to accept offer' });
+  }
+});
+
+// Transfer NFT
+app.post('/api/nft/:id/transfer', authenticateToken, (req, res) => {
+  try {
+    const { id } = req.params;
+    const { to_address, transfer_type = 'gift' } = req.body;
+    const userId = req.user.id;
+
+    // Verify ownership
+    const ownership = db.getNFTOwnership(id, userId);
+    if (!ownership || !ownership.is_active) {
+      return res.status(403).json({ error: 'You do not own this NFT' });
+    }
+
+    // Find recipient user by wallet address
+    const recipient = db.getUserByWalletAddress(to_address);
+    if (!recipient) {
+      return res.status(404).json({ error: 'Recipient not found' });
+    }
+
+    // Process the transfer
+    const transfer = db.processNFTTransfer(id, userId, recipient.id, transfer_type);
+
+    // Update ownership records
+    db.updateNFTOwnership(id, userId, { is_active: 0 });
+    db.createNFTOwnership({
+      nft_id: id,
+      owner_id: recipient.id,
+      ownership_type: 'owned'
+    });
+
+    res.json(transfer);
+  } catch (error) {
+    logError('Error transferring NFT:', error, { endpoint: '/api/nft/:id/transfer', userId: req.user?.id, nftId: req.params.id });
+    res.status(500).json({ error: 'Failed to transfer NFT' });
+  }
+});
+
+// Verify NFT ownership
+app.post('/api/nft/:id/verify', authenticateToken, (req, res) => {
+  try {
+    const { id } = req.params;
+    const { verification_type = 'ownership' } = req.body;
+    const userId = req.user.id;
+
+    // Create verification request
+    const verification = db.createNFTVerification({
+      nft_id: id,
+      verification_type,
+      status: 'pending'
+    });
+
+    // In a real implementation, this would trigger blockchain verification
+    // For now, we'll simulate the verification process
+    setTimeout(() => {
+      const nft = db.getNFTById(id);
+      const isVerified = Math.random() > 0.3; // 70% success rate for demo
+      
+      db.updateNFTVerification(verification.id, {
+        status: isVerified ? 'verified' : 'rejected',
+        verified_by: 'system',
+        verification_data: JSON.stringify({
+          blockchain_signature: '0x' + Math.random().toString(16).substr(2, 64),
+          verified_at: new Date().toISOString()
+        })
+      });
+    }, 5000);
+
+    res.status(201).json(verification);
+  } catch (error) {
+    logError('Error verifying NFT:', error, { endpoint: '/api/nft/:id/verify', userId: req.user?.id, nftId: req.params.id });
+    res.status(500).json({ error: 'Failed to verify NFT' });
+  }
+});
+
+// Get NFT verification status
+app.get('/api/nft/:id/verification', (req, res) => {
+  try {
+    const { id } = req.params;
+    const verification = db.getNFTVerification(id);
+    res.json(verification);
+  } catch (error) {
+    logError('Error fetching NFT verification:', error, { endpoint: '/api/nft/:id/verification', nftId: req.params.id });
+    res.status(500).json({ error: 'Failed to fetch verification status' });
+  }
+});
+
+// Get user's NFT portfolio
+app.get('/api/user/nft/portfolio', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const portfolio = db.getUserNFTPortfolio(userId);
+    res.json(portfolio);
+  } catch (error) {
+    logError('Error fetching user NFT portfolio:', error, { endpoint: '/api/user/nft/portfolio', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to fetch portfolio' });
+  }
+});
+
+// Get NFT market statistics
+app.get('/api/nft/market/stats', (req, res) => {
+  try {
+    const period = req.query.period || '30d';
+    const stats = db.getNFTMarketStats(period);
+    res.json(stats);
+  } catch (error) {
+    logError('Error fetching NFT market stats:', error, { endpoint: '/api/nft/market/stats' });
+    res.status(500).json({ error: 'Failed to fetch market statistics' });
+  }
+});
+
+if (sentryEnabled) {
+  app.use(Sentry.Handlers.errorHandler());
+}
+
+// Get queue status and metrics
+app.get('/api/queue/status', authenticateToken, (req, res) => {
+  try {
+    const status = transactionQueue.getQueueStatus();
+    res.json(status);
+  } catch (error) {
+    logError('Error fetching queue status:', error, { endpoint: '/api/queue/status', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to fetch queue status' });
+  }
+});
+
+// Get mobile-friendly queue status
+app.get('/api/queue/mobile-status', authenticateToken, (req, res) => {
+  try {
+    const status = transactionQueue.getMobileQueueStatus();
+    res.json(status);
+  } catch (error) {
+    logError('Error fetching mobile queue status:', error, { endpoint: '/api/queue/mobile-status', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to fetch mobile queue status' });
+  }
+});
+
+// Enqueue a new transaction
+app.post('/api/queue/transactions', authenticateToken, async (req, res) => {
+  try {
+    const { transactionData, priority } = req.body;
+    
+    // Validate input
+    if (!transactionData) {
+      return res.status(400).json({ error: 'Transaction data is required' });
+    }
+    
+    // Set default priority if not provided
+    const transactionPriority = priority ? PRIORITY[priority.toUpperCase()] : PRIORITY.NORMAL;
+    if (!transactionPriority) {
+      return res.status(400).json({ error: 'Invalid priority level' });
+    }
+    
+    // Add user context to transaction
+    const enrichedTransactionData = {
+      ...transactionData,
+      userId: req.user.id,
+      submittedAt: new Date().toISOString()
+    };
+    
+    const transactionId = await transactionQueue.enqueue(enrichedTransactionData, transactionPriority);
+    
+    res.json({
+      transactionId,
+      priority: transactionPriority,
+      status: 'enqueued'
+    });
+  } catch (error) {
+    logError('Error enqueuing transaction:', error, { endpoint: '/api/queue/transactions', userId: req.user?.id });
+    res.status(500).json({ error: error.message || 'Failed to enqueue transaction' });
+  }
+});
+
+// Get specific transaction details
+app.get('/api/queue/transactions/:transactionId', authenticateToken, (req, res) => {
+  try {
+    const { transactionId } = req.params;
+    const transaction = transactionQueue.getTransaction(transactionId);
+    
+    if (!transaction) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+    
+    // Only allow users to see their own transactions (unless admin)
+    if (transaction.data.userId !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    res.json(transaction);
+  } catch (error) {
+    logError('Error fetching transaction:', error, { endpoint: '/api/queue/transactions/:transactionId', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to fetch transaction' });
+  }
+});
+
+// Cancel a pending transaction
+app.delete('/api/queue/transactions/:transactionId', authenticateToken, (req, res) => {
+  try {
+    const { transactionId } = req.params;
+    const transaction = transactionQueue.getTransaction(transactionId);
+    
+    if (!transaction) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+    
+    // Only allow users to cancel their own transactions (unless admin)
+    if (transaction.data.userId !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    const cancelled = transactionQueue.cancelTransaction(transactionId);
+    
+    if (cancelled) {
+      res.json({ message: 'Transaction cancelled successfully' });
+    } else {
+      res.status(400).json({ error: 'Cannot cancel transaction - it may already be processing or completed' });
+    }
+  } catch (error) {
+    logError('Error cancelling transaction:', error, { endpoint: '/api/queue/transactions/:transactionId', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to cancel transaction' });
+  }
+});
+
+// Get user's transaction history
+app.get('/api/queue/transactions', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { status, limit = 50, offset = 0 } = req.query;
+    
+    // Get all transactions and filter by user
+    const userTransactions = Array.from(transactionQueue.transactions.values())
+      .filter(tx => tx.data.userId === userId)
+      .filter(tx => !status || tx.status === status)
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(parseInt(offset), parseInt(offset) + parseInt(limit));
+    
+    res.json({
+      transactions: userTransactions,
+      total: userTransactions.length,
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+  } catch (error) {
+    logError('Error fetching user transactions:', error, { endpoint: '/api/queue/transactions', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to fetch transactions' });
+  }
+});
+
+// Admin: Get all transactions
+app.get('/api/admin/queue/transactions', authenticateAdmin, (req, res) => {
+  try {
+    const { status, priority, limit = 100, offset = 0 } = req.query;
+    
+    let transactions = Array.from(transactionQueue.transactions.values());
+    
+    // Apply filters
+    if (status) {
+      transactions = transactions.filter(tx => tx.status === status);
+    }
+    if (priority) {
+      const priorityLevel = PRIORITY[priority.toUpperCase()];
+      if (priorityLevel) {
+        transactions = transactions.filter(tx => tx.priority === priorityLevel);
+      }
+    }
+    
+    // Sort and paginate
+    transactions = transactions
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(parseInt(offset), parseInt(offset) + parseInt(limit));
+    
+    res.json({
+      transactions,
+      total: transactions.length,
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+  } catch (error) {
+    logError('Error fetching admin transactions:', error, { endpoint: '/api/admin/queue/transactions' });
+    res.status(500).json({ error: 'Failed to fetch transactions' });
+  }
+});
+
+// Admin: Get queue configuration
+app.get('/api/admin/queue/config', authenticateAdmin, (req, res) => {
+  try {
+    const config = {
+      maxQueueSize: transactionQueue.maxQueueSize,
+      batchSize: transactionQueue.batchSize,
+      batchTimeout: transactionQueue.batchTimeout,
+      maxRetries: transactionQueue.maxRetries,
+      retryDelay: transactionQueue.retryDelay,
+      gasOptimization: transactionQueue.gasOptimization
+    };
+    
+    res.json(config);
+  } catch (error) {
+    logError('Error fetching queue config:', error, { endpoint: '/api/admin/queue/config' });
+    res.status(500).json({ error: 'Failed to fetch queue configuration' });
+  }
+});
+
+// Admin: Update queue configuration
+app.put('/api/admin/queue/config', authenticateAdmin, (req, res) => {
+  try {
+    const { maxQueueSize, batchSize, batchTimeout, maxRetries, retryDelay, gasOptimization } = req.body;
+    
+    // Update configuration
+    if (maxQueueSize !== undefined) transactionQueue.maxQueueSize = maxQueueSize;
+    if (batchSize !== undefined) transactionQueue.batchSize = batchSize;
+    if (batchTimeout !== undefined) transactionQueue.batchTimeout = batchTimeout;
+    if (maxRetries !== undefined) transactionQueue.maxRetries = maxRetries;
+    if (retryDelay !== undefined) transactionQueue.retryDelay = retryDelay;
+    if (gasOptimization !== undefined) transactionQueue.gasOptimization = gasOptimization;
+    
+    res.json({ message: 'Queue configuration updated successfully' });
+  } catch (error) {
+    logError('Error updating queue config:', error, { endpoint: '/api/admin/queue/config' });
+    res.status(500).json({ error: 'Failed to update queue configuration' });
+  }
+});
+
+// WebSocket integration for real-time queue updates
+io.on('connection', (socket) => {
+  console.log('Client connected to transaction queue updates');
+  
+  // Join user-specific room for their transactions
+  socket.on('joinUserQueue', (userId) => {
+    socket.join(`user_${userId}`);
+  });
+  
+  // Listen for transaction queue events
+  transactionQueue.on('transactionEnqueued', (transaction) => {
+    io.to(`user_${transaction.data.userId}`).emit('transactionEnqueued', transaction);
+  });
+  
+  transactionQueue.on('transactionProcessing', (transaction) => {
+    io.to(`user_${transaction.data.userId}`).emit('transactionProcessing', transaction);
+  });
+  
+  transactionQueue.on('transactionCompleted', (transaction) => {
+    io.to(`user_${transaction.data.userId}`).emit('transactionCompleted', transaction);
+  });
+  
+  transactionQueue.on('transactionFailed', (transaction) => {
+    io.to(`user_${transaction.data.userId}`).emit('transactionFailed', transaction);
+  });
+  
+  transactionQueue.on('transactionRetry', (transaction) => {
+    io.to(`user_${transaction.data.userId}`).emit('transactionRetry', transaction);
+  });
+  
+  socket.on('disconnect', () => {
+    console.log('Client disconnected from transaction queue updates');
+  });
+});
+
+// ==================== WALLET MANAGEMENT API ENDPOINTS ====================
+
+// Get wallet manager status
+app.get('/api/wallets/status', authenticateToken, (req, res) => {
+  try {
+    const status = walletManager.getStatus();
+    res.json(status);
+  } catch (error) {
+    logError('Error fetching wallet manager status:', error, { endpoint: '/api/wallets/status', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to fetch wallet manager status' });
+  }
+});
+
+// Get all wallets for user
+app.get('/api/wallets', authenticateToken, (req, res) => {
+  try {
+    const wallets = walletManager.getAllWallets();
+    // Filter wallets by user if needed (in a real implementation, wallets would be user-specific)
+    res.json({
+      wallets,
+      count: wallets.length
+    });
+  } catch (error) {
+    logError('Error fetching wallets:', error, { endpoint: '/api/wallets', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to fetch wallets' });
+  }
+});
+
+// Get specific wallet details
+app.get('/api/wallets/:walletId', authenticateToken, (req, res) => {
+  try {
+    const { walletId } = req.params;
+    const wallet = walletManager.getWallet(walletId);
+    
+    if (!wallet) {
+      return res.status(404).json({ error: 'Wallet not found' });
+    }
+    
+    // Remove sensitive data for security
+    const safeWallet = { ...wallet };
+    delete safeWallet.encryptedSecretKey;
+    delete safeWallet.encryptedPrivateKey;
+    delete safeWallet.customData;
+    
+    res.json(safeWallet);
+  } catch (error) {
+    logError('Error fetching wallet:', error, { endpoint: '/api/wallets/:walletId', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to fetch wallet' });
+  }
+});
+
+// Create new wallet
+app.post('/api/wallets', authenticateToken, async (req, res) => {
+  try {
+    const walletData = req.body;
+    
+    // Validate required fields
+    if (!walletData.name || !walletData.type) {
+      return res.status(400).json({ error: 'Name and type are required' });
+    }
+    
+    // Add user context
+    walletData.userId = req.user.id;
+    
+    const walletId = await walletManager.createWallet(walletData);
+    
+    res.json({
+      walletId,
+      message: 'Wallet created successfully'
+    });
+  } catch (error) {
+    logError('Error creating wallet:', error, { endpoint: '/api/wallets', userId: req.user?.id });
+    res.status(500).json({ error: error.message || 'Failed to create wallet' });
+  }
+});
+
+// Add existing wallet
+app.post('/api/wallets/import', authenticateToken, async (req, res) => {
+  try {
+    const walletData = req.body;
+    
+    // Validate required fields
+    if (!walletData.name || !walletData.publicKey || !walletData.secretKey) {
+      return res.status(400).json({ error: 'Name, publicKey, and secretKey are required' });
+    }
+    
+    // Add user context
+    walletData.userId = req.user.id;
+    
+    const walletId = await walletManager.addExistingWallet(walletData);
+    
+    res.json({
+      walletId,
+      message: 'Wallet imported successfully'
+    });
+  } catch (error) {
+    logError('Error importing wallet:', error, { endpoint: '/api/wallets/import', userId: req.user?.id });
+    res.status(500).json({ error: error.message || 'Failed to import wallet' });
+  }
+});
+
+// Set active wallet
+app.put('/api/wallets/:walletId/active', authenticateToken, async (req, res) => {
+  try {
+    const { walletId } = req.params;
+    
+    await walletManager.setActiveWallet(walletId);
+    
+    res.json({
+      message: 'Active wallet updated successfully'
+    });
+  } catch (error) {
+    logError('Error setting active wallet:', error, { endpoint: '/api/wallets/:walletId/active', userId: req.user?.id });
+    res.status(500).json({ error: error.message || 'Failed to set active wallet' });
+  }
+});
+
+// Get active wallet
+app.get('/api/wallets/active', authenticateToken, (req, res) => {
+  try {
+    const wallet = walletManager.getActiveWallet();
+    
+    if (!wallet) {
+      return res.status(404).json({ error: 'No active wallet found' });
+    }
+    
+    // Remove sensitive data
+    const safeWallet = { ...wallet };
+    delete safeWallet.encryptedSecretKey;
+    delete safeWallet.encryptedPrivateKey;
+    delete safeWallet.customData;
+    
+    res.json(safeWallet);
+  } catch (error) {
+    logError('Error fetching active wallet:', error, { endpoint: '/api/wallets/active', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to fetch active wallet' });
+  }
+});
+
+// Update wallet
+app.put('/api/wallets/:walletId', authenticateToken, async (req, res) => {
+  try {
+    const { walletId } = req.params;
+    const updates = req.body;
+    
+    await walletManager.updateWallet(walletId, updates);
+    
+    res.json({
+      message: 'Wallet updated successfully'
+    });
+  } catch (error) {
+    logError('Error updating wallet:', error, { endpoint: '/api/wallets/:walletId', userId: req.user?.id });
+    res.status(500).json({ error: error.message || 'Failed to update wallet' });
+  }
+});
+
+// Delete wallet
+app.delete('/api/wallets/:walletId', authenticateToken, async (req, res) => {
+  try {
+    const { walletId } = req.params;
+    
+    await walletManager.deleteWallet(walletId);
+    
+    res.json({
+      message: 'Wallet deleted successfully'
+    });
+  } catch (error) {
+    logError('Error deleting wallet:', error, { endpoint: '/api/wallets/:walletId', userId: req.user?.id });
+    res.status(500).json({ error: error.message || 'Failed to delete wallet' });
+  }
+});
+
+// Lock wallet
+app.post('/api/wallets/:walletId/lock', authenticateToken, async (req, res) => {
+  try {
+    const { walletId } = req.params;
+    
+    await walletManager.lockWallet(walletId);
+    
+    res.json({
+      message: 'Wallet locked successfully'
+    });
+  } catch (error) {
+    logError('Error locking wallet:', error, { endpoint: '/api/wallets/:walletId/lock', userId: req.user?.id });
+    res.status(500).json({ error: error.message || 'Failed to lock wallet' });
+  }
+});
+
+// Unlock wallet
+app.post('/api/wallets/:walletId/unlock', authenticateToken, async (req, res) => {
+  try {
+    const { walletId } = req.params;
+    const { password } = req.body;
+    
+    if (!password) {
+      return res.status(400).json({ error: 'Password is required' });
+    }
+    
+    await walletManager.unlockWallet(walletId, password);
+    
+    res.json({
+      message: 'Wallet unlocked successfully'
+    });
+  } catch (error) {
+    logError('Error unlocking wallet:', error, { endpoint: '/api/wallets/:walletId/unlock', userId: req.user?.id });
+    res.status(500).json({ error: error.message || 'Failed to unlock wallet' });
+  }
+});
+
+// Get wallet balance
+app.get('/api/wallets/:walletId/balance', authenticateToken, async (req, res) => {
+  try {
+    const { walletId } = req.params;
+    
+    const balance = await walletManager.getWalletBalance(walletId);
+    
+    res.json({
+      walletId,
+      balance,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logError('Error fetching wallet balance:', error, { endpoint: '/api/wallets/:walletId/balance', userId: req.user?.id });
+    res.status(500).json({ error: error.message || 'Failed to fetch wallet balance' });
+  }
+});
+
+// Get aggregated balance across all wallets
+app.get('/api/wallets/balance/aggregate', authenticateToken, async (req, res) => {
+  try {
+    const aggregatedBalance = await walletManager.getAggregatedBalance();
+    
+    res.json(aggregatedBalance);
+  } catch (error) {
+    logError('Error fetching aggregated balance:', error, { endpoint: '/api/wallets/balance/aggregate', userId: req.user?.id });
+    res.status(500).json({ error: error.message || 'Failed to fetch aggregated balance' });
+  }
+});
+
+// Get wallet transaction history
+app.get('/api/wallets/:walletId/transactions', authenticateToken, async (req, res) => {
+  try {
+    const { walletId } = req.params;
+    const options = {
+      limit: parseInt(req.query.limit) || 50,
+      type: req.query.type,
+      dateFrom: req.query.dateFrom,
+      dateTo: req.query.dateTo,
+      refresh: req.query.refresh !== 'false'
+    };
+    
+    const transactions = await walletManager.getTransactionHistory(walletId, options);
+    
+    res.json({
+      walletId,
+      transactions,
+      count: transactions.length,
+      options
+    });
+  } catch (error) {
+    logError('Error fetching transaction history:', error, { endpoint: '/api/wallets/:walletId/transactions', userId: req.user?.id });
+    res.status(500).json({ error: error.message || 'Failed to fetch transaction history' });
+  }
+});
+
+// Create wallet backup
+app.post('/api/wallets/backup', authenticateToken, async (req, res) => {
+  try {
+    const { walletIds, password, includeSettings } = req.body;
+    
+    const backupId = await walletManager.createBackup(walletIds, { 
+      password,
+      includeSettings: includeSettings !== false 
+    });
+    
+    res.json({
+      backupId,
+      message: 'Backup created successfully'
+    });
+  } catch (error) {
+    logError('Error creating backup:', error, { endpoint: '/api/wallets/backup', userId: req.user?.id });
+    res.status(500).json({ error: error.message || 'Failed to create backup' });
+  }
+});
+
+// Restore from backup
+app.post('/api/wallets/restore', authenticateToken, async (req, res) => {
+  try {
+    const { backupData, password } = req.body;
+    
+    if (!backupData) {
+      return res.status(400).json({ error: 'Backup data is required' });
+    }
+    
+    const restoredWallets = await walletManager.restoreFromBackup(backupData, password);
+    
+    res.json({
+      restoredWallets,
+      count: restoredWallets.length,
+      message: 'Wallets restored successfully'
+    });
+  } catch (error) {
+    logError('Error restoring from backup:', error, { endpoint: '/api/wallets/restore', userId: req.user?.id });
+    res.status(500).json({ error: error.message || 'Failed to restore from backup' });
+  }
+});
+
+// Export wallet
+app.get('/api/wallets/:walletId/export', authenticateToken, async (req, res) => {
+  try {
+    const { walletId } = req.params;
+    const { format, password } = req.query;
+    
+    const exportData = await walletManager.exportWallet(walletId, format || 'json', password);
+    
+    // Set appropriate headers
+    if (format === 'csv') {
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="wallet-${walletId}.csv"`);
+    } else {
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="wallet-${walletId}.json"`);
+    }
+    
+    res.send(exportData);
+  } catch (error) {
+    logError('Error exporting wallet:', error, { endpoint: '/api/wallets/:walletId/export', userId: req.user?.id });
+    res.status(500).json({ error: error.message || 'Failed to export wallet' });
+  }
+});
+
+// Get supported wallet types and security levels
+app.get('/api/wallets/supported', (req, res) => {
+  try {
+    res.json({
+      types: Object.values(WALLET_TYPES),
+      securityLevels: Object.values(SECURITY_LEVELS),
+      networks: {
+        [WALLET_TYPES.STELLAR]: ['mainnet', 'testnet'],
+        [WALLET_TYPES.ETHEREUM]: ['mainnet', 'goerli', 'sepolia'],
+        [WALLET_TYPES.BITCOIN]: ['mainnet', 'testnet']
+      }
+    });
+  } catch (error) {
+    logError('Error fetching supported wallet info:', error, { endpoint: '/api/wallets/supported' });
+    res.status(500).json({ error: 'Failed to fetch supported wallet info' });
+  }
+});
+
+// Mobile-specific endpoints
+
+// Get mobile wallet status (simplified)
+app.get('/api/wallets/mobile/status', authenticateToken, (req, res) => {
+  try {
+    const status = walletManager.getStatus();
+    const mobileStatus = {
+      walletCount: status.walletCount,
+      activeWalletName: status.activeWalletName,
+      hasLockedWallets: walletManager.getAllWallets().some(w => w.isLocked),
+      lastBackup: status.lastBackup,
+      autoBackupEnabled: status.autoBackupEnabled
+    };
+    
+    res.json(mobileStatus);
+  } catch (error) {
+    logError('Error fetching mobile wallet status:', error, { endpoint: '/api/wallets/mobile/status', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to fetch mobile wallet status' });
+  }
+});
+
+// Quick balance check for mobile
+app.get('/api/wallets/mobile/balances', authenticateToken, async (req, res) => {
+  try {
+    const wallets = walletManager.getAllWallets();
+    const balances = await Promise.all(
+      wallets.map(async (wallet) => {
+        const balance = await walletManager.getWalletBalance(wallet.id);
+        return {
+          id: wallet.id,
+          name: wallet.name,
+          type: wallet.type,
+          balance,
+          isActive: wallet.isActive,
+          isLocked: wallet.isLocked
+        };
+      })
+    );
+    
+    res.json({
+      balances,
+      total: balances.reduce((sum, w) => sum + w.balance, 0)
+    });
+  } catch (error) {
+    logError('Error fetching mobile balances:', error, { endpoint: '/api/wallets/mobile/balances', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to fetch mobile balances' });
+  }
+});
+
+// Admin endpoints
+
+// Get all wallets (admin only)
+app.get('/api/admin/wallets', authenticateAdmin, (req, res) => {
+  try {
+    const { userId, type, network } = req.query;
+    let wallets = walletManager.getAllWallets();
+    
+    // Apply filters
+    if (userId) {
+      wallets = wallets.filter(w => w.userId === userId);
+    }
+    if (type) {
+      wallets = wallets.filter(w => w.type === type);
+    }
+    if (network) {
+      wallets = wallets.filter(w => w.network === network);
+    }
+    
+    res.json({
+      wallets,
+      count: wallets.length
+    });
+  } catch (error) {
+    logError('Error fetching admin wallets:', error, { endpoint: '/api/admin/wallets' });
+    res.status(500).json({ error: 'Failed to fetch admin wallets' });
+  }
+});
+
+// Get wallet manager configuration (admin only)
+app.get('/api/admin/wallets/config', authenticateAdmin, (req, res) => {
+  try {
+    const config = {
+      maxWallets: walletManager.maxWallets,
+      defaultSecurityLevel: walletManager.defaultSecurityLevel,
+      securitySettings: walletManager.securitySettings,
+      backupSettings: walletManager.backupSettings
+    };
+    
+    res.json(config);
+  } catch (error) {
+    logError('Error fetching wallet manager config:', error, { endpoint: '/api/admin/wallets/config' });
+    res.status(500).json({ error: 'Failed to fetch wallet manager config' });
+  }
+});
+
+// Update wallet manager configuration (admin only)
+app.put('/api/admin/wallets/config', authenticateAdmin, (req, res) => {
+  try {
+    const { maxWallets, defaultSecurityLevel, securitySettings, backupSettings } = req.body;
+    
+    // Update configuration
+    if (maxWallets !== undefined) walletManager.maxWallets = maxWallets;
+    if (defaultSecurityLevel !== undefined) walletManager.defaultSecurityLevel = defaultSecurityLevel;
+    if (securitySettings) walletManager.securitySettings = { ...walletManager.securitySettings, ...securitySettings };
+    if (backupSettings) walletManager.backupSettings = { ...walletManager.backupSettings, ...backupSettings };
+    
+    res.json({
+      message: 'Wallet manager configuration updated successfully'
+    });
+  } catch (error) {
+    logError('Error updating wallet manager config:', error, { endpoint: '/api/admin/wallets/config' });
+    res.status(500).json({ error: 'Failed to update wallet manager config' });
+  }
+});
+
+// WebSocket integration for real-time wallet updates
+io.on('connection', (socket) => {
+  console.log('Client connected to wallet management updates');
+  
+  // Join user-specific room for their wallets
+  socket.on('joinUserWallets', (userId) => {
+    socket.join(`user_${userId}`);
+  });
+  
+  // Listen for wallet manager events
+  walletManager.on('walletCreated', (data) => {
+    io.to(`user_${data.wallet.userId}`).emit('walletCreated', data);
+  });
+  
+  walletManager.on('walletSwitched', (data) => {
+    io.to(`user_${data.wallet.userId}`).emit('walletSwitched', data);
+  });
+  
+  walletManager.on('walletLocked', (data) => {
+    io.to(`user_${data.wallet.userId}`).emit('walletLocked', data);
+  });
+  
+  walletManager.on('walletUnlocked', (data) => {
+    io.to(`user_${data.wallet.userId}`).emit('walletUnlocked', data);
+  });
+  
+  walletManager.on('balanceUpdated', (data) => {
+    io.to(`user_${data.wallet.userId}`).emit('balanceUpdated', data);
+  });
+  
+  walletManager.on('backupCreated', (data) => {
+    io.to(`user_${data.wallet.userId}`).emit('backupCreated', data);
+  });
+  
+  socket.on('disconnect', () => {
+    console.log('Client disconnected from wallet management updates');
+  });
+});
+
+// ==================== BLOCKCHAIN ANALYTICS API ENDPOINTS ====================
+
+// Get transaction analytics
+app.get('/api/analytics/transactions', authenticateToken, async (req, res) => {
+  try {
+    const options = {
+      timeRange: req.query.timeRange || '24h',
+      interval: req.query.interval || AGGREGATION_INTERVALS.HOUR,
+      filters: req.query.filters ? JSON.parse(req.query.filters) : {},
+      groupBy: req.query.groupBy ? JSON.parse(req.query.groupBy) : []
+    };
+    
+    const analytics = await blockchainAnalytics.getTransactionAnalytics(options);
+    res.json(analytics);
+  } catch (error) {
+    logError('Error fetching transaction analytics:', error, { endpoint: '/api/analytics/transactions', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to fetch transaction analytics' });
+  }
+});
+
+// Get network statistics
+app.get('/api/analytics/network', authenticateToken, async (req, res) => {
+  try {
+    const options = {
+      timeRange: req.query.timeRange || '24h',
+      metrics: req.query.metrics ? JSON.parse(req.query.metrics) : ['all']
+    };
+    
+    const statistics = await blockchainAnalytics.getNetworkStatistics(options);
+    res.json(statistics);
+  } catch (error) {
+    logError('Error fetching network statistics:', error, { endpoint: '/api/analytics/network', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to fetch network statistics' });
+  }
+});
+
+// Get performance metrics
+app.get('/api/analytics/performance', authenticateToken, async (req, res) => {
+  try {
+    const options = {
+      timeRange: req.query.timeRange || '24h',
+      interval: req.query.interval || AGGREGATION_INTERVALS.HOUR,
+      component: req.query.component || 'all'
+    };
+    
+    const metrics = await blockchainAnalytics.getPerformanceMetrics(options);
+    res.json(metrics);
+  } catch (error) {
+    logError('Error fetching performance metrics:', error, { endpoint: '/api/analytics/performance', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to fetch performance metrics' });
+  }
+});
+
+// Get cost analysis
+app.get('/api/analytics/costs', authenticateToken, async (req, res) => {
+  try {
+    const options = {
+      timeRange: req.query.timeRange || '30d',
+      interval: req.query.interval || AGGREGATION_INTERVALS.DAY,
+      category: req.query.category || 'all'
+    };
+    
+    const analysis = await blockchainAnalytics.getCostAnalysis(options);
+    res.json(analysis);
+  } catch (error) {
+    logError('Error fetching cost analysis:', error, { endpoint: '/api/analytics/costs', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to fetch cost analysis' });
+  }
+});
+
+// Get trend visualization data
+app.get('/api/analytics/trends', authenticateToken, async (req, res) => {
+  try {
+    const options = {
+      timeRange: req.query.timeRange || '7d',
+      metrics: req.query.metrics ? JSON.parse(req.query.metrics) : ['transactions', 'costs', 'performance'],
+      chartType: req.query.chartType || 'line'
+    };
+    
+    const visualization = await blockchainAnalytics.getTrendVisualization(options);
+    res.json(visualization);
+  } catch (error) {
+    logError('Error fetching trend visualization:', error, { endpoint: '/api/analytics/trends', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to fetch trend visualization' });
+  }
+});
+
+// Export analytics data
+app.get('/api/analytics/export', authenticateToken, async (req, res) => {
+  try {
+    const options = {
+      format: req.query.format || 'json',
+      timeRange: req.query.timeRange || '30d',
+      metrics: req.query.metrics ? JSON.parse(req.query.metrics) : ['all'],
+      includeRaw: req.query.includeRaw === 'true'
+    };
+    
+    const exportData = await blockchainAnalytics.exportAnalytics(options);
+    
+    // Set appropriate headers for download
+    const filename = `analytics-${new Date().toISOString().split('T')[0]}.${options.format}`;
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    
+    switch (options.format.toLowerCase()) {
+      case 'csv':
+        res.setHeader('Content-Type', 'text/csv');
+        break;
+      case 'xlsx':
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        break;
+      case 'pdf':
+        res.setHeader('Content-Type', 'application/pdf');
+        break;
+      default:
+        res.setHeader('Content-Type', 'application/json');
+    }
+    
+    res.send(exportData);
+  } catch (error) {
+    logError('Error exporting analytics:', error, { endpoint: '/api/analytics/export', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to export analytics' });
+  }
+});
+
+// Get mobile-optimized analytics
+app.get('/api/analytics/mobile', authenticateToken, async (req, res) => {
+  try {
+    const options = {
+      timeRange: req.query.timeRange || '24h',
+      limit: parseInt(req.query.limit) || 50
+    };
+    
+    const analytics = await blockchainAnalytics.getMobileAnalytics(options);
+    res.json(analytics);
+  } catch (error) {
+    logError('Error fetching mobile analytics:', error, { endpoint: '/api/analytics/mobile', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to fetch mobile analytics' });
+  }
+});
+
+// Get analytics dashboard overview
+app.get('/api/analytics/dashboard', authenticateToken, async (req, res) => {
+  try {
+    const timeRange = req.query.timeRange || '24h';
+    
+    // Fetch multiple analytics types in parallel
+    const [
+      transactionAnalytics,
+      networkStatistics,
+      performanceMetrics,
+      costAnalysis
+    ] = await Promise.all([
+      blockchainAnalytics.getTransactionAnalytics({ timeRange }),
+      blockchainAnalytics.getNetworkStatistics({ timeRange }),
+      blockchainAnalytics.getPerformanceMetrics({ timeRange }),
+      blockchainAnalytics.getCostAnalysis({ timeRange: '30d' })
+    ]);
+    
+    const dashboard = {
+      overview: {
+        totalTransactions: transactionAnalytics.summary.totalTransactions,
+        successRate: transactionAnalytics.summary.successRate,
+        networkHealth: networkStatistics.overall.status,
+        averageResponseTime: performanceMetrics.responseTime[0]?.avg || 0,
+        totalCosts: costAnalysis.totalCosts.total,
+        uptime: performanceMetrics.availability.uptime
+      },
+      charts: {
+        transactionTrends: transactionAnalytics.trends,
+        networkThroughput: networkStatistics.throughput,
+        performanceOverview: performanceMetrics.responseTime,
+        costBreakdown: costAnalysis.costBreakdown
+      },
+      alerts: [
+        {
+          type: networkStatistics.overall.status === 'healthy' ? 'success' : 'warning',
+          message: `Network status: ${networkStatistics.overall.status}`,
+          timestamp: new Date().toISOString()
+        },
+        {
+          type: performanceMetrics.availability.uptime > 99 ? 'success' : 'warning',
+          message: `System uptime: ${performanceMetrics.availability.uptime}%`,
+          timestamp: new Date().toISOString()
+        }
+      ],
+      timeRange,
+      lastUpdated: new Date().toISOString()
+    };
+    
+    res.json(dashboard);
+  } catch (error) {
+    logError('Error fetching analytics dashboard:', error, { endpoint: '/api/analytics/dashboard', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to fetch analytics dashboard' });
+  }
+});
+
+// Get real-time analytics data
+app.get('/api/analytics/realtime', authenticateToken, async (req, res) => {
+  try {
+    const realTimeData = blockchainAnalytics.realTimeData.get('current');
+    
+    if (!realTimeData) {
+      return res.json({
+        timestamp: new Date().toISOString(),
+        activeUsers: 0,
+        currentTPS: 0,
+        avgLatency: 0,
+        status: 'no_data'
+      });
+    }
+    
+    res.json(realTimeData);
+  } catch (error) {
+    logError('Error fetching real-time analytics:', error, { endpoint: '/api/analytics/realtime', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to fetch real-time analytics' });
+  }
+});
+
+// Get analytics engine statistics (admin only)
+app.get('/api/admin/analytics/stats', authenticateAdmin, (req, res) => {
+  try {
+    const stats = blockchainAnalytics.getStats();
+    res.json(stats);
+  } catch (error) {
+    logError('Error fetching analytics stats:', error, { endpoint: '/api/admin/analytics/stats' });
+    res.status(500).json({ error: 'Failed to fetch analytics stats' });
+  }
+});
+
+// Clear analytics cache (admin only)
+app.post('/api/admin/analytics/cache/clear', authenticateAdmin, (req, res) => {
+  try {
+    blockchainAnalytics.clearCache();
+    res.json({ message: 'Analytics cache cleared successfully' });
+  } catch (error) {
+    logError('Error clearing analytics cache:', error, { endpoint: '/api/admin/analytics/cache/clear' });
+    res.status(500).json({ error: 'Failed to clear analytics cache' });
+  }
+});
+
+// Get supported analytics options
+app.get('/api/analytics/supported', (req, res) => {
+  try {
+    const supported = {
+      timeRanges: ['1h', '24h', '7d', '30d', '90d'],
+      intervals: Object.values(AGGREGATION_INTERVALS),
+      metricTypes: Object.values(METRIC_TYPES),
+      exportFormats: ['json', 'csv', 'xlsx', 'pdf'],
+      chartTypes: ['line', 'bar', 'area', 'pie', 'scatter']
+    };
+    
+    res.json(supported);
+  } catch (error) {
+    logError('Error fetching supported analytics options:', error, { endpoint: '/api/analytics/supported' });
+    res.status(500).json({ error: 'Failed to fetch supported analytics options' });
+  }
+});
+
+// WebSocket integration for real-time analytics updates
+io.on('connection', (socket) => {
+  console.log('Client connected to analytics updates');
+  
+  // Join user-specific room for their analytics
+  socket.on('joinUserAnalytics', (userId) => {
+    socket.join(`analytics_${userId}`);
+  });
+  
+  // Listen for analytics events
+  blockchainAnalytics.on('analyticsGenerated', (data) => {
+    io.emit('analyticsUpdate', data);
+  });
+  
+  blockchainAnalytics.on('realTimeData', (data) => {
+    io.emit('realTimeUpdate', data);
+  });
+  
+  blockchainAnalytics.on('error', (data) => {
+    io.emit('analyticsError', data);
+  });
+  
+  socket.on('disconnect', () => {
+    console.log('Client disconnected from analytics updates');
+  });
+});
+
+if (sentryEnabled) {
+  app.use(Sentry.Handlers.errorHandler());
+}
+
 app.use((err, req, res, next) => {
   logError('Unhandled request error:', err, {
     endpoint: req.originalUrl,
@@ -3473,6 +5308,41 @@ app.use((err, req, res, next) => {
     error: 'An unexpected server error occurred'
   });
 });
+
+// 404 Handler - Must be after all other routes
+app.use((req, res, next) => {
+  res.status(404).sendFile(__dirname + '/public/404.html');
+});
+
+// Global Error Handler - Must be last
+app.use((err, req, res, next) => {
+  logError('Express error handler:', err, {
+    url: req.url,
+    method: req.method,
+    ip: req.ip
+  });
+
+  // Don't expose error details in production
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  
+  res.status(err.status || 500);
+  
+  // Send HTML error page for browser requests
+  if (req.accepts('html')) {
+    res.sendFile(__dirname + '/public/500.html');
+  } else {
+    // Send JSON for API requests
+    res.json({
+      error: isDevelopment ? err.message : 'Internal server error',
+      ...(isDevelopment && { stack: err.stack })
+    });
+  }
+});
+
+// Sentry error handler (must be after routes but before other error handlers)
+if (sentryEnabled) {
+  app.use(Sentry.Handlers.errorHandler());
+}
 
 process.on('unhandledRejection', (reason) => {
   const rejectionError = reason instanceof Error ? reason : new Error(String(reason));

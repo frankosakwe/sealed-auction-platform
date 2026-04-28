@@ -1,0 +1,636 @@
+/* Mobile-Responsive NFT Gallery Styles */
+
+/* Base Mobile Styles */
+@media (max-width: 768px) {
+    /* Navigation */
+    .nav-mobile {
+        padding: 0.5rem 1rem;
+    }
+    
+    .nav-mobile .flex {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .nav-mobile .hidden.md\\:flex {
+        display: none;
+    }
+    
+    .nav-mobile .text-xl {
+        font-size: 1.25rem;
+    }
+    
+    /* Mobile Menu Toggle */
+    .mobile-menu-toggle {
+        display: block;
+        position: fixed;
+        top: 1rem;
+        right: 1rem;
+        z-index: 50;
+        background: rgba(255, 255, 255, 0.9);
+        border-radius: 0.5rem;
+        padding: 0.5rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    .mobile-menu {
+        position: fixed;
+        top: 0;
+        left: -100%;
+        width: 80%;
+        height: 100vh;
+        background: white;
+        z-index: 40;
+        transition: left 0.3s ease;
+        overflow-y: auto;
+    }
+    
+    .mobile-menu.active {
+        left: 0;
+    }
+    
+    .mobile-menu-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100vh;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 30;
+        display: none;
+    }
+    
+    .mobile-menu-overlay.active {
+        display: block;
+    }
+
+    /* Stats Cards */
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 0.75rem !important;
+    }
+    
+    .stats-card {
+        padding: 1rem !important;
+    }
+    
+    .stats-card .text-2xl {
+        font-size: 1.5rem !important;
+    }
+    
+    .stats-card .w-12 {
+        width: 2.5rem !important;
+        height: 2.5rem !important;
+    }
+
+    /* Filters Section */
+    .filters-section {
+        padding: 1rem !important;
+    }
+    
+    .filters-grid {
+        grid-template-columns: 1fr !important;
+        gap: 0.75rem !important;
+    }
+    
+    .filter-row {
+        flex-direction: column !important;
+        gap: 0.5rem !important;
+    }
+    
+    .filter-row .text-sm {
+        font-size: 0.875rem;
+        margin-bottom: 0.25rem;
+    }
+    
+    .view-toggle {
+        justify-content: center !important;
+    }
+    
+    /* NFT Gallery Grid */
+    .nft-gallery {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 1rem !important;
+        padding: 0 1rem;
+    }
+    
+    /* NFT Cards */
+    .nft-card {
+        border-radius: 0.75rem !important;
+        overflow: hidden;
+    }
+    
+    .nft-card .aspect-square {
+        aspect-ratio: 1;
+    }
+    
+    .nft-card .p-4 {
+        padding: 0.75rem !important;
+    }
+    
+    .nft-card .text-xl {
+        font-size: 1rem !important;
+    }
+    
+    .nft-card .text-sm {
+        font-size: 0.75rem !important;
+    }
+    
+    .nft-card img {
+        object-fit: cover;
+    }
+    
+    /* NFT Card Overlay Actions */
+    .nft-card .absolute.inset-0 {
+        opacity: 0;
+        transition: opacity 0.2s ease;
+    }
+    
+    .nft-card:hover .absolute.inset-0 {
+        opacity: 1;
+    }
+    
+    .nft-card .flex.space-x-2 {
+        gap: 0.5rem;
+    }
+    
+    .nft-card .p-2 {
+        padding: 0.5rem !important;
+    }
+    
+    .nft-card .w-6 {
+        width: 1.5rem !important;
+        height: 1.5rem !important;
+    }
+    
+    /* Badges */
+    .nft-card .absolute.top-2 {
+        top: 0.5rem !important;
+        left: 0.5rem !important;
+    }
+    
+    .nft-card .flex.flex-col {
+        gap: 0.25rem !important;
+    }
+    
+    .nft-card .px-2 {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+    
+    .nft-card .py-1 {
+        padding-top: 0.25rem !important;
+        padding-bottom: 0.25rem !important;
+    }
+    
+    .nft-card .text-xs {
+        font-size: 0.625rem !important;
+    }
+
+    /* NFT Modal */
+    .nft-modal {
+        margin: 1rem !important;
+        max-height: calc(100vh - 2rem) !important;
+        border-radius: 1rem !important;
+    }
+    
+    .nft-modal .grid {
+        grid-template-columns: 1fr !important;
+        gap: 1rem !important;
+    }
+    
+    .nft-modal .p-6 {
+        padding: 1rem !important;
+    }
+    
+    .nft-modal .aspect-square {
+        max-height: 50vh;
+    }
+    
+    .nft-modal .text-2xl {
+        font-size: 1.5rem !important;
+    }
+    
+    .nft-modal .space-y-6 > * + * {
+        margin-top: 1rem !important;
+    }
+    
+    /* Action Buttons */
+    .action-buttons {
+        flex-direction: column !important;
+        gap: 0.5rem !important;
+    }
+    
+    .action-buttons .px-4 {
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+    
+    .action-buttons .py-2 {
+        padding-top: 0.75rem !important;
+        padding-bottom: 0.75rem !important;
+    }
+
+    /* Create NFT Modal */
+    .create-nft-modal {
+        margin: 1rem !important;
+        max-height: calc(100vh - 2rem) !important;
+        border-radius: 1rem !important;
+    }
+    
+    .create-nft-modal .p-6 {
+        padding: 1rem !important;
+    }
+    
+    .create-nft-modal .text-2xl {
+        font-size: 1.5rem !important;
+    }
+    
+    .create-nft-modal .space-y-6 > * + * {
+        margin-top: 1rem !important;
+    }
+    
+    /* Form Elements */
+    .form-input {
+        padding: 0.75rem !important;
+        font-size: 1rem !important;
+    }
+    
+    .form-label {
+        font-size: 0.875rem !important;
+        margin-bottom: 0.5rem !important;
+    }
+    
+    /* File Upload */
+    .file-upload {
+        padding: 2rem 1rem !important;
+    }
+    
+    .file-upload .text-4xl {
+        font-size: 2rem !important;
+    }
+    
+    .file-upload .text-sm {
+        font-size: 0.75rem !important;
+    }
+    
+    /* Properties Container */
+    .properties-container {
+        gap: 0.5rem !important;
+    }
+    
+    .properties-container .flex {
+        gap: 0.5rem !important;
+    }
+    
+    .properties-container input {
+        padding: 0.5rem !important;
+        font-size: 0.875rem !important;
+    }
+    
+    .properties-container button {
+        padding: 0.5rem !important;
+    }
+}
+
+/* Small Mobile Styles */
+@media (max-width: 480px) {
+    /* Stats Cards */
+    .stats-grid {
+        grid-template-columns: 1fr !important;
+        gap: 0.5rem !important;
+    }
+    
+    /* NFT Gallery Grid */
+    .nft-gallery {
+        grid-template-columns: 1fr !important;
+        gap: 1rem !important;
+        padding: 0 0.75rem;
+    }
+    
+    /* NFT Cards */
+    .nft-card .p-4 {
+        padding: 0.5rem !important;
+    }
+    
+    .nft-card .text-xl {
+        font-size: 0.875rem !important;
+    }
+    
+    .nft-card .text-sm {
+        font-size: 0.625rem !important;
+    }
+    
+    /* Filters */
+    .filter-input {
+        padding: 0.5rem !important;
+        font-size: 0.875rem !important;
+    }
+    
+    .filter-select {
+        padding: 0.5rem !important;
+        font-size: 0.875rem !important;
+    }
+    
+    /* Modal */
+    .nft-modal {
+        margin: 0.5rem !important;
+        max-height: calc(100vh - 1rem) !important;
+    }
+    
+    .nft-modal .p-6 {
+        padding: 0.75rem !important;
+    }
+    
+    .nft-modal .text-2xl {
+        font-size: 1.25rem !important;
+    }
+    
+    /* Create NFT Modal */
+    .create-nft-modal {
+        margin: 0.5rem !important;
+        max-height: calc(100vh - 1rem) !important;
+    }
+    
+    .create-nft-modal .p-6 {
+        padding: 0.75rem !important;
+    }
+    
+    .create-nft-modal .text-2xl {
+        font-size: 1.25rem !important;
+    }
+    
+    /* Buttons */
+    .btn {
+        padding: 0.75rem 1rem !important;
+        font-size: 0.875rem !important;
+    }
+    
+    .btn-sm {
+        padding: 0.5rem 0.75rem !important;
+        font-size: 0.75rem !important;
+    }
+}
+
+/* Touch-friendly interactions */
+@media (hover: none) and (pointer: coarse) {
+    .nft-card {
+        transition: transform 0.2s ease;
+    }
+    
+    .nft-card:active {
+        transform: scale(0.98);
+    }
+    
+    .nft-card .absolute.inset-0 {
+        opacity: 1;
+        background: rgba(0, 0, 0, 0.3);
+    }
+    
+    .nft-card .flex.space-x-2 {
+        opacity: 1;
+    }
+    
+    .btn {
+        transition: background-color 0.2s ease;
+    }
+    
+    .btn:active {
+        transform: scale(0.98);
+    }
+}
+
+/* Landscape Mobile */
+@media (max-width: 768px) and (orientation: landscape) {
+    .nft-modal {
+        max-height: 90vh !important;
+        overflow-y: auto;
+    }
+    
+    .nft-modal .grid {
+        grid-template-columns: 1fr 1fr !important;
+        gap: 1rem !important;
+    }
+    
+    .nft-modal .aspect-square {
+        max-height: 60vh;
+    }
+    
+    .stats-grid {
+        grid-template-columns: repeat(4, 1fr) !important;
+        gap: 0.5rem !important;
+    }
+    
+    .stats-card {
+        padding: 0.75rem !important;
+    }
+    
+    .stats-card .text-2xl {
+        font-size: 1.25rem !important;
+    }
+}
+
+/* High DPI displays */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    .nft-card img {
+        image-rendering: -webkit-optimize-contrast;
+        image-rendering: crisp-edges;
+    }
+    
+    .nft-card .fa {
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    .nft-card,
+    .nft-card * {
+        transition: none !important;
+        animation: none !important;
+    }
+    
+    .nft-modal {
+        transition: none !important;
+    }
+    
+    .mobile-menu {
+        transition: none !important;
+    }
+}
+
+/* Dark mode mobile adjustments */
+@media (max-width: 768px) {
+    [data-theme="dark"] .mobile-menu {
+        background: #1a202c;
+        color: white;
+    }
+    
+    [data-theme="dark"] .mobile-menu-toggle {
+        background: rgba(26, 32, 44, 0.9);
+        color: white;
+    }
+    
+    [data-theme="dark"] .nft-card {
+        background: #2d3748;
+        border-color: #4a5568;
+    }
+    
+    [data-theme="dark"] .nft-modal {
+        background: #1a202c;
+        color: white;
+    }
+    
+    [data-theme="dark"] .create-nft-modal {
+        background: #1a202c;
+        color: white;
+    }
+}
+
+/* Loading states for mobile */
+.mobile-loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 200px;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.mobile-loading .spinner {
+    width: 2rem;
+    height: 2rem;
+    border-width: 3px;
+}
+
+.mobile-loading .text {
+    font-size: 0.875rem;
+    color: #666;
+}
+
+[data-theme="dark"] .mobile-loading .text {
+    color: #999;
+}
+
+/* Skeleton loaders for mobile */
+.mobile-skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: mobile-loading 1.5s infinite;
+    border-radius: 0.5rem;
+}
+
+[data-theme="dark"] .mobile-skeleton {
+    background: linear-gradient(90deg, #333 25%, #444 50%, #333 75%);
+    background-size: 200% 100%;
+}
+
+@keyframes mobile-loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* Mobile-specific utilities */
+.mobile-only {
+    display: block;
+}
+
+.desktop-only {
+    display: none;
+}
+
+@media (min-width: 769px) {
+    .mobile-only {
+        display: none;
+    }
+    
+    .desktop-only {
+        display: block;
+    }
+}
+
+/* Mobile scroll indicators */
+.mobile-scroll-indicator {
+    position: fixed;
+    bottom: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 1rem;
+    font-size: 0.75rem;
+    z-index: 20;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.mobile-scroll-indicator.visible {
+    opacity: 1;
+}
+
+/* Mobile pull-to-refresh */
+.mobile-pull-refresh {
+    position: relative;
+    padding-top: 60px;
+    margin-top: -60px;
+    transition: margin-top 0.3s ease;
+}
+
+.mobile-pull-refresh.pulling {
+    margin-top: 0;
+}
+
+.mobile-pull-refresh .refresh-indicator {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: #666;
+}
+
+.mobile-pull-refresh .refresh-indicator .spinner {
+    width: 1rem;
+    height: 1rem;
+}
+
+/* Mobile error states */
+.mobile-error {
+    padding: 1rem;
+    background: #fee;
+    border: 1px solid #fcc;
+    border-radius: 0.5rem;
+    color: #c33;
+    font-size: 0.875rem;
+    text-align: center;
+    margin: 1rem;
+}
+
+[data-theme="dark"] .mobile-error {
+    background: #4a1a1a;
+    border-color: #6b1a1a;
+    color: #ff6666;
+}
+
+/* Mobile success states */
+.mobile-success {
+    padding: 1rem;
+    background: #efe;
+    border: 1px solid #cfc;
+    border-radius: 0.5rem;
+    color: #3c3;
+    font-size: 0.875rem;
+    text-align: center;
+    margin: 1rem;
+}
+
+[data-theme="dark"] .mobile-success {
+    background: #1a4a1a;
+    border-color: #1a6b1a;
+    color: #66ff66;
+}

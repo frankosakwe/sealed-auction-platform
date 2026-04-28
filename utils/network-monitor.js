@@ -1,8 +1,8 @@
-const { Server, Networks } = require('stellar-sdk');
+const { Horizon, Networks } = require('@stellar/stellar-sdk');
 
 class NetworkMonitor {
   constructor() {
-    this.server = new Server(process.env.STELLAR_HORIZON_URL || 'https://horizon.stellar.org');
+    this.server = new Horizon.Server(process.env.STELLAR_HORIZON_URL || 'https://horizon.stellar.org');
     this.networkStatus = {
       healthy: true,
       lastCheck: new Date(),

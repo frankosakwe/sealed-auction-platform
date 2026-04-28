@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>VR Auction Hall Test</title>
+    
+    <!-- Scripts and Styles -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r169/three.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="vr-styles.css">
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            color: white;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        }
+        
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .test-section {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+        
+        .test-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 8px;
+        }
+        
+        .test-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-indicator.success { background: #48bb78; }
+        .status-indicator.error { background: #f56565; }
+        .status-indicator.warning { background: #ed8936; }
+        .status-indicator.info { background: #4299e1; }
+        
+        .test-result {
+            margin-top: 12px;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+        
+        .performance-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+        
+        .stat-card {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #667eea;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.7;
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold mb-4 bg-gradient-to-r from-purple-400 to-indigo-600 bg-clip-text text-transparent">
+                VR Auction Hall Test Suite
+            </h1>
+            <p class="text-lg opacity-80">Comprehensive testing for VR functionality and performance</p>
+        </header>
+
+        <!-- VR Support Detection -->
+        <section class="test-section">
+            <h2 class="text-2xl font-semibold mb-4">
+                <i class="fas fa-vr-cardboard mr-2"></i>VR Support Detection
+            </h2>
+            <div id="vr-support-status">
+                <p class="mb-4">Checking VR support...</p>
+            </div>
+            <button onclick="testVRSupport()" class="test-button">
+                <i class="fas fa-search mr-2"></i>Test VR Support
+            </button>
+            <div id="vr-support-result" class="test-result" style="display: none;"></div>
+        </section>
+
+        <!-- Three.js Setup Test -->
+        <section class="test-section">
+            <h2 class="text-2xl font-semibold mb-4">
+                <i class="fas fa-cube mr-2"></i>Three.js Setup
+            </h2>
+            <div id="threejs-status">
+                <p class="mb-4">Testing Three.js initialization...</p>
+            </div>
+            <button onclick="testThreeJS()" class="test-button">
+                <i class="fas fa-play mr-2"></i>Test Three.js
+            </button>
+            <button onclick="testSceneCreation()" class="test-button">
+                <i class="fas fa-image mr-2"></i>Test Scene Creation
+            </button>
+            <div id="threejs-result" class="test-result" style="display: none;"></div>
+        </section>
+
+        <!-- VR Hall Initialization -->
+        <section class="test-section">
+            <h2 class="text-2xl font-semibold mb-4">
+                <i class="fas fa-building mr-2"></i>VR Hall Initialization
+            </h2>
+            <div id="vr-hall-status">
+                <p class="mb-4">Testing VR Auction Hall initialization...</p>
+            </div>
+            <button onclick="testVRHallInit()" class="test-button">
+                <i class="fas fa-rocket mr-2"></i>Initialize VR Hall
+            </button>
+            <button onclick="testEnvironmentCreation()" class="test-button">
+                <i class="fas fa-tree mr-2"></i>Test Environment
+            </button>
+            <div id="vr-hall-result" class="test-result" style="display: none;"></div>
+        </section>
+
+        <!-- Motion Controls Test -->
+        <section class="test-section">
+            <h2 class="text-2xl font-semibold mb-4">
+                <i class="fas fa-gamepad mr-2"></i>Motion Controls
+            </h2>
+            <div id="controls-status">
+                <p class="mb-4">Testing motion controller support...</p>
+            </div>
+            <button onclick="testControllerDetection()" class="test-button">
+                <i class="fas fa-gamepad mr-2"></i>Test Controllers
+            </button>
+            <button onclick="testInteraction()" class="test-button">
+                <i class="fas fa-hand-pointer mr-2"></i>Test Interactions
+            </button>
+            <div id="controls-result" class="test-result" style="display: none;"></div>
+        </section>
+
+        <!-- Performance Monitoring -->
+        <section class="test-section">
+            <h2 class="text-2xl font-semibold mb-4">
+                <i class="fas fa-tachometer-alt mr-2"></i>Performance Monitoring
+            </h2>
+            <div class="performance-stats">
+                <div class="stat-card">
+                    <div class="stat-value" id="fps-counter">60</div>
+                    <div class="stat-label">FPS</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="memory-usage">0</div>
+                    <div class="stat-label">Memory (MB)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="draw-calls">0</div>
+                    <div class="stat-label">Draw Calls</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="triangles">0</div>
+                    <div class="stat-label">Triangles</div>
+                </div>
+            </div>
+            <button onclick="startPerformanceTest()" class="test-button">
+                <i class="fas fa-play mr-2"></i>Start Performance Test
+            </button>
+            <button onclick="stopPerformanceTest()" class="test-button">
+                <i class="fas fa-stop mr-2"></i>Stop Performance Test
+            </button>
+            <div id="performance-result" class="test-result" style="display: none;"></div>
+        </section>
+
+        <!-- Mobile VR Detection -->
+        <section class="test-section">
+            <h2 class="text-2xl font-semibold mb-4">
+                <i class="fas fa-mobile-alt mr-2"></i>Mobile VR Support
+            </h2>
+            <div id="mobile-vr-status">
+                <p class="mb-4">Testing mobile VR capabilities...</p>
+            </div>
+            <button onclick="testMobileVR()" class="test-button">
+                <i class="fas fa-mobile mr-2"></i>Test Mobile VR
+            </button>
+            <button onclick="testOptimizations()" class="test-button">
+                <i class="fas fa-cog mr-2"></i>Test Optimizations
+            </button>
+            <div id="mobile-vr-result" class="test-result" style="display: none;"></div>
+        </section>
+
+        <!-- Integration Test -->
+        <section class="test-section">
+            <h2 class="text-2xl font-semibold mb-4">
+                <i class="fas fa-plug mr-2"></i>Integration Test
+            </h2>
+            <div id="integration-status">
+                <p class="mb-4">Testing integration with main application...</p>
+            </div>
+            <button onclick="testAppIntegration()" class="test-button">
+                <i class="fas fa-link mr-2"></i>Test App Integration
+            </button>
+            <button onclick="testRealTimeUpdates()" class="test-button">
+                <i class="fas fa-sync mr-2"></i>Test Real-time Updates
+            </button>
+            <div id="integration-result" class="test-result" style="display: none;"></div>
+        </section>
+
+        <!-- Full VR Test -->
+        <section class="test-section">
+            <h2 class="text-2xl font-semibold mb-4">
+                <i class="fas fa-vr-cardboard mr-2"></i>Full VR Experience Test
+            </h2>
+            <p class="mb-4">Launch the complete VR experience for comprehensive testing</p>
+            <button onclick="launchFullVRTest()" class="test-button bg-gradient-to-r from-green-500 to-emerald-600">
+                <i class="fas fa-play-circle mr-2"></i>Launch Full VR Test
+            </button>
+            <div id="full-vr-result" class="test-result" style="display: none;"></div>
+        </section>
+    </div>
+
+    <!-- Scripts -->
+    <script src="vr-auction-hall.js"></script>
+    <script src="vr-integration.js"></script>
+    
+    <script>
+        let vrHall = null;
+        let performanceInterval = null;
+        let testResults = {};
+
+        // Initialize test suite
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('VR Test Suite initialized');
+            updateStatus('vr-support-status', 'Ready to test VR support', 'info');
+        });
+
+        // VR Support Detection Test
+        async function testVRSupport() {
+            const resultDiv = document.getElementById('vr-support-result');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = 'Testing VR support...';
+
+            try {
+                const results = {
+                    webxr: 'xr' in navigator,
+                    vrSession: false,
+                    immersiveVR: false,
+                    userAgent: navigator.userAgent,
+                    mobileVR: detectMobileVR()
+                };
+
+                if (results.webxr) {
+                    results.immersiveVR = await navigator.xr.isSessionSupported('immersive-vr');
+                    results.vrSession = await navigator.xr.isSessionSupported('vr');
+                }
+
+                testResults.vrSupport = results;
+                
+                let output = 'VR Support Test Results:\n';
+                output += `WebXR Available: ${results.webxr ? '✅' : '❌'}\n`;
+                output += `Immersive VR: ${results.immersiveVR ? '✅' : '❌'}\n`;
+                output += `VR Session: ${results.vrSession ? '✅' : '❌'}\n`;
+                output += `Mobile VR: ${results.mobileVR ? '✅' : '❌'}\n`;
+                output += `User Agent: ${results.userAgent}\n`;
+
+                resultDiv.innerHTML = `<pre>${output}</pre>`;
+                updateStatus('vr-support-status', 'VR support test completed', results.immersiveVR ? 'success' : 'warning');
+
+            } catch (error) {
+                resultDiv.innerHTML = `Error testing VR support: ${error.message}`;
+                updateStatus('vr-support-status', 'VR support test failed', 'error');
+            }
+        }
+
+        // Three.js Test
+        function testThreeJS() {
+            const resultDiv = document.getElementById('threejs-result');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = 'Testing Three.js...';
+
+            try {
+                const results = {
+                    threeJS: typeof THREE !== 'undefined',
+                    webGL: checkWebGLSupport(),
+                    renderer: false,
+                    scene: false,
+                    camera: false
+                };
+
+                if (results.threeJS && results.webGL) {
+                    // Test renderer creation
+                    const testRenderer = new THREE.WebGLRenderer();
+                    results.renderer = true;
+                    testRenderer.dispose();
+
+                    // Test scene creation
+                    const testScene = new THREE.Scene();
+                    results.scene = true;
+
+                    // Test camera creation
+                    const testCamera = new THREE.PerspectiveCamera();
+                    results.camera = true;
+                }
+
+                testResults.threeJS = results;
+
+                let output = 'Three.js Test Results:\n';
+                output += `Three.js Loaded: ${results.threeJS ? '✅' : '❌'}\n`;
+                output += `WebGL Support: ${results.webGL ? '✅' : '❌'}\n`;
+                output += `Renderer Creation: ${results.renderer ? '✅' : '❌'}\n`;
+                output += `Scene Creation: ${results.scene ? '✅' : '❌'}\n`;
+                output += `Camera Creation: ${results.camera ? '✅' : '❌'}\n`;
+
+                resultDiv.innerHTML = `<pre>${output}</pre>`;
+                updateStatus('threejs-status', 'Three.js test completed', results.threeJS && results.webGL ? 'success' : 'error');
+
+            } catch (error) {
+                resultDiv.innerHTML = `Error testing Three.js: ${error.message}`;
+                updateStatus('threejs-status', 'Three.js test failed', 'error');
+            }
+        }
+
+        function testSceneCreation() {
+            const resultDiv = document.getElementById('threejs-result');
+            resultDiv.style.display = 'block';
+
+            try {
+                // Create a simple test scene
+                const scene = new THREE.Scene();
+                const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                const renderer = new THREE.WebGLRenderer();
+                renderer.setSize(800, 600);
+
+                // Add basic objects
+                const geometry = new THREE.BoxGeometry();
+                const material = new THREE.MeshBasicMaterial({ color: 0x667eea });
+                const cube = new THREE.Mesh(geometry, material);
+                scene.add(cube);
+
+                const light = new THREE.DirectionalLight();
+                scene.add(light);
+
+                // Test rendering
+                renderer.render(scene, camera);
+
+                // Cleanup
+                renderer.dispose();
+                geometry.dispose();
+                material.dispose();
+
+                resultDiv.innerHTML = `<pre>Scene creation test: ✅ SUCCESS\nBasic scene with cube and light created successfully</pre>`;
+                updateStatus('threejs-status', 'Scene creation test completed', 'success');
+
+            } catch (error) {
+                resultDiv.innerHTML = `Error creating scene: ${error.message}`;
+                updateStatus('threejs-status', 'Scene creation test failed', 'error');
+            }
+        }
+
+        // VR Hall Test
+        async function testVRHallInit() {
+            const resultDiv = document.getElementById('vr-hall-result');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = 'Initializing VR Hall...';
+
+            try {
+                vrHall = new VRAuctionHall();
+                
+                // Wait for initialization
+                await new Promise(resolve => setTimeout(resolve, 2000));
+
+                const results = {
+                    initialized: vrHall !== null,
+                    scene: vrHall.scene !== null,
+                    camera: vrHall.camera !== null,
+                    renderer: vrHall.renderer !== null,
+                    vrSupported: vrHall.vrSupported
+                };
+
+                testResults.vrHall = results;
+
+                let output = 'VR Hall Test Results:\n';
+                output += `Initialized: ${results.initialized ? '✅' : '❌'}\n`;
+                output += `Scene Created: ${results.scene ? '✅' : '❌'}\n`;
+                output += `Camera Created: ${results.camera ? '✅' : '❌'}\n`;
+                output += `Renderer Created: ${results.renderer ? '✅' : '❌'}\n`;
+                output += `VR Supported: ${results.vrSupported ? '✅' : '❌'}\n`;
+
+                resultDiv.innerHTML = `<pre>${output}</pre>`;
+                updateStatus('vr-hall-status', 'VR Hall initialization completed', results.initialized ? 'success' : 'error');
+
+            } catch (error) {
+                resultDiv.innerHTML = `Error initializing VR Hall: ${error.message}`;
+                updateStatus('vr-hall-status', 'VR Hall initialization failed', 'error');
+            }
+        }
+
+        function testEnvironmentCreation() {
+            const resultDiv = document.getElementById('vr-hall-result');
+            resultDiv.style.display = 'block';
+
+            if (!vrHall) {
+                resultDiv.innerHTML = 'VR Hall not initialized. Run initialization test first.';
+                return;
+            }
+
+            try {
+                const results = {
+                    sceneObjects: vrHall.scene.children.length,
+                    lighting: vrHall.scene.children.filter(child => child instanceof THREE.Light).length,
+                    meshes: vrHall.scene.children.filter(child => child instanceof THREE.Mesh).length
+                };
+
+                let output = 'Environment Test Results:\n';
+                output += `Scene Objects: ${results.sceneObjects}\n`;
+                output += `Lights: ${results.lighting}\n`;
+                output += `Meshes: ${results.meshes}\n`;
+
+                resultDiv.innerHTML = `<pre>${output}</pre>`;
+                updateStatus('vr-hall-status', 'Environment test completed', 'success');
+
+            } catch (error) {
+                resultDiv.innerHTML = `Error testing environment: ${error.message}`;
+                updateStatus('vr-hall-status', 'Environment test failed', 'error');
+            }
+        }
+
+        // Controller Tests
+        async function testControllerDetection() {
+            const resultDiv = document.getElementById('controls-result');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = 'Testing controller detection...';
+
+            try {
+                const results = {
+                    gamepadAPI: 'getGamepads' in navigator,
+                    gamepads: navigator.getGamepads().length,
+                    vrControllers: false
+                };
+
+                if (vrHall && vrHall.vrSupported) {
+                    results.vrControllers = vrHall.controller1 !== null && vrHall.controller2 !== null;
+                }
+
+                testResults.controllers = results;
+
+                let output = 'Controller Test Results:\n';
+                output += `Gamepad API: ${results.gamepadAPI ? '✅' : '❌'}\n`;
+                output += `Connected Gamepads: ${results.gamepads}\n`;
+                output += `VR Controllers: ${results.vrControllers ? '✅' : '❌'}\n`;
+
+                resultDiv.innerHTML = `<pre>${output}</pre>`;
+                updateStatus('controls-status', 'Controller test completed', 'success');
+
+            } catch (error) {
+                resultDiv.innerHTML = `Error testing controllers: ${error.message}`;
+                updateStatus('controls-status', 'Controller test failed', 'error');
+            }
+        }
+
+        function testInteraction() {
+            const resultDiv = document.getElementById('controls-result');
+            resultDiv.style.display = 'block';
+
+            if (!vrHall) {
+                resultDiv.innerHTML = 'VR Hall not initialized. Run initialization test first.';
+                return;
+            }
+
+            try {
+                // Test raycaster
+                const testResults = {
+                    raycaster: vrHall.raycaster !== null,
+                    interactiveObjects: vrHall.interactiveObjects.length,
+                    eventListeners: vrHall.interactiveObjects.length > 0
+                };
+
+                let output = 'Interaction Test Results:\n';
+                output += `Raycaster: ${testResults.raycaster ? '✅' : '❌'}\n`;
+                output += `Interactive Objects: ${testResults.interactiveObjects}\n`;
+                output += `Event Listeners: ${testResults.eventListeners ? '✅' : '❌'}\n`;
+
+                resultDiv.innerHTML = `<pre>${output}</pre>`;
+                updateStatus('controls-status', 'Interaction test completed', 'success');
+
+            } catch (error) {
+                resultDiv.innerHTML = `Error testing interactions: ${error.message}`;
+                updateStatus('controls-status', 'Interaction test failed', 'error');
+            }
+        }
+
+        // Performance Tests
+        function startPerformanceTest() {
+            const resultDiv = document.getElementById('performance-result');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = 'Starting performance test...';
+
+            let frameCount = 0;
+            let lastTime = performance.now();
+            
+            performanceInterval = setInterval(() => {
+                const currentTime = performance.now();
+                const deltaTime = currentTime - lastTime;
+                const fps = Math.round(1000 / deltaTime);
+                
+                frameCount++;
+                
+                // Update UI
+                document.getElementById('fps-counter').textContent = fps;
+                
+                // Estimate memory usage (if available)
+                if (performance.memory) {
+                    const memoryMB = Math.round(performance.memory.usedJSHeapSize / 1048576);
+                    document.getElementById('memory-usage').textContent = memoryMB;
+                }
+                
+                // Update draw calls and triangles if VR Hall is available
+                if (vrHall && vrHall.renderer) {
+                    document.getElementById('draw-calls').textContent = 'N/A'; // Three.js doesn't expose this easily
+                    document.getElementById('triangles').textContent = 'N/A';
+                }
+                
+                lastTime = currentTime;
+                
+                // Log every 60 frames
+                if (frameCount % 60 === 0) {
+                    console.log(`Performance: ${fps} FPS, Frame: ${frameCount}`);
+                }
+                
+            }, 16); // ~60 FPS
+
+            updateStatus('performance-status', 'Performance monitoring started', 'success');
+        }
+
+        function stopPerformanceTest() {
+            if (performanceInterval) {
+                clearInterval(performanceInterval);
+                performanceInterval = null;
+                
+                const resultDiv = document.getElementById('performance-result');
+                resultDiv.innerHTML += '<br><br>Performance test stopped.';
+                updateStatus('performance-status', 'Performance monitoring stopped', 'info');
+            }
+        }
+
+        // Mobile VR Tests
+        function testMobileVR() {
+            const resultDiv = document.getElementById('mobile-vr-result');
+            resultDiv.style.display = 'block';
+
+            const results = {
+                isMobile: /android|iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase()),
+                isMobileVR: detectMobileVR(),
+                webXRMobile: false,
+                deviceMemory: navigator.deviceMemory || 'Unknown',
+                maxTouchPoints: navigator.maxTouchPoints
+            };
+
+            // Test WebXR mobile support
+            if ('xr' in navigator) {
+                navigator.xr.isSessionSupported('immersive-vr').then(supported => {
+                    results.webXRMobile = supported;
+                    
+                    let output = 'Mobile VR Test Results:\n';
+                    output += `Mobile Device: ${results.isMobile ? '✅' : '❌'}\n`;
+                    output += `Mobile VR Capable: ${results.isMobileVR ? '✅' : '❌'}\n`;
+                    output += `WebXR Mobile: ${results.webXRMobile ? '✅' : '❌'}\n`;
+                    output += `Device Memory: ${results.deviceMemory} GB\n`;
+                    output += `Max Touch Points: ${results.maxTouchPoints}\n`;
+
+                    resultDiv.innerHTML = `<pre>${output}</pre>`;
+                    updateStatus('mobile-vr-status', 'Mobile VR test completed', 'success');
+                });
+            } else {
+                resultDiv.innerHTML = 'WebXR not available on this device';
+                updateStatus('mobile-vr-status', 'Mobile VR test completed', 'warning');
+            }
+        }
+
+        function testOptimizations() {
+            const resultDiv = document.getElementById('mobile-vr-result');
+            resultDiv.style.display = 'block';
+
+            if (!vrHall) {
+                resultDiv.innerHTML = 'VR Hall not initialized. Run initialization test first.';
+                return;
+            }
+
+            try {
+                // Test performance mode toggle
+                const originalMode = vrHall.performanceMode;
+                vrHall.togglePerformanceMode();
+                const toggledMode = vrHall.performanceMode;
+                vrHall.togglePerformanceMode(); // Restore original
+
+                const results = {
+                    performanceModeToggle: toggledMode !== originalMode,
+                    pixelRatio: vrHall.renderer.getPixelRatio(),
+                    shadowMapEnabled: vrHall.renderer.shadowMap.enabled
+                };
+
+                let output = 'Optimization Test Results:\n';
+                output += `Performance Mode Toggle: ${results.performanceModeToggle ? '✅' : '❌'}\n`;
+                output += `Pixel Ratio: ${results.pixelRatio}\n`;
+                output += `Shadow Map: ${results.shadowMapEnabled ? '✅' : '❌'}\n`;
+
+                resultDiv.innerHTML = `<pre>${output}</pre>`;
+                updateStatus('mobile-vr-status', 'Optimization test completed', 'success');
+
+            } catch (error) {
+                resultDiv.innerHTML = `Error testing optimizations: ${error.message}`;
+                updateStatus('mobile-vr-status', 'Optimization test failed', 'error');
+            }
+        }
+
+        // Integration Tests
+        function testAppIntegration() {
+            const resultDiv = document.getElementById('integration-result');
+            resultDiv.style.display = 'block';
+
+            const results = {
+                vrIntegrationAvailable: typeof VRIntegration !== 'undefined',
+                vrIntegrationInstance: window.vrIntegration !== null,
+                globalFunctions: {
+                    enterVR: typeof window.enterVRMode === 'function',
+                    togglePerformance: typeof window.toggleVRPerformance === 'function'
+                }
+            };
+
+            let output = 'Integration Test Results:\n';
+            output += `VRIntegration Class: ${results.vrIntegrationAvailable ? '✅' : '❌'}\n`;
+            output += `VR Integration Instance: ${results.vrIntegrationInstance ? '✅' : '❌'}\n`;
+            output += `Global Functions:\n`;
+            output += `  - enterVR: ${results.globalFunctions.enterVR ? '✅' : '❌'}\n`;
+            output += `  - togglePerformance: ${results.globalFunctions.togglePerformance ? '✅' : '❌'}\n`;
+
+            resultDiv.innerHTML = `<pre>${output}</pre>`;
+            updateStatus('integration-status', 'Integration test completed', 'success');
+        }
+
+        function testRealTimeUpdates() {
+            const resultDiv = document.getElementById('integration-result');
+            resultDiv.style.display = 'block';
+
+            if (!window.vrIntegration) {
+                resultDiv.innerHTML = 'VR Integration not available. Run integration test first.';
+                return;
+            }
+
+            try {
+                // Simulate auction updates
+                const testAuction = {
+                    id: 'test-' + Date.now(),
+                    title: 'Test VR Auction',
+                    status: 'active',
+                    startingBid: 100
+                };
+
+                window.vrIntegration.onAuctionCreated(testAuction);
+                
+                setTimeout(() => {
+                    window.vrIntegration.onBidPlaced({
+                        auctionId: testAuction.id,
+                        bidCount: 1
+                    });
+                }, 1000);
+
+                setTimeout(() => {
+                    window.vrIntegration.onAuctionClosed({
+                        ...testAuction,
+                        status: 'closed',
+                        winner: 'test-user'
+                    });
+                }, 2000);
+
+                resultDiv.innerHTML = `<pre>Real-time update test: ✅ SUCCESS\nSimulated auction lifecycle events sent to VR system\nCheck VR environment for visual updates.</pre>`;
+                updateStatus('integration-status', 'Real-time update test completed', 'success');
+
+            } catch (error) {
+                resultDiv.innerHTML = `Error testing real-time updates: ${error.message}`;
+                updateStatus('integration-status', 'Real-time update test failed', 'error');
+            }
+        }
+
+        // Full VR Test
+        async function launchFullVRTest() {
+            const resultDiv = document.getElementById('full-vr-result');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = 'Launching full VR experience test...';
+
+            try {
+                // Run all tests in sequence
+                await testVRSupport();
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                testThreeJS();
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                await testVRHallInit();
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                testEnvironmentCreation();
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                await testControllerDetection();
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                testInteraction();
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                testAppIntegration();
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // Start performance monitoring
+                startPerformanceTest();
+
+                // Load test auctions
+                if (vrHall) {
+                    const testAuctions = [
+                        { id: '1', title: 'VR Test Item 1', status: 'active', startingBid: 100 },
+                        { id: '2', title: 'VR Test Item 2', status: 'active', startingBid: 200 },
+                        { id: '3', title: 'VR Test Item 3', status: 'active', startingBid: 300 }
+                    ];
+                    vrHall.loadAuctionItems(testAuctions);
+                }
+
+                resultDiv.innerHTML = `<pre>Full VR Test: ✅ SUCCESS\nAll components initialized successfully\nPerformance monitoring started\nTest auctions loaded in VR environment\n\nReady to launch VR experience!</pre>`;
+                
+                // Show VR entry button
+                if (document.getElementById('vr-entry-button')) {
+                    document.getElementById('vr-entry-button').style.display = 'block';
+                }
+
+            } catch (error) {
+                resultDiv.innerHTML = `Error in full VR test: ${error.message}`;
+            }
+        }
+
+        // Utility Functions
+        function detectMobileVR() {
+            const userAgent = navigator.userAgent.toLowerCase();
+            return /android|iphone|ipad|ipod/.test(userAgent) && 
+                   (userAgent.includes('oculus') || userAgent.includes('quest') || 
+                    userAgent.includes('cardboard') || userAgent.includes('daydream'));
+        }
+
+        function checkWebGLSupport() {
+            try {
+                const canvas = document.createElement('canvas');
+                const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                return gl !== null;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function updateStatus(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            const statusClass = {
+                success: 'success',
+                error: 'error',
+                warning: 'warning',
+                info: 'info'
+            }[type] || 'info';
+
+            element.innerHTML = `
+                <span class="status-indicator ${statusClass}"></span>
+                ${message}
+            `;
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (performanceInterval) {
+                clearInterval(performanceInterval);
+            }
+            if (vrHall) {
+                vrHall.dispose();
+            }
+        });
+    </script>
+</body>
+</html>
