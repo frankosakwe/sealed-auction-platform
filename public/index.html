@@ -45,10 +45,14 @@
             --bg-primary: #ffffff;
             --bg-secondary: #f8fafc;
             --bg-tertiary: #e2e8f0;
+            --bg-quaternary: #edf2f7;
             --text-primary: #1a202c;
             --text-secondary: #4a5568;
             --text-tertiary: #718096;
+            --text-quaternary: #a0aec0;
             --border-color: #e2e8f0;
+            --border-color-light: #f7fafc;
+            --border-color-dark: #cbd5e0;
             --glass-bg: rgba(255, 255, 255, 0.8);
             --glass-border: rgba(255, 255, 255, 0.3);
             --gradient-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -57,6 +61,15 @@
             --button-primary-hover: #5a67d8;
             --button-secondary: #718096;
             --button-secondary-hover: #4a5568;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            --success-color: #48bb78;
+            --warning-color: #ed8936;
+            --error-color: #f56565;
+            --info-color: #4299e1;
         }
 
         [data-theme="dark"] {
@@ -64,10 +77,14 @@
             --bg-primary: #1a202c;
             --bg-secondary: #2d3748;
             --bg-tertiary: #4a5568;
+            --bg-quaternary: #2d3748;
             --text-primary: #ffffff;
             --text-secondary: #e2e8f0;
             --text-tertiary: #a0aec0;
+            --text-quaternary: #718096;
             --border-color: #4a5568;
+            --border-color-light: #2d3748;
+            --border-color-dark: #718096;
             --glass-bg: rgba(255, 255, 255, 0.1);
             --glass-border: rgba(255, 255, 255, 0.2);
             --gradient-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -76,6 +93,32 @@
             --button-primary-hover: #805ad5;
             --button-secondary: #4a5568;
             --button-secondary-hover: #2d3748;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+            --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+            --success-color: #68d391;
+            --warning-color: #f6ad55;
+            --error-color: #fc8181;
+            --info-color: #63b3ed;
+        }
+
+        /* High contrast mode support */
+        .high-contrast {
+            --text-primary: #000000;
+            --text-secondary: #333333;
+            --border-color: #000000;
+            --button-primary: #0000ff;
+            --button-primary-hover: #000080;
+        }
+
+        [data-theme="dark"].high-contrast {
+            --text-primary: #ffffff;
+            --text-secondary: #cccccc;
+            --border-color: #ffffff;
+            --button-primary: #00ffff;
+            --button-primary-hover: #0080ff;
         }
 
         .gradient-bg {
@@ -321,29 +364,36 @@
             position: relative;
             width: 60px;
             height: 30px;
-            background: var(--button-secondary);
+            background: var(--bg-tertiary);
             border-radius: 15px;
             border: 2px solid var(--border-color);
             cursor: pointer;
             transition: all 0.3s ease;
+            outline: none;
         }
 
         .theme-toggle:hover {
-            background: var(--button-secondary-hover);
+            background: var(--bg-quaternary);
+            box-shadow: var(--shadow-md);
+        }
+
+        .theme-toggle:focus {
+            box-shadow: 0 0 0 3px var(--button-primary);
         }
 
         .theme-toggle-slider {
             position: absolute;
-            top: 3px;
-            left: 3px;
-            width: 20px;
-            height: 20px;
-            background: white;
+            top: 2px;
+            left: 2px;
+            width: 22px;
+            height: 22px;
+            background: var(--bg-primary);
             border-radius: 50%;
-            transition: transform 0.3s ease;
+            transition: transform 0.3s ease, background-color 0.3s ease;
             display: flex;
             align-items: center;
             justify-content: center;
+            box-shadow: var(--shadow-sm);
         }
 
         [data-theme="dark"] .theme-toggle-slider {
@@ -352,39 +402,64 @@
 
         .theme-toggle-slider i {
             font-size: 12px;
-            color: var(--text-primary);
+            color: var(--text-secondary);
+            transition: color 0.3s ease;
+        }
+
+        /* Enhanced component theming */
+        .glass-effect {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            box-shadow: var(--shadow-lg);
         }
 
         /* Form input styles */
         .form-input {
-            background: var(--glass-bg);
-            border: 1px solid var(--glass-border);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
             color: var(--text-primary);
+            transition: all 0.3s ease;
         }
 
         .form-input:focus {
             outline: none;
-            box-shadow: 0 0 0 2px var(--button-primary);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.3);
+            border-color: var(--button-primary);
         }
 
+        .form-input::placeholder {
+            color: var(--text-tertiary);
+        }
+
+        /* Button styles */
         .btn-primary {
             background: var(--button-primary);
             color: white;
+            border: none;
+            transition: all 0.3s ease;
         }
 
         .btn-primary:hover {
             background: var(--button-primary-hover);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-md);
         }
 
         .btn-secondary {
             background: var(--button-secondary);
             color: white;
+            border: none;
+            transition: all 0.3s ease;
         }
 
         .btn-secondary:hover {
             background: var(--button-secondary-hover);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-md);
         }
 
+        /* Text color utilities */
         .text-primary {
             color: var(--text-primary);
         }
@@ -393,8 +468,193 @@
             color: var(--text-secondary);
         }
 
-        .text-secondary:hover {
+        .text-tertiary {
+            color: var(--text-tertiary);
+        }
+
+        .text-quaternary {
+            color: var(--text-quaternary);
+        }
+
+        /* Background utilities */
+        .bg-primary {
+            background-color: var(--bg-primary);
+        }
+
+        .bg-secondary {
+            background-color: var(--bg-secondary);
+        }
+
+        .bg-tertiary {
+            background-color: var(--bg-tertiary);
+        }
+
+        /* Border utilities */
+        .border-primary {
+            border-color: var(--border-color);
+        }
+
+        /* Status colors */
+        .text-success {
+            color: var(--success-color);
+        }
+
+        .text-warning {
+            color: var(--warning-color);
+        }
+
+        .text-error {
+            color: var(--error-color);
+        }
+
+        .text-info {
+            color: var(--info-color);
+        }
+
+        .bg-success {
+            background-color: var(--success-color);
+        }
+
+        .bg-warning {
+            background-color: var(--warning-color);
+        }
+
+        .bg-error {
+            background-color: var(--error-color);
+        }
+
+        .bg-info {
+            background-color: var(--info-color);
+        }
+
+        /* Card and container theming */
+        .auction-card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
             color: var(--text-primary);
+            transition: all 0.3s ease;
+        }
+
+        .auction-card:hover {
+            box-shadow: var(--shadow-xl);
+            transform: translateY(-2px);
+        }
+
+        /* Modal theming */
+        .modal-content {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-xl);
+        }
+
+        /* Navigation theming */
+        .nav-item {
+            color: var(--text-secondary);
+            transition: all 0.3s ease;
+        }
+
+        .nav-item:hover {
+            color: var(--text-primary);
+            background: var(--bg-secondary);
+        }
+
+        .nav-item.active {
+            color: var(--button-primary);
+            background: var(--bg-secondary);
+        }
+
+        /* Notification theming */
+        .notification {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            box-shadow: var(--shadow-lg);
+        }
+
+        /* Table theming */
+        .table {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .table th {
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .table td {
+            border-bottom: 1px solid var(--border-color-light);
+        }
+
+        .table tr:hover {
+            background: var(--bg-secondary);
+        }
+
+        /* Dropdown theming */
+        .dropdown {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .dropdown-item {
+            color: var(--text-primary);
+            transition: all 0.3s ease;
+        }
+
+        .dropdown-item:hover {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
+        /* Scrollbar theming */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--border-color-dark);
+        }
+
+        /* Selection theming */
+        ::selection {
+            background: var(--button-primary);
+            color: white;
+        }
+
+        ::-moz-selection {
+            background: var(--button-primary);
+            color: white;
+        }
+
+        /* Focus outline theming */
+        *:focus {
+            outline: 2px solid var(--button-primary);
+            outline-offset: 2px;
+        }
+
+        /* Reduced motion support */
+        @media (prefers-reduced-motion: reduce) {
+            .theme-toggle,
+            .theme-toggle-slider,
+            .auction-card,
+            .btn-primary,
+            .btn-secondary,
+            .form-input,
+            .nav-item {
+                transition: none !important;
+            }
         }
         
         .loading-content {
@@ -1873,7 +2133,16 @@
         </div>
     </div>
 
+    <!-- Error Handling Scripts - Load First -->
+    <script src="error-boundary.js"></script>
+    <script src="network-error-handler.js"></script>
+    <script src="form-validation.js"></script>
+    
+    <!-- Application Scripts -->
     <script src="app.js"></script>
+    <script src="app-error-integration.js"></script>
+    <script src="theme-system.js"></script>
+    <script src="theme-integration.js"></script>
     <script src="ar-preview.js"></script>
     <script src="ai-recommendations.js"></script>
     <script src="blockchain-ui.js"></script>

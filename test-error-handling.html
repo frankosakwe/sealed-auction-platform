@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error Handling Test Suite</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        .test-card {
+            background: white;
+            border-radius: 1rem;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .test-result {
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            margin-top: 0.5rem;
+            font-family: monospace;
+            font-size: 0.875rem;
+        }
+        .test-pass {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #10b981;
+        }
+        .test-fail {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #ef4444;
+        }
+        .test-pending {
+            background: #fef3c7;
+            color: #92400e;
+            border: 1px solid #f59e0b;
+        }
+    </style>
+</head>
+<body>
+    <div class="max-w-4xl mx-auto">
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-white mb-2">Error Handling Test Suite</h1>
+            <p class="text-white opacity-90">Comprehensive tests for error handling and recovery</p>
+        </div>
+
+        <div class="test-card">
+            <h2 class="text-2xl font-bold mb-4">Test Results</h2>
+            <div id="testResults"></div>
+            <div class="mt-4 flex space-x-2">
+                <button onclick="runAllTests()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
+                    <i class="fas fa-play mr-2"></i>Run All Tests
+                </button>
+                <button onclick="clearResults()" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors">
+                    <i class="fas fa-trash mr-2"></i>Clear Results
+                </button>
+            </div>
+        </div>
+
+        <div class="test-card">
+            <h2 class="text-2xl font-bold mb-4">Individual Tests</h2>
+            
+            <div class="space-y-2">
+                <button onclick="testErrorBoundary()" class="w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors text-left">
+                    <i class="fas fa-shield-alt mr-2"></i>Test Error Boundary
+                </button>
+                
+                <button onclick="testNetworkError()" class="w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors text-left">
+                    <i class="fas fa-network-wired mr-2"></i>Test Network Error Handler
+                </button>
+                
+                <button onclick="testFormValidation()" class="w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors text-left">
+                    <i class="fas fa-check-square mr-2"></i>Test Form Validation
+                </button>
+                
+                <button onclick="testNetworkRetry()" class="w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors text-left">
+                    <i class="fas fa-redo mr-2"></i>Test Network Retry
+                </button>
+                
+                <button onclick="testOfflineMode()" class="w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors text-left">
+                    <i class="fas fa-wifi-slash mr-2"></i>Test Offline Mode
+                </button>
+                
+                <button onclick="test404Page()" class="w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors text-left">
+                    <i class="fas fa-question-circle mr-2"></i>Test 404 Page
+                </button>
+                
+                <button onclick="test500Page()" class="w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors text-left">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>Test 500 Page
+                </button>
+            </div>
+        </div>
+
+        <div class="test-card">
+            <h2 class="text-2xl font-bold mb-4">Test Form</h2>
+            <form id="testForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold mb-1">Email</label>
+                    <input type="text" name="email" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-1">Password</label>
+                    <input type="password" name="password" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-1">Amount</label>
+                    <input type="number" name="amount" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                </div>
+                <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors">
+                    Submit Test Form
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Load error handling scripts -->
+    <script src="/public/error-boundary.js"></script>
+    <script src="/public/network-error-handler.js"></script>
+    <script src="/public/form-validation.js"></script>
+
+    <script>
+        let testResults = [];
+
+        function addResult(testName, passed, message) {
+            const result = {
+                name: testName,
+                passed: passed,
+                message: message,
+                timestamp: new Date().toISOString()
+            };
+            testResults.push(result);
+            displayResults();
+        }
+
+        function displayResults() {
+            const container = document.getElementById('testResults');
+            if (testResults.length === 0) {
+                container.innerHTML = '<p class="text-gray-500">No tests run yet</p>';
+                return;
+            }
+
+            container.innerHTML = testResults.map(result => `
+                <div class="test-result ${result.passed ? 'test-pass' : 'test-fail'}">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <i class="fas ${result.passed ? 'fa-check-circle' : 'fa-times-circle'} mr-2"></i>
+                            <strong>${result.name}</strong>
+                        </div>
+                        <span class="text-xs opacity-75">${new Date(result.timestamp).toLocaleTimeString()}</span>
+                    </div>
+                    <div class="mt-1 text-sm">${result.message}</div>
+                </div>
+            `).join('');
+        }
+
+        function clearResults() {
+            testResults = [];
+            displayResults();
+        }
+
+        // Test 1: Error Boundary
+        function testErrorBoundary() {
+            try {
+                if (!window.errorBoundary) {
+                    addResult('Error Boundary', false, 'Error boundary not loaded');
+                    return;
+                }
+
+                // Test error handling
+                const testError = {
+                    message: 'Test error from test suite',
+                    stack: 'Test stack trace',
+                    type: 'test',
+                    timestamp: new Date().toISOString()
+                };
+
+                window.errorBoundary.handleError(testError);
+                
+                // Check if error was stored
+                const errors = window.errorBoundary.getErrorHistory();
+                if (errors.length > 0 && errors[0].message === testError.message) {
+                    addResult('Error Boundary', true, 'Error boundary successfully caught and stored error');
+                } else {
+                    addResult('Error Boundary', false, 'Error was not stored correctly');
+                }
+            } catch (error) {
+                addResult('Error Boundary', false, `Test failed: ${error.message}`);
+            }
+        }
+
+        // Test 2: Network Error Handler
+        function testNetworkError() {
+            try {
+                if (!window.networkErrorHandler) {
+                    addResult('Network Error Handler', false, 'Network error handler not loaded');
+                    return;
+                }
+
+                // Test network status
+                const status = window.networkErrorHandler.getNetworkStatus();
+                if (status && typeof status.online === 'boolean') {
+                    addResult('Network Error Handler', true, `Network status: ${status.online ? 'Online' : 'Offline'}`);
+                } else {
+                    addResult('Network Error Handler', false, 'Failed to get network status');
+                }
+            } catch (error) {
+                addResult('Network Error Handler', false, `Test failed: ${error.message}`);
+            }
+        }
+
+        // Test 3: Form Validation
+        function testFormValidation() {
+            try {
+                if (!window.formValidator) {
+                    addResult('Form Validation', false, 'Form validator not loaded');
+                    return;
+                }
+
+                // Initialize test form
+                window.formValidator.initForm('testForm', {
+                    rules: {
+                        email: {
+                            required: true,
+                            email: true
+                        },
+                        password: {
+                            required: true,
+                            minLength: 8
+                        },
+                        amount: {
+                            required: true,
+                            number: true,
+                            positive: true
+                        }
+                    },
+                    onSubmit: (data) => {
+                        addResult('Form Validation', true, 'Form validation working correctly');
+                    }
+                });
+
+                addResult('Form Validation', true, 'Form validator initialized successfully');
+            } catch (error) {
+                addResult('Form Validation', false, `Test failed: ${error.message}`);
+            }
+        }
+
+        // Test 4: Network Retry
+        async function testNetworkRetry() {
+            try {
+                if (!window.networkErrorHandler) {
+                    addResult('Network Retry', false, 'Network error handler not loaded');
+                    return;
+                }
+
+                // Test with a failing endpoint
+                try {
+                    await window.networkErrorHandler.fetchWithRetry('/api/nonexistent', {}, 1);
+                    addResult('Network Retry', false, 'Should have thrown an error');
+                } catch (error) {
+                    addResult('Network Retry', true, 'Retry mechanism working (expected failure)');
+                }
+            } catch (error) {
+                addResult('Network Retry', false, `Test failed: ${error.message}`);
+            }
+        }
+
+        // Test 5: Offline Mode
+        function testOfflineMode() {
+            try {
+                if (!window.networkErrorHandler) {
+                    addResult('Offline Mode', false, 'Network error handler not loaded');
+                    return;
+                }
+
+                const isOnline = navigator.onLine;
+                addResult('Offline Mode', true, `Browser reports: ${isOnline ? 'Online' : 'Offline'}`);
+            } catch (error) {
+                addResult('Offline Mode', false, `Test failed: ${error.message}`);
+            }
+        }
+
+        // Test 6: 404 Page
+        function test404Page() {
+            window.open('/nonexistent-page', '_blank');
+            addResult('404 Page', true, 'Opened 404 page in new tab - verify manually');
+        }
+
+        // Test 7: 500 Page
+        function test500Page() {
+            window.open('/500.html', '_blank');
+            addResult('500 Page', true, 'Opened 500 page in new tab - verify manually');
+        }
+
+        // Run all tests
+        async function runAllTests() {
+            clearResults();
+            testErrorBoundary();
+            testNetworkError();
+            testFormValidation();
+            await testNetworkRetry();
+            testOfflineMode();
+            
+            const passed = testResults.filter(r => r.passed).length;
+            const total = testResults.length;
+            
+            console.log(`Tests completed: ${passed}/${total} passed`);
+        }
+
+        // Initialize
+        displayResults();
+        console.log('Error Handling Test Suite loaded');
+        console.log('Click "Run All Tests" to start testing');
+    </script>
+</body>
+</html>

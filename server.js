@@ -108,6 +108,67 @@ function logError(message, error, context = {}) {
   trackError(error, { message, ...context });
 }
 
+// Error reporting endpoints
+app.post('/api/errors/report', (req, res) => {
+  try {
+    const errorData = req.body;
+    console.error('Client error reported:', errorData);
+    
+    // Track error
+    trackError(new Error(errorData.message), {
+      type: 'client',
+      ...errorData
+    });
+    
+    res.json({ success: true, message: 'Error reported successfully' });
+  } catch (error) {
+    console.error('Failed to process error report:', error);
+    res.status(500).json({ error: 'Failed to process error report' });
+  }
+});
+
+app.post('/api/errors/404', (req, res) => {
+  try {
+    const errorData = req.body;
+    console.warn('404 error:', errorData);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to log 404 error' });
+  }
+});
+
+app.post('/api/errors/500', (req, res) => {
+  try {
+    const errorData = req.body;
+    console.error('500 error:', errorData);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to log 500 error' });
+  }
+});
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  try {
+    // Check database connection
+    const dbHealthy = db && db.db;
+    
+    res.json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      services: {
+        database: dbHealthy ? 'healthy' : 'unhealthy',
+        server: 'healthy'
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+});
+
 // Security middleware
 app.use(helmet());
 app.use(createMetricsMiddleware(appMetrics));
@@ -4067,6 +4128,41 @@ app.use((err, req, res, next) => {
     error: 'An unexpected server error occurred'
   });
 });
+
+// 404 Handler - Must be after all other routes
+app.use((req, res, next) => {
+  res.status(404).sendFile(__dirname + '/public/404.html');
+});
+
+// Global Error Handler - Must be last
+app.use((err, req, res, next) => {
+  logError('Express error handler:', err, {
+    url: req.url,
+    method: req.method,
+    ip: req.ip
+  });
+
+  // Don't expose error details in production
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  
+  res.status(err.status || 500);
+  
+  // Send HTML error page for browser requests
+  if (req.accepts('html')) {
+    res.sendFile(__dirname + '/public/500.html');
+  } else {
+    // Send JSON for API requests
+    res.json({
+      error: isDevelopment ? err.message : 'Internal server error',
+      ...(isDevelopment && { stack: err.stack })
+    });
+  }
+});
+
+// Sentry error handler (must be after routes but before other error handlers)
+if (sentryEnabled) {
+  app.use(Sentry.Handlers.errorHandler());
+}
 
 process.on('unhandledRejection', (reason) => {
   const rejectionError = reason instanceof Error ? reason : new Error(String(reason));
