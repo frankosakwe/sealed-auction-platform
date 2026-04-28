@@ -19,18 +19,29 @@ const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
-const { Server, Keypair, TransactionBuilder, Networks, BASE_FEE, Asset } = require('stellar-sdk');
+const { Horizon, Keypair, TransactionBuilder, Networks, BASE_FEE, Asset } = require('@stellar/stellar-sdk');
 const session = require('express-session');
 const passport = require('passport');
 const AuctionDatabase = require('./database');
 const { ApplicationMetrics, createMetricsMiddleware } = require('./utils/metrics');
 const NetworkMonitor = require('./utils/network-monitor');
+const { TransactionQueue, PRIORITY, STATUS } = require('./utils/transaction-queue');
 
 // Initialize database
 const db = new AuctionDatabase();
 
 // Initialize network monitor
 const networkMonitor = new NetworkMonitor();
+
+// Initialize transaction queue
+const transactionQueue = new TransactionQueue({
+  networkMonitor: networkMonitor,
+  maxQueueSize: 10000,
+  batchSize: 10,
+  batchTimeout: 5000,
+  maxRetries: 3,
+  gasOptimization: true
+});
 
 const app = express();
 const server = http.createServer(app);
@@ -2835,7 +2846,7 @@ app.get('/api/network/recommendations', (req, res) => {
 });
 
 // Get congestion information
-app.get('/api/network/congestion', (req, res) => {
+app.get('/api/network/congestion', async (req, res) => {
   try {
     await networkMonitor.checkCongestion();
     const status = networkMonitor.getNetworkStatus();
@@ -2954,6 +2965,250 @@ app.get('/api/export-bid-history', authenticateToken, (req, res) => {
     logError('Error exporting bid history:', error, { endpoint: '/api/export-bid-history', userId: req.user?.id });
     res.status(500).json({ error: 'Failed to export bid history' });
   }
+});
+
+// ==================== TRANSACTION QUEUE MANAGEMENT API ENDPOINTS ====================
+
+// Get queue status and metrics
+app.get('/api/queue/status', authenticateToken, (req, res) => {
+  try {
+    const status = transactionQueue.getQueueStatus();
+    res.json(status);
+  } catch (error) {
+    logError('Error fetching queue status:', error, { endpoint: '/api/queue/status', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to fetch queue status' });
+  }
+});
+
+// Get mobile-friendly queue status
+app.get('/api/queue/mobile-status', authenticateToken, (req, res) => {
+  try {
+    const status = transactionQueue.getMobileQueueStatus();
+    res.json(status);
+  } catch (error) {
+    logError('Error fetching mobile queue status:', error, { endpoint: '/api/queue/mobile-status', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to fetch mobile queue status' });
+  }
+});
+
+// Enqueue a new transaction
+app.post('/api/queue/transactions', authenticateToken, async (req, res) => {
+  try {
+    const { transactionData, priority } = req.body;
+    
+    // Validate input
+    if (!transactionData) {
+      return res.status(400).json({ error: 'Transaction data is required' });
+    }
+    
+    // Set default priority if not provided
+    const transactionPriority = priority ? PRIORITY[priority.toUpperCase()] : PRIORITY.NORMAL;
+    if (!transactionPriority) {
+      return res.status(400).json({ error: 'Invalid priority level' });
+    }
+    
+    // Add user context to transaction
+    const enrichedTransactionData = {
+      ...transactionData,
+      userId: req.user.id,
+      submittedAt: new Date().toISOString()
+    };
+    
+    const transactionId = await transactionQueue.enqueue(enrichedTransactionData, transactionPriority);
+    
+    res.json({
+      transactionId,
+      priority: transactionPriority,
+      status: 'enqueued'
+    });
+  } catch (error) {
+    logError('Error enqueuing transaction:', error, { endpoint: '/api/queue/transactions', userId: req.user?.id });
+    res.status(500).json({ error: error.message || 'Failed to enqueue transaction' });
+  }
+});
+
+// Get specific transaction details
+app.get('/api/queue/transactions/:transactionId', authenticateToken, (req, res) => {
+  try {
+    const { transactionId } = req.params;
+    const transaction = transactionQueue.getTransaction(transactionId);
+    
+    if (!transaction) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+    
+    // Only allow users to see their own transactions (unless admin)
+    if (transaction.data.userId !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    res.json(transaction);
+  } catch (error) {
+    logError('Error fetching transaction:', error, { endpoint: '/api/queue/transactions/:transactionId', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to fetch transaction' });
+  }
+});
+
+// Cancel a pending transaction
+app.delete('/api/queue/transactions/:transactionId', authenticateToken, (req, res) => {
+  try {
+    const { transactionId } = req.params;
+    const transaction = transactionQueue.getTransaction(transactionId);
+    
+    if (!transaction) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+    
+    // Only allow users to cancel their own transactions (unless admin)
+    if (transaction.data.userId !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    const cancelled = transactionQueue.cancelTransaction(transactionId);
+    
+    if (cancelled) {
+      res.json({ message: 'Transaction cancelled successfully' });
+    } else {
+      res.status(400).json({ error: 'Cannot cancel transaction - it may already be processing or completed' });
+    }
+  } catch (error) {
+    logError('Error cancelling transaction:', error, { endpoint: '/api/queue/transactions/:transactionId', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to cancel transaction' });
+  }
+});
+
+// Get user's transaction history
+app.get('/api/queue/transactions', authenticateToken, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { status, limit = 50, offset = 0 } = req.query;
+    
+    // Get all transactions and filter by user
+    const userTransactions = Array.from(transactionQueue.transactions.values())
+      .filter(tx => tx.data.userId === userId)
+      .filter(tx => !status || tx.status === status)
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(parseInt(offset), parseInt(offset) + parseInt(limit));
+    
+    res.json({
+      transactions: userTransactions,
+      total: userTransactions.length,
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+  } catch (error) {
+    logError('Error fetching user transactions:', error, { endpoint: '/api/queue/transactions', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to fetch transactions' });
+  }
+});
+
+// Admin: Get all transactions
+app.get('/api/admin/queue/transactions', authenticateAdmin, (req, res) => {
+  try {
+    const { status, priority, limit = 100, offset = 0 } = req.query;
+    
+    let transactions = Array.from(transactionQueue.transactions.values());
+    
+    // Apply filters
+    if (status) {
+      transactions = transactions.filter(tx => tx.status === status);
+    }
+    if (priority) {
+      const priorityLevel = PRIORITY[priority.toUpperCase()];
+      if (priorityLevel) {
+        transactions = transactions.filter(tx => tx.priority === priorityLevel);
+      }
+    }
+    
+    // Sort and paginate
+    transactions = transactions
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(parseInt(offset), parseInt(offset) + parseInt(limit));
+    
+    res.json({
+      transactions,
+      total: transactions.length,
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+  } catch (error) {
+    logError('Error fetching admin transactions:', error, { endpoint: '/api/admin/queue/transactions' });
+    res.status(500).json({ error: 'Failed to fetch transactions' });
+  }
+});
+
+// Admin: Get queue configuration
+app.get('/api/admin/queue/config', authenticateAdmin, (req, res) => {
+  try {
+    const config = {
+      maxQueueSize: transactionQueue.maxQueueSize,
+      batchSize: transactionQueue.batchSize,
+      batchTimeout: transactionQueue.batchTimeout,
+      maxRetries: transactionQueue.maxRetries,
+      retryDelay: transactionQueue.retryDelay,
+      gasOptimization: transactionQueue.gasOptimization
+    };
+    
+    res.json(config);
+  } catch (error) {
+    logError('Error fetching queue config:', error, { endpoint: '/api/admin/queue/config' });
+    res.status(500).json({ error: 'Failed to fetch queue configuration' });
+  }
+});
+
+// Admin: Update queue configuration
+app.put('/api/admin/queue/config', authenticateAdmin, (req, res) => {
+  try {
+    const { maxQueueSize, batchSize, batchTimeout, maxRetries, retryDelay, gasOptimization } = req.body;
+    
+    // Update configuration
+    if (maxQueueSize !== undefined) transactionQueue.maxQueueSize = maxQueueSize;
+    if (batchSize !== undefined) transactionQueue.batchSize = batchSize;
+    if (batchTimeout !== undefined) transactionQueue.batchTimeout = batchTimeout;
+    if (maxRetries !== undefined) transactionQueue.maxRetries = maxRetries;
+    if (retryDelay !== undefined) transactionQueue.retryDelay = retryDelay;
+    if (gasOptimization !== undefined) transactionQueue.gasOptimization = gasOptimization;
+    
+    res.json({ message: 'Queue configuration updated successfully' });
+  } catch (error) {
+    logError('Error updating queue config:', error, { endpoint: '/api/admin/queue/config' });
+    res.status(500).json({ error: 'Failed to update queue configuration' });
+  }
+});
+
+// WebSocket integration for real-time queue updates
+io.on('connection', (socket) => {
+  console.log('Client connected to transaction queue updates');
+  
+  // Join user-specific room for their transactions
+  socket.on('joinUserQueue', (userId) => {
+    socket.join(`user_${userId}`);
+  });
+  
+  // Listen for transaction queue events
+  transactionQueue.on('transactionEnqueued', (transaction) => {
+    io.to(`user_${transaction.data.userId}`).emit('transactionEnqueued', transaction);
+  });
+  
+  transactionQueue.on('transactionProcessing', (transaction) => {
+    io.to(`user_${transaction.data.userId}`).emit('transactionProcessing', transaction);
+  });
+  
+  transactionQueue.on('transactionCompleted', (transaction) => {
+    io.to(`user_${transaction.data.userId}`).emit('transactionCompleted', transaction);
+  });
+  
+  transactionQueue.on('transactionFailed', (transaction) => {
+    io.to(`user_${transaction.data.userId}`).emit('transactionFailed', transaction);
+  });
+  
+  transactionQueue.on('transactionRetry', (transaction) => {
+    io.to(`user_${transaction.data.userId}`).emit('transactionRetry', transaction);
+  });
+  
+  socket.on('disconnect', () => {
+    console.log('Client disconnected from transaction queue updates');
+  });
 });
 
 if (sentryEnabled) {
