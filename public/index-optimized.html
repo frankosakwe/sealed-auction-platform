@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Private-Input Sealed-Bid Auction - Stellar Blockchain</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="description" content="Private-input sealed-bid auction system on Stellar blockchain with advanced analytics and bookmark management">
+    <meta name="theme-color" content="#667eea">
+    <meta name="background-color" content="#ffffff">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Auction Platform">
+    <meta name="application-name" content="Auction Platform">
+    <meta name="msapplication-TileColor" content="#667eea">
+    <meta name="msapplication-config" content="/browserconfig.xml">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json">
+    
+    <!-- Preconnect to external domains -->
+    <link rel="preconnect" href="https://cdn.tailwindcss.com">
+    <link rel="preconnect" href="https://unpkg.com">
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    
+    <!-- Apple Touch Icons -->
+    <link rel="apple-touch-icon" sizes="72x72" href="/icons/icon-72x72.png">
+    <link rel="apple-touch-icon" sizes="96x96" href="/icons/icon-96x96.png">
+    <link rel="apple-touch-icon" sizes="128x128" href="/icons/icon-128x128.png">
+    <link rel="apple-touch-icon" sizes="144x144" href="/icons/icon-144x144.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" sizes="384x384" href="/icons/icon-384x384.png">
+    <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512x512.png">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16x16.png">
+    <link rel="shortcut icon" href="/favicon.ico">
+    
+    <!-- Critical CSS (inline) -->
+    <style>
+        /* Critical above-the-fold styles */
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8fafc;
+            --bg-tertiary: #e2e8f0;
+            --text-primary: #1a202c;
+            --text-secondary: #4a5568;
+            --text-tertiary: #718096;
+            --accent: #667eea;
+            --accent-hover: #5a67d8;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .loading-skeleton {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+        }
+
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .lazy {
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .lazy.loaded {
+            opacity: 1;
+        }
+
+        /* Critical layout styles */
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 1rem;
+        }
+
+        .nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .btn:hover {
+            background: var(--accent-hover);
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        /* Performance metrics display (hidden by default) */
+        .performance-metrics {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            z-index: 9999;
+        }
+    </style>
+
+    <!-- Preload critical resources -->
+    <link rel="preload" href="/performance-optimizer.js" as="script">
+    <link rel="preload" href="https://cdn.tailwindcss.com" as="style">
+    <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style">
+    
+    <!-- Load Tailwind CSS asynchronously -->
+    <link rel="stylesheet" href="https://cdn.tailwindcss.com" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="https://cdn.tailwindcss.com"></noscript>
+    
+    <!-- Load Font Awesome asynchronously -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
+</head>
+<body>
+    <!-- Loading indicator -->
+    <div id="initialLoader" class="fixed inset-0 bg-white z-50 flex items-center justify-center">
+        <div class="text-center">
+            <div class="loading-skeleton w-16 h-16 rounded-full mx-auto mb-4"></div>
+            <p class="text-gray-600">Loading Auction Platform...</p>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <nav class="nav">
+                <div class="logo">
+                    <h1 class="text-2xl font-bold">
+                        <i class="fas fa-gavel mr-2"></i>
+                        Sealed Auction Platform
+                    </h1>
+                </div>
+                <div class="nav-actions">
+                    <button id="authBtn" class="btn">
+                        <i class="fas fa-sign-in-alt mr-2"></i>
+                        Sign In
+                    </button>
+                    <button id="themeToggle" class="btn ml-2">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container my-8">
+        <!-- Hero Section -->
+        <section class="hero text-center py-12">
+            <h2 class="text-4xl font-bold mb-4">Secure Sealed-Bid Auctions</h2>
+            <p class="text-xl text-gray-600 mb-8">Powered by Stellar Blockchain Technology</p>
+            <div class="hero-actions">
+                <button id="startAuctionBtn" class="btn btn-lg mr-4">
+                    <i class="fas fa-plus-circle mr-2"></i>
+                    Start Auction
+                </button>
+                <button id="viewAuctionsBtn" class="btn btn-lg">
+                    <i class="fas fa-eye mr-2"></i>
+                    View Auctions
+                </button>
+            </div>
+        </section>
+
+        <!-- Features Grid (lazy loaded) -->
+        <section class="features grid grid-cols-1 md:grid-cols-3 gap-6 my-12" data-module="features" data-module-path="/features.js">
+            <div class="feature-card loading-skeleton h-48 rounded-lg"></div>
+            <div class="feature-card loading-skeleton h-48 rounded-lg"></div>
+            <div class="feature-card loading-skeleton h-48 rounded-lg"></div>
+        </section>
+
+        <!-- Auctions Grid (lazy loaded) -->
+        <section class="auctions-section my-12">
+            <h3 class="text-2xl font-bold mb-6">Active Auctions</h3>
+            <div id="auctionsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" data-module="auctions" data-module-path="/auctions.js">
+                <!-- Loading skeletons -->
+                <div class="auction-card loading-skeleton h-64 rounded-lg"></div>
+                <div class="auction-card loading-skeleton h-64 rounded-lg"></div>
+                <div class="auction-card loading-skeleton h-64 rounded-lg"></div>
+            </div>
+        </section>
+
+        <!-- Analytics Dashboard (lazy loaded) -->
+        <section class="analytics-section my-12" data-module="analytics" data-module-path="/bid-analytics.js">
+            <h3 class="text-2xl font-bold mb-6">Market Analytics</h3>
+            <div class="analytics-container loading-skeleton h-96 rounded-lg"></div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white py-8 mt-16">
+        <div class="container">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                <div>
+                    <h4 class="font-bold mb-4">Platform</h4>
+                    <ul class="space-y-2">
+                        <li><a href="#" class="hover:text-gray-300">About</a></li>
+                        <li><a href="#" class="hover:text-gray-300">Features</a></li>
+                        <li><a href="#" class="hover:text-gray-300">Security</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-bold mb-4">Resources</h4>
+                    <ul class="space-y-2">
+                        <li><a href="#" class="hover:text-gray-300">Documentation</a></li>
+                        <li><a href="#" class="hover:text-gray-300">API</a></li>
+                        <li><a href="#" class="hover:text-gray-300">Support</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-bold mb-4">Legal</h4>
+                    <ul class="space-y-2">
+                        <li><a href="#" class="hover:text-gray-300">Privacy</a></li>
+                        <li><a href="#" class="hover:text-gray-300">Terms</a></li>
+                        <li><a href="#" class="hover:text-gray-300">Compliance</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-bold mb-4">Connect</h4>
+                    <div class="flex space-x-4">
+                        <a href="#" class="hover:text-gray-300"><i class="fab fa-twitter"></i></a>
+                        <a href="#" class="hover:text-gray-300"><i class="fab fa-github"></i></a>
+                        <a href="#" class="hover:text-gray-300"><i class="fab fa-discord"></i></a>
+                    </div>
+                </div>
+            </div>
+            <div class="border-t border-gray-700 mt-8 pt-8 text-center">
+                <p>&copy; 2024 Sealed Auction Platform. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Performance Metrics Display (for development) -->
+    <div id="performanceMetrics" class="performance-metrics hidden">
+        <div>Load Time: <span id="loadTime">0</span>ms</div>
+        <div>LCP: <span id="lcp">0</span>ms</div>
+        <div>FID: <span id="fid">0</span>ms</div>
+        <div>CLS: <span id="cls">0</span></div>
+    </div>
+
+    <!-- Critical Scripts -->
+    <script>
+        // Performance monitoring start
+        window.addEventListener('load', function() {
+            // Hide initial loader
+            const loader = document.getElementById('initialLoader');
+            if (loader) {
+                loader.style.opacity = '0';
+                setTimeout(() => loader.remove(), 300);
+            }
+        });
+
+        // Initialize performance optimizer first
+        (function() {
+            const script = document.createElement('script');
+            script.src = '/performance-optimizer.js';
+            script.async = true;
+            script.onload = function() {
+                console.log('Performance optimizer loaded');
+                
+                // Load core application
+                const coreScript = document.createElement('script');
+                coreScript.src = '/app.js';
+                coreScript.async = true;
+                coreScript.onload = function() {
+                    console.log('Core application loaded');
+                    
+                    // Initialize lazy loading
+                    performanceOptimizer.optimizeImages();
+                    performanceOptimizer.setupCaching();
+                };
+                document.head.appendChild(coreScript);
+            };
+            document.head.appendChild(script);
+        })();
+
+        // Show performance metrics in development
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            document.getElementById('performanceMetrics').classList.remove('hidden');
+            
+            // Update metrics display
+            setInterval(() => {
+                const metrics = performanceOptimizer.performanceMetrics;
+                document.getElementById('loadTime').textContent = Math.round(metrics.loadTime || 0);
+                document.getElementById('lcp').textContent = Math.round(metrics.largestContentfulPaint || 0);
+                document.getElementById('fid').textContent = Math.round(metrics.firstInputDelay || 0);
+                document.getElementById('cls').textContent = (metrics.cumulativeLayoutShift || 0).toFixed(3);
+            }, 1000);
+        }
+    </script>
+
+    <!-- Non-critical scripts will be loaded by the performance optimizer -->
+</body>
+</html>
