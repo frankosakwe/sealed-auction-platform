@@ -1,0 +1,78 @@
+<!-- ============================================ -->
+<!-- INTERNATIONALIZATION (i18n) INTEGRATION     -->
+<!-- Add this snippet to your index.html         -->
+<!-- ============================================ -->
+
+<!-- STEP 1: Add to <head> section (after other CSS) -->
+<link rel="stylesheet" href="/rtl-support.css">
+
+<!-- STEP 2: Add before closing </body> tag (after other scripts) -->
+<script src="/i18n.js"></script>
+<script src="/language-switcher.js"></script>
+<script src="/i18n-integration.js"></script>
+
+<!-- ============================================ -->
+<!-- OPTIONAL: Add language selector to header   -->
+<!-- Add this inside your header/nav element     -->
+<!-- ============================================ -->
+<div class="flex items-center space-x-3">
+    <i class="fas fa-globe"></i>
+    <select id="languageSelector" class="px-3 py-1 rounded-lg bg-white/20 border border-white/30 focus:outline-none focus:ring-2 focus:ring-white/50">
+        <option value="en">English</option>
+        <option value="es">Español</option>
+        <option value="fr">Français</option>
+        <option value="de">Deutsch</option>
+        <option value="ar">العربية</option>
+        <option value="zh">中文</option>
+        <option value="ja">日本語</option>
+        <option value="pt">Português</option>
+        <option value="ru">Русский</option>
+        <option value="hi">हिन्दी</option>
+    </select>
+</div>
+
+<!-- ============================================ -->
+<!-- USAGE EXAMPLES                              -->
+<!-- ============================================ -->
+
+<!-- Example 1: Translate text in HTML -->
+<h1 data-i18n="app.title">Sealed Bid Auction Platform</h1>
+<button data-i18n="auction.placeBid">Place Bid</button>
+
+<!-- Example 2: Translate placeholder -->
+<input type="text" data-i18n-placeholder="auth.username" placeholder="Username">
+
+<!-- Example 3: Translate title attribute -->
+<button data-i18n-title="auction.share" title="Share">
+    <i class="fas fa-share"></i>
+</button>
+
+<!-- Example 4: Use in JavaScript -->
+<script>
+// Translate text
+const text = window.i18n.t('auction.placeBid');
+
+// Format currency
+const xlm = window.i18n.formatCurrency(1234.56, 'XLM');
+// Result: "1,234.56 XLM" (or localized)
+
+// Format date
+const date = window.i18n.formatDate(new Date(), 'medium');
+// Result: "Dec 25, 2024" (or localized)
+
+// Format number
+const num = window.i18n.formatNumber(1234567.89);
+// Result: "1,234,567.89" (or localized)
+
+// Change language
+window.i18n.setLanguage('es');
+
+// Check if RTL
+const isRTL = window.i18n.isRTL();
+</script>
+
+<!-- ============================================ -->
+<!-- TESTING                                     -->
+<!-- Navigate to /test-i18n.html to test all     -->
+<!-- i18n features                               -->
+<!-- ============================================ -->

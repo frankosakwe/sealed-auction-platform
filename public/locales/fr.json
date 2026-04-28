@@ -1,0 +1,150 @@
+{
+  "app": {
+    "title": "Plateforme d'Enchères Scellées",
+    "subtitle": "Enchères sécurisées par blockchain sur Stellar"
+  },
+  "nav": {
+    "auctions": "Enchères",
+    "create": "Créer une Enchère",
+    "myBids": "Mes Offres",
+    "dashboard": "Tableau de Bord",
+    "analytics": "Analytiques",
+    "bookmarks": "Favoris",
+    "wallet": "Portefeuille",
+    "network": "Réseau",
+    "ai": "Recommandations IA",
+    "filter": "Filtrer"
+  },
+  "auth": {
+    "login": "Connexion",
+    "register": "S'inscrire",
+    "logout": "Déconnexion",
+    "username": "Nom d'utilisateur",
+    "password": "Mot de passe",
+    "loginPrompt": "Vous avez déjà un compte?",
+    "registerPrompt": "Vous n'avez pas de compte?",
+    "loginSuccess": "Connexion réussie!",
+    "registerSuccess": "Inscription réussie!",
+    "loginError": "Échec de l'authentification",
+    "required": "Ce champ est obligatoire"
+  },
+  "auction": {
+    "title": "Titre",
+    "description": "Description",
+    "startingBid": "Enchère de Départ",
+    "currentHighest": "Enchère la Plus Haute",
+    "endTime": "Heure de Fin",
+    "status": "Statut",
+    "bids": "Offres",
+    "winner": "Gagnant",
+    "active": "Active",
+    "closed": "Fermée",
+    "expired": "Expirée",
+    "placeBid": "Placer une Offre",
+    "viewDetails": "Voir les Détails",
+    "share": "Partager",
+    "arPreview": "Aperçu AR",
+    "createAuction": "Créer une Enchère",
+    "noAuctions": "Aucune enchère disponible",
+    "loadingMore": "Chargement d'autres enchères...",
+    "ends": "Se termine",
+    "created": "Créée"
+  },
+  "bid": {
+    "amount": "Montant de l'Offre",
+    "secretKey": "Clé Secrète",
+    "placeBid": "Placer une Offre",
+    "bidSuccess": "Offre placée avec succès!",
+    "bidError": "Échec du placement de l'offre",
+    "minimumBid": "Offre minimale",
+    "yourBid": "Votre Offre",
+    "highestBid": "Offre la Plus Haute"
+  },
+  "filter": {
+    "title": "Filtrer les Enchères",
+    "category": "Catégorie",
+    "status": "Statut",
+    "priceRange": "Fourchette de Prix",
+    "dateRange": "Plage de Dates",
+    "sortBy": "Trier Par",
+    "apply": "Appliquer les Filtres",
+    "reset": "Réinitialiser",
+    "savePreset": "Enregistrer le Préréglage",
+    "results": "résultats trouvés",
+    "categories": {
+      "art": "Art",
+      "collectibles": "Objets de Collection",
+      "electronics": "Électronique",
+      "fashion": "Mode",
+      "jewelry": "Bijoux",
+      "vehicles": "Véhicules",
+      "realestate": "Immobilier",
+      "other": "Autre"
+    },
+    "sortOptions": {
+      "newest": "Plus Récent",
+      "oldest": "Plus Ancien",
+      "priceAsc": "Prix: Croissant",
+      "priceDesc": "Prix: Décroissant",
+      "endingSoon": "Se Termine Bientôt",
+      "mostBids": "Plus d'Offres"
+    }
+  },
+  "notifications": {
+    "title": "Notifications",
+    "markAllRead": "Tout Marquer comme Lu",
+    "clearAll": "Tout Effacer",
+    "noNotifications": "Aucune notification",
+    "newAuction": "Nouvelle enchère",
+    "auctionClosed": "Enchère fermée",
+    "bidPlaced": "Nouvelle offre placée",
+    "youWon": "Vous avez gagné l'enchère!",
+    "outbid": "Vous avez été surenchéri"
+  },
+  "settings": {
+    "language": "Langue",
+    "theme": "Thème",
+    "currency": "Devise",
+    "notifications": "Notifications",
+    "privacy": "Confidentialité",
+    "security": "Sécurité"
+  },
+  "common": {
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "close": "Fermer",
+    "confirm": "Confirmer",
+    "loading": "Chargement...",
+    "error": "Erreur",
+    "success": "Succès",
+    "warning": "Avertissement",
+    "info": "Information",
+    "search": "Rechercher",
+    "filter": "Filtrer",
+    "sort": "Trier",
+    "more": "Plus",
+    "less": "Moins",
+    "yes": "Oui",
+    "no": "Non",
+    "ok": "OK"
+  },
+  "time": {
+    "justNow": "À l'instant",
+    "minutesAgo": "il y a {{count}} minutes",
+    "hoursAgo": "il y a {{count}} heures",
+    "daysAgo": "il y a {{count}} jours",
+    "weeksAgo": "il y a {{count}} semaines",
+    "monthsAgo": "il y a {{count}} mois"
+  },
+  "errors": {
+    "networkError": "Erreur réseau. Veuillez vérifier votre connexion.",
+    "serverError": "Erreur serveur. Veuillez réessayer plus tard.",
+    "notFound": "Ressource introuvable",
+    "unauthorized": "Accès non autorisé",
+    "forbidden": "Accès interdit",
+    "validationError": "Erreur de validation",
+    "unknownError": "Une erreur inconnue s'est produite"
+  }
+}
