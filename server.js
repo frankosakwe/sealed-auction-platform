@@ -400,7 +400,53 @@ if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
 
 // Rate limiting configuration
 const JWT_SECRET = process.env.JWT_SECRET || 'your-jwt-secret-change-in-production';
+const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || 'your-refresh-token-secret-change-in-production';
 const tokenBlacklist = new Set();
+
+// Helper function to generate device fingerprint
+function generateDeviceFingerprint(req) {
+  const user_agent = req.headers['user-agent'] || '';
+  const ip = req.ip || req.connection.remoteAddress || '';
+  const accept_language = req.headers['accept-language'] || '';
+  const accept_encoding = req.headers['accept-encoding'] || '';
+  
+  return crypto.createHash('sha256')
+    .update(user_agent + ip + accept_language + accept_encoding)
+    .digest('hex');
+}
+
+// Helper function to generate refresh token
+function generateRefreshToken() {
+  return crypto.randomBytes(64).toString('hex');
+}
+
+// Helper function to hash refresh token
+function hashRefreshToken(token) {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+// Helper function to get device info from request
+function getDeviceInfo(req) {
+  const user_agent = req.headers['user-agent'] || 'Unknown';
+  const ip = req.ip || req.connection.remoteAddress || 'Unknown';
+  
+  // Parse user agent to get browser and OS info
+  let browser = 'Unknown';
+  let os = 'Unknown';
+  
+  if (user_agent.includes('Chrome')) browser = 'Chrome';
+  else if (user_agent.includes('Firefox')) browser = 'Firefox';
+  else if (user_agent.includes('Safari')) browser = 'Safari';
+  else if (user_agent.includes('Edge')) browser = 'Edge';
+  
+  if (user_agent.includes('Windows')) os = 'Windows';
+  else if (user_agent.includes('Mac')) os = 'macOS';
+  else if (user_agent.includes('Linux')) os = 'Linux';
+  else if (user_agent.includes('Android')) os = 'Android';
+  else if (user_agent.includes('iOS')) os = 'iOS';
+  
+  return `${browser} on ${os}`;
+}
 
 // Import validation middleware
 const { validateRequest } = require('./utils/validation');
@@ -1144,6 +1190,36 @@ app.post('/api/auth/login',
     db.resetFailedLoginAttempts(username);
     const token = generateToken(user);
     
+    // Generate refresh token
+    const refreshTokenValue = generateRefreshToken();
+    const refreshTokenHash = hashRefreshToken(refreshTokenValue);
+    const refreshTokenId = uuidv4();
+    const deviceId = generateDeviceFingerprint(req);
+    const deviceInfo = getDeviceInfo(req);
+    const ipAddress = req.ip || req.connection.remoteAddress || 'Unknown';
+    const userAgent = req.headers['user-agent'] || 'Unknown';
+    
+    // Create refresh token (7 days expiration)
+    const refreshTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    db.createRefreshToken({
+      id: refreshTokenId,
+      user_id: user.id,
+      token_hash: refreshTokenHash,
+      device_info: deviceInfo,
+      ip_address: ipAddress,
+      user_agent: userAgent,
+      expires_at: refreshTokenExpiresAt
+    });
+    
+    // Create user session
+    const sessionId = uuidv4();
+    db.createUserSession({
+      id: sessionId,
+      user_id: user.id,
+      refresh_token_id: refreshTokenId,
+      device_fingerprint: deviceId
+    });
+    
     res.sendData({ 
       id: user.id, 
       userId: user.id,
@@ -1151,8 +1227,14 @@ app.post('/api/auth/login',
       role: user.role,
       token: token,
       expiresIn: '24h',
+      refreshToken: refreshTokenValue,
+      refreshTokenExpiresIn: '7d',
+      sessionId: sessionId,
+      deviceInfo: deviceInfo,
       _links: {
         verify: { href: '/api/auth/verify', method: 'GET' },
+        refresh: { href: '/api/auth/refresh', method: 'POST' },
+        sessions: { href: '/api/auth/sessions', method: 'GET' },
         auctions: { href: '/api/auctions', method: 'GET' }
       }
     }, 'loginResponse');
@@ -1167,18 +1249,37 @@ app.post('/api/auth/logout', authenticateToken, (req, res) => {
   try {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
+    const { refreshToken, sessionId, logoutAll = false } = req.body;
     
+    // Blacklist the access token
     if (token) {
       tokenBlacklist.add(token);
     }
     
+    // Handle refresh token revocation
+    if (refreshToken) {
+      const refreshTokenHash = hashRefreshToken(refreshToken);
+      db.revokeRefreshToken(refreshTokenHash);
+    }
+    
+    // Handle session deactivation
+    if (sessionId && !logoutAll) {
+      db.deactivateSession(sessionId);
+    } else if (logoutAll) {
+      // Logout from all devices
+      db.revokeAllUserRefreshTokens(req.user.userId);
+      db.deactivateAllUserSessions(req.user.userId);
+    }
+    
     res.sendData({ 
-      message: 'Logged out successfully',
+      message: logoutAll ? 'Logged out from all devices successfully' : 'Logged out successfully',
+      loggedOutFromAllDevices: logoutAll,
       _links: {
         login: { href: '/api/auth/login', method: 'POST' }
       }
     }, 'logoutResponse');
   } catch (error) {
+    logError('Error during logout:', error, { endpoint: '/api/auth/logout', method: 'POST' });
     res.status(500).sendData({ error: 'Failed to logout' });
   }
 });
@@ -1196,6 +1297,149 @@ app.get('/api/auth/verify', authenticateToken, (req, res) => {
       logout: { href: '/api/auth/logout', method: 'POST' }
     }
   }, 'verifyResponse');
+});
+
+// Refresh token endpoint for token rotation
+app.post('/api/auth/refresh', 
+  authLimiter,
+  validateRequest.body({
+    refreshToken: { type: 'string', required: true },
+    sessionId: { type: 'string', required: true }
+  }),
+  async (req, res) => {
+  try {
+    const { refreshToken, sessionId } = req.sanitizedBody;
+    
+    if (!refreshToken || !sessionId) {
+      return res.status(400).sendData({ error: 'Refresh token and session ID are required' });
+    }
+    
+    // Hash the refresh token to look up in database
+    const refreshTokenHash = hashRefreshToken(refreshToken);
+    const storedToken = db.getRefreshToken(refreshTokenHash);
+    
+    if (!storedToken) {
+      return res.status(401).sendData({ error: 'Invalid or expired refresh token' });
+    }
+    
+    // Get user information
+    const user = {
+      id: storedToken.user_id,
+      username: storedToken.username,
+      role: storedToken.role || 'user'
+    };
+    
+    // Update last used timestamp
+    db.updateRefreshTokenLastUsed(storedToken.id);
+    db.updateSessionActivity(sessionId);
+    
+    // Revoke the old refresh token (token rotation)
+    db.revokeRefreshToken(refreshTokenHash);
+    
+    // Generate new access token
+    const newAccessToken = generateToken(user);
+    
+    // Generate new refresh token
+    const newRefreshTokenValue = generateRefreshToken();
+    const newRefreshTokenHash = hashRefreshToken(newRefreshTokenValue);
+    const newRefreshTokenId = uuidv4();
+    
+    // Create new refresh token
+    const refreshTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    db.createRefreshToken({
+      id: newRefreshTokenId,
+      user_id: user.id,
+      token_hash: newRefreshTokenHash,
+      device_info: storedToken.device_info,
+      ip_address: req.ip || req.connection.remoteAddress || 'Unknown',
+      user_agent: req.headers['user-agent'] || 'Unknown',
+      expires_at: refreshTokenExpiresAt
+    });
+    
+    // Update session with new refresh token
+    const updateSessionStmt = db.prepare(`
+      UPDATE user_sessions SET refresh_token_id = ?, last_activity_at = datetime('now') WHERE id = ?
+    `);
+    updateSessionStmt.run(newRefreshTokenId, sessionId);
+    
+    res.sendData({
+      token: newAccessToken,
+      refreshToken: newRefreshTokenValue,
+      expiresIn: '24h',
+      refreshTokenExpiresIn: '7d',
+      _links: {
+        verify: { href: '/api/auth/verify', method: 'GET' },
+        sessions: { href: '/api/auth/sessions', method: 'GET' },
+        logout: { href: '/api/auth/logout', method: 'POST' }
+      }
+    }, 'tokenRefreshResponse');
+    
+  } catch (error) {
+    logError('Error refreshing token:', error, { endpoint: '/api/auth/refresh', method: 'POST' });
+    res.status(500).sendData({ error: 'Failed to refresh token' });
+  }
+});
+
+// Get user sessions endpoint for multi-device support
+app.get('/api/auth/sessions', authenticateToken, (req, res) => {
+  try {
+    const sessions = db.getUserSessions(req.user.userId);
+    
+    res.sendData({
+      sessions: sessions.map(session => ({
+        id: session.id,
+        deviceInfo: session.device_info,
+        ipAddress: session.ip_address,
+        createdAt: session.created_at,
+        lastActivityAt: session.last_activity_at,
+        tokenCreatedAt: session.token_created_at,
+        lastUsedAt: session.last_used_at,
+        expiresAt: session.expires_at,
+        isActive: session.is_active
+      })),
+      totalSessions: sessions.length,
+      _links: {
+        self: { href: '/api/auth/sessions', method: 'GET' },
+        logout: { href: '/api/auth/logout', method: 'POST' },
+        refresh: { href: '/api/auth/refresh', method: 'POST' }
+      }
+    }, 'sessionsResponse');
+    
+  } catch (error) {
+    logError('Error getting user sessions:', error, { endpoint: '/api/auth/sessions', method: 'GET' });
+    res.status(500).sendData({ error: 'Failed to get sessions' });
+  }
+});
+
+// Revoke specific session endpoint
+app.delete('/api/auth/sessions/:sessionId', authenticateToken, (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    
+    // Get the session to verify it belongs to the current user
+    const sessions = db.getUserSessions(req.user.userId);
+    const session = sessions.find(s => s.id === sessionId);
+    
+    if (!session) {
+      return res.status(404).sendData({ error: 'Session not found' });
+    }
+    
+    // Revoke the refresh token and deactivate the session
+    db.revokeRefreshToken(session.refresh_token_id);
+    db.deactivateSession(sessionId);
+    
+    res.sendData({
+      message: 'Session revoked successfully',
+      revokedSessionId: sessionId,
+      _links: {
+        sessions: { href: '/api/auth/sessions', method: 'GET' }
+      }
+    }, 'sessionRevokedResponse');
+    
+  } catch (error) {
+    logError('Error revoking session:', error, { endpoint: `/api/auth/sessions/${req.params.sessionId}`, method: 'DELETE' });
+    res.status(500).sendData({ error: 'Failed to revoke session' });
+  }
 });
 
 // Account lockout status endpoint
@@ -5712,7 +5956,19 @@ process.on('uncaughtException', (error) => {
   setTimeout(() => process.exit(1), 200);
 });
 
+// Cleanup job for expired tokens and sessions
+setInterval(() => {
+  try {
+    db.cleanupExpiredTokens();
+    db.cleanupExpiredRefreshTokens();
+    console.log('[CLEANUP] Cleaned up expired tokens and sessions');
+  } catch (error) {
+    logError('Error during cleanup:', error, { task: 'token_cleanup' });
+  }
+}, 60 * 60 * 1000); // Run every hour
+
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
   console.log(`Sealed-Bid Auction server running on port ${PORT}`);
+  console.log('[SECURITY] Enhanced authentication system with JWT tokens, refresh token rotation, and session management enabled');
 });
