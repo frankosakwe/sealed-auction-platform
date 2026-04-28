@@ -1108,6 +1108,170 @@ app.patch('/api/auctions/:id',
   }
 });
 
+// Advanced filtering and search endpoints
+app.get('/api/auctions/filter/advanced',
+  readLimiter,
+  validateRequest.query({
+    page: { type: 'number' },
+    limit: { type: 'number' },
+    status: { type: 'string' },
+    category: { type: 'string' },
+    minPrice: { type: 'number' },
+    maxPrice: { type: 'number' },
+    search: { type: 'string' },
+    sortBy: { type: 'string' },
+    endingSoon: { type: 'boolean' }
+  }),
+  (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      status,
+      category,
+      minPrice,
+      maxPrice,
+      search,
+      sortBy,
+      endingSoon
+    } = req.sanitizedQuery || {};
+
+    const filters = {
+      status: status || 'all',
+      category: category || 'all',
+      minPrice: minPrice !== undefined ? parseFloat(minPrice) : undefined,
+      maxPrice: maxPrice !== undefined ? parseFloat(maxPrice) : undefined,
+      search: search || '',
+      sortBy: sortBy || 'newest',
+      endingSoon: endingSoon === 'true' || endingSoon === true
+    };
+
+    const validatedLimit = Math.min(Math.max(parseInt(limit) || 10, 1), 100);
+    const validatedPage = Math.max(parseInt(page) || 1, 1);
+
+    const result = db.getFilteredAuctions(validatedPage, validatedLimit, filters);
+
+    const auctionList = result.auctions.map(auction => ({
+      id: auction.id,
+      title: auction.title,
+      description: auction.description,
+      startingBid: auction.starting_bid,
+      currentHighestBid: auction.current_highest_bid || auction.starting_bid,
+      endTime: auction.end_time,
+      status: auction.status,
+      category: auction.category,
+      bidCount: auction.bid_count || 0,
+      viewCount: auction.view_count || 0,
+      creator: auction.creator_id,
+      _links: {
+        self: { href: `/api/auctions/${auction.id}` },
+        bids: { href: `/api/auctions/${auction.id}/bids` }
+      }
+    }));
+
+    res.sendData({
+      auctions: auctionList,
+      pagination: result.pagination,
+      filters: filters,
+      _links: {
+        self: { href: `/api/auctions/filter/advanced?page=${validatedPage}&limit=${validatedLimit}` }
+      }
+    }, 'filteredAuctionsResponse');
+  } catch (error) {
+    logError('Error fetching filtered auctions:', error, { endpoint: '/api/auctions/filter/advanced', method: 'GET' });
+    res.status(500).sendData({ error: 'Failed to fetch auctions' });
+  }
+});
+
+// Search autocomplete endpoint
+app.get('/api/auctions/search/autocomplete',
+  readLimiter,
+  validateRequest.query({
+    q: { type: 'string' }
+  }),
+  (req, res) => {
+  try {
+    const { q = '' } = req.sanitizedQuery || {};
+
+    if (q.trim().length < 2) {
+      return res.sendData({ suggestions: [] }, 'autocompleteResponse');
+    }
+
+    const suggestions = db.searchAuctions(q, 20);
+
+    const formattedSuggestions = suggestions.map(auction => ({
+      id: auction.id,
+      title: auction.title,
+      category: auction.category,
+      price: auction.current_highest_bid,
+      type: 'auction'
+    }));
+
+    res.sendData({
+      suggestions: formattedSuggestions,
+      query: q
+    }, 'autocompleteResponse');
+  } catch (error) {
+    logError('Error fetching search suggestions:', error, { endpoint: '/api/auctions/search/autocomplete', method: 'GET' });
+    res.sendData({ suggestions: [] }, 'autocompleteResponse');
+  }
+});
+
+// Get auction categories
+app.get('/api/auctions/categories',
+  readLimiter,
+  (req, res) => {
+  try {
+    const categories = db.getAuctionCategories();
+    res.sendData({
+      categories: categories.map(c => ({ name: c.category })),
+      _links: {
+        self: { href: '/api/auctions/categories' }
+      }
+    }, 'categoriesResponse');
+  } catch (error) {
+    logError('Error fetching categories:', error, { endpoint: '/api/auctions/categories', method: 'GET' });
+    res.status(500).sendData({ error: 'Failed to fetch categories' });
+  }
+});
+
+// Track auction view
+app.post('/api/auctions/:id/views',
+  readLimiter,
+  validateRequest.params({
+    id: { type: 'uuid', required: true }
+  }),
+  (req, res) => {
+  try {
+    const auctionId = req.sanitizedParams.id;
+    const userId = req.user?.userId || null;
+    const ipAddress = req.ip || req.connection.remoteAddress;
+    const userAgent = req.get('user-agent');
+
+    const result = db.recordAuctionView(auctionId, userId, ipAddress, userAgent);
+    
+    if (result.success) {
+      res.sendData({ 
+        success: true, 
+        viewId: result.id,
+        _links: {
+          self: { href: `/api/auctions/${auctionId}` }
+        }
+      }, 'viewRecorded');
+    } else {
+      // Still return 200 even if view recording fails - it's not critical
+      res.sendData({ 
+        success: false, 
+        message: 'View recorded but tracking may be unavailable' 
+      }, 'viewPartiallyRecorded');
+    }
+  } catch (error) {
+    logError('Error recording auction view:', error, { endpoint: '/api/auctions/:id/views', method: 'POST' });
+    // Don't fail the request if view tracking fails
+    res.sendData({ success: false }, 'viewNotRecorded');
+  }
+});
+
 // ODHUNTER: Kept only PATCH endpoint and removed legacy /api/auctions/:id/close and /api/auctions/:id/bid
 app.post('/api/users', 
   authLimiter,
