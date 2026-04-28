@@ -1,12 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Private-Input Sealed-Bid Auction - Stellar Blockchain</title>
-    
+
     <!-- PWA Meta Tags -->
-    <meta name="description" content="Private-input sealed-bid auction system on Stellar blockchain with advanced analytics and bookmark management">
+    <meta name="description"
+        content="Private-input sealed-bid auction system on Stellar blockchain with advanced analytics and bookmark management">
     <meta name="theme-color" content="#667eea">
     <meta name="background-color" content="#ffffff">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -15,10 +17,10 @@
     <meta name="application-name" content="Auction Platform">
     <meta name="msapplication-TileColor" content="#667eea">
     <meta name="msapplication-config" content="/browserconfig.xml">
-    
+
     <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.json">
-    
+
     <!-- Apple Touch Icons -->
     <link rel="apple-touch-icon" sizes="72x72" href="/icons/icon-72x72.png">
     <link rel="apple-touch-icon" sizes="96x96" href="/icons/icon-96x96.png">
@@ -28,12 +30,12 @@
     <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192x192.png">
     <link rel="apple-touch-icon" sizes="384x384" href="/icons/icon-384x384.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512x512.png">
-    
+
     <!-- Favicon -->
     <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16x16.png">
     <link rel="shortcut icon" href="/favicon.ico">
-    
+
     <!-- Scripts and Styles -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/stellar-sdk@11.0.0/dist/stellar-sdk.min.js"></script>
@@ -126,25 +128,37 @@
         .gradient-bg {
             background: var(--gradient-bg);
         }
+
         .glass-effect {
             background: var(--glass-bg);
             backdrop-filter: blur(10px);
             border: 1px solid var(--glass-border);
         }
+
         .animate-pulse-slow {
             animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
         }
+
         .animate-fade-in {
             animation: fadeIn 0.3s ease-in-out;
         }
+
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
+
         .stellar-gradient {
             background: var(--stellar-gradient);
         }
-        
+
         /* Loading spinner styles */
         .spinner {
             display: inline-block;
@@ -155,64 +169,71 @@
             border-top-color: #fff;
             animation: spin 1s ease-in-out infinite;
         }
-        
+
         .spinner-lg {
             width: 40px;
             height: 40px;
             border-width: 4px;
         }
-        
+
         @keyframes spin {
-            to { transform: rotate(360deg); }
+            to {
+                transform: rotate(360deg);
+            }
         }
-        
+
         /* Skeleton loader styles */
         .skeleton {
             background: linear-gradient(90deg, rgba(255, 255, 255, 0.1) 25%, rgba(255, 255, 255, 0.2) 50%, rgba(255, 255, 255, 0.1) 75%);
             background-size: 200% 100%;
             animation: loading 1.5s infinite;
         }
-        
+
         @keyframes loading {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
+            0% {
+                background-position: 200% 0;
+            }
+
+            100% {
+                background-position: -200% 0;
+            }
         }
-        
+
         .skeleton-card {
             background: rgba(255, 255, 255, 0.05);
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 12px;
             padding: 24px;
         }
-        
+
         .skeleton-text {
             height: 16px;
             border-radius: 4px;
             margin-bottom: 8px;
         }
-        
+
         .skeleton-text.title {
             height: 24px;
             width: 60%;
         }
-        
+
         .skeleton-text.large {
             height: 20px;
             width: 80%;
         }
-        
+
         .skeleton-text.small {
             height: 14px;
             width: 40%;
         }
-        
+
         .skeleton-button {
             height: 40px;
             border-radius: 8px;
             width: 100%;
             margin-top: 16px;
         }
-        
+
         /* Social Sharing Styles */
         .social-sharing-container {
             margin-top: 1rem;
@@ -221,7 +242,7 @@
             border-radius: 8px;
             border: 1px solid var(--border-color);
         }
-        
+
         .share-btn {
             padding: 0.5rem 1rem;
             border: none;
@@ -236,88 +257,88 @@
             text-decoration: none;
             color: white;
         }
-        
+
         .share-btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
-        
+
         .share-btn:active {
             transform: translateY(0);
         }
-        
+
         .twitter-btn {
             background: #1DA1F2;
         }
-        
+
         .twitter-btn:hover {
             background: #1a91da;
         }
-        
+
         .facebook-btn {
             background: #4267B2;
         }
-        
+
         .facebook-btn:hover {
             background: #365899;
         }
-        
+
         .linkedin-btn {
             background: #0077B5;
         }
-        
+
         .linkedin-btn:hover {
             background: #005885;
         }
-        
+
         .whatsapp-btn {
             background: #25D366;
         }
-        
+
         .whatsapp-btn:hover {
             background: #20b954;
         }
-        
+
         .telegram-btn {
             background: #0088cc;
         }
-        
+
         .telegram-btn:hover {
             background: #0077b8;
         }
-        
+
         .email-btn {
             background: #EA4335;
         }
-        
+
         .email-btn:hover {
             background: #d23321;
         }
-        
+
         .copy-btn {
             background: #6B7280;
         }
-        
+
         .copy-btn:hover {
             background: #4B5563;
         }
-        
+
         .custom-btn {
             background: #8B5CF6;
         }
-        
+
         .custom-btn:hover {
             background: #7C3AED;
         }
-        
+
         .native-btn {
             background: #10B981;
         }
-        
+
         .native-btn:hover {
             background: #059669;
         }
-        
+
         .share-preview {
             margin-top: 0.75rem;
             padding: 0.75rem;
@@ -325,28 +346,28 @@
             border-radius: 6px;
             border: 1px solid var(--border-color);
         }
-        
+
         .share-image {
             border-radius: 4px;
         }
-        
+
         .share-message {
             font-style: italic;
             color: var(--text-secondary);
         }
-        
+
         /* Mobile responsive sharing */
         @media (max-width: 768px) {
             .share-btn {
                 padding: 0.4rem 0.8rem;
                 font-size: 0.75rem;
             }
-            
+
             .social-sharing-container .flex {
                 gap: 0.5rem;
             }
         }
-        
+
         /* Loading overlay styles */
         .loading-overlay {
             position: fixed;
@@ -360,7 +381,7 @@
             justify-content: center;
             z-index: 9999;
         }
-        
+
         /* Theme toggle styles */
         .theme-toggle {
             position: relative;
@@ -648,6 +669,7 @@
 
         /* Reduced motion support */
         @media (prefers-reduced-motion: reduce) {
+
             .theme-toggle,
             .theme-toggle-slider,
             .auction-card,
@@ -658,23 +680,23 @@
                 transition: none !important;
             }
         }
-        
+
         .loading-content {
             text-align: center;
             color: white;
         }
-        
+
         .loading-content .spinner {
             margin: 0 auto 16px;
         }
-        
+
         /* Button loading state */
         .btn-loading {
             position: relative;
             color: transparent !important;
             pointer-events: none;
         }
-        
+
         .btn-loading::after {
             content: '';
             position: absolute;
@@ -688,69 +710,85 @@
             border-top-color: #fff;
             animation: spin 1s ease-in-out infinite;
         }
-        
+
         /* Validation styles */
         .error-message {
             animation: slideIn 0.3s ease-out;
         }
-        
+
         @keyframes slideIn {
             from {
                 opacity: 0;
                 transform: translateY(-10px);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0);
             }
         }
-        
+
         /* Input validation states */
-        input.error, textarea.error {
+        input.error,
+        textarea.error {
             border-color: #ef4444 !important;
             background-color: rgba(239, 68, 68, 0.1) !important;
             animation: shake 0.3s ease-in-out;
         }
-        
+
         @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            25% { transform: translateX(-5px); }
-            75% { transform: translateX(5px); }
+
+            0%,
+            100% {
+                transform: translateX(0);
+            }
+
+            25% {
+                transform: translateX(-5px);
+            }
+
+            75% {
+                transform: translateX(5px);
+            }
         }
-        
-        input.valid, textarea.valid {
+
+        input.valid,
+        textarea.valid {
             border-color: #10b981 !important;
             background-color: rgba(16, 185, 129, 0.1) !important;
         }
-        
+
         /* Form field focus states */
-        input:focus, textarea:focus {
+        input:focus,
+        textarea:focus {
             outline: none;
             box-shadow: 0 0 0 3px rgba(147, 51, 234, 0.3);
             transition: all 0.3s ease;
         }
-        
-        input.error:focus, textarea.error:focus {
+
+        input.error:focus,
+        textarea.error:focus {
             box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.3);
         }
-        
-        input.valid:focus, textarea.valid:focus {
+
+        input.valid:focus,
+        textarea.valid:focus {
             box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.3);
         }
-        
+
         /* Button disabled state */
         button:disabled {
             opacity: 0.5;
             cursor: not-allowed;
             transform: none !important;
         }
-        
+
         /* Onboarding Wizard Styles */
         .wizard-overlay {
             background: rgba(0, 0, 0, 0.5);
             backdrop-filter: blur(4px);
         }
-        
+
         .wizard-container {
             background: white;
             border-radius: 16px;
@@ -759,21 +797,21 @@
             max-height: 80vh;
             overflow-y: auto;
         }
-        
+
         .step-indicator {
             transition: all 0.3s ease;
         }
-        
+
         .step-indicator.active {
             background: #667eea;
             color: white;
         }
-        
+
         .step-indicator.completed {
             background: #48bb78;
             color: white;
         }
-        
+
         .highlight-element {
             position: relative;
             z-index: 1001;
@@ -781,12 +819,19 @@
             border-radius: 8px;
             animation: pulse 2s infinite;
         }
-        
+
         @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.02); }
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.02);
+            }
         }
-        
+
         .tutorial-tooltip {
             position: absolute;
             z-index: 1002;
@@ -797,21 +842,31 @@
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
             max-width: 300px;
         }
-        
+
         .progress-bar {
             transition: width 0.5s ease;
         }
-        
+
         .reward-badge {
             animation: bounceIn 0.6s ease;
         }
-        
+
         @keyframes bounceIn {
-            0% { transform: scale(0); opacity: 0; }
-            50% { transform: scale(1.1); }
-            100% { transform: scale(1); opacity: 1; }
+            0% {
+                transform: scale(0);
+                opacity: 0;
+            }
+
+            50% {
+                transform: scale(1.1);
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
         }
-        
+
         @media (max-width: 768px) {
             .wizard-container {
                 margin: 1rem;
@@ -819,16 +874,16 @@
                 max-height: calc(100vh - 2rem);
             }
         }
-        
+
         button:disabled:hover {
             transform: none !important;
         }
-        
+
         /* Loading spinner for validation */
         .validation-loading {
             position: relative;
         }
-        
+
         .validation-loading::after {
             content: '';
             position: absolute;
@@ -842,11 +897,17 @@
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
-        
+
         @keyframes spin {
-            0% { transform: translateY(-50%) rotate(0deg); }
-            100% { transform: translateY(-50%) rotate(360deg); }
+            0% {
+                transform: translateY(-50%) rotate(0deg);
+            }
+
+            100% {
+                transform: translateY(-50%) rotate(360deg);
+            }
         }
+
         .line-clamp-3 {
             display: -webkit-box;
             -webkit-line-clamp: 3;
@@ -857,23 +918,28 @@
             -moz-line-clamp: 3;
             -moz-box-orient: vertical;
         }
+
         @media (max-width: 640px) {
             .truncate-mobile {
                 overflow: hidden;
                 text-overflow: ellipsis;
                 white-space: nowrap;
             }
+
             .auction-card-mobile {
                 min-height: 280px;
             }
+
             .mobile-overflow-hidden {
                 overflow: hidden;
             }
         }
+
         @media (max-width: 768px) {
             .md-flex-col {
                 flex-direction: column;
             }
+
             .md-w-full {
                 width: 100%;
             }
@@ -1117,10 +1183,11 @@
         }
     </style>
 </head>
+
 <body class="stellar-gradient min-h-screen" style="color: var(--text-primary);">
     <!-- Skip Navigation Link -->
     <a href="#main-content" class="skip-link">Skip to main content</a>
-    
+
     <!-- Header -->
     <header role="banner" class="glass-effect shadow-lg">
         <div class="container mx-auto px-4 py-4">
@@ -1134,60 +1201,62 @@
                 <div class="flex items-center space-x-4">
                     <!-- Bid Analytics Link -->
                     <div id="analyticsLink" class="hidden">
-                        <a href="bid-analytics.html" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors">
+                        <a href="bid-analytics.html"
+                            class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors">
                             <i class="fas fa-chart-line mr-2" aria-hidden="true"></i>Analytics
                         </a>
                     </div>
-                    
+
                     <!-- Help Button -->
                     <div class="relative">
-                        <button 
-                            onclick="startOnboardingWizard()"
+                        <button onclick="startOnboardingWizard()"
                             class="relative p-2 hover:bg-white/10 rounded-full transition-colors"
-                            title="Help & Tutorial"
-                        >
+                            title="Help & Tutorial">
                             <i class="fas fa-question-circle text-xl" aria-hidden="true"></i>
                         </button>
                     </div>
-                    
+
                     <!-- Notification Bell -->
                     <div class="relative">
-                        <button 
-                            onclick="openNotificationCenter()"
-                            class="relative p-2 hover:bg-white/10 rounded-full transition-colors"
-                            title="Notifications"
-                        >
+                        <button onclick="openNotificationCenter()"
+                            class="relative p-2 hover:bg-white/10 rounded-full transition-colors" title="Notifications">
                             <i class="fas fa-bell text-xl" aria-hidden="true"></i>
-                            <span id="notification-badge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center animate-pulse">
+                            <span id="notification-badge"
+                                class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center animate-pulse">
                                 0
                             </span>
                         </button>
                     </div>
-                    
+
                     <!-- User Menu -->
                     <div id="userMenu" class="hidden">
                         <div class="relative">
-                            <button onclick="toggleUserDropdown()" class="flex items-center space-x-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors">
+                            <button onclick="toggleUserDropdown()"
+                                class="flex items-center space-x-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors">
                                 <i class="fas fa-user"></i>
                                 <span id="usernameDisplay"></span>
                                 <i class="fas fa-chevron-down text-sm"></i>
                             </button>
-                            
+
                             <!-- User Dropdown -->
-                            <div id="userDropdown" class="hidden absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                            <div id="userDropdown"
+                                class="hidden absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
                                 <div class="p-4 border-b">
                                     <p class="font-medium text-gray-900" id="dropdownUsername"></p>
                                     <p class="text-sm text-gray-500" id="dropdownEmail"></p>
                                 </div>
-                                
+
                                 <div class="p-2">
-                                    <button onclick="showOAuthAccounts()" class="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded">
+                                    <button onclick="showOAuthAccounts()"
+                                        class="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded">
                                         <i class="fas fa-link mr-2"></i>Linked Accounts
                                     </button>
-                                    <button onclick="refreshToken()" class="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded">
+                                    <button onclick="refreshToken()"
+                                        class="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded">
                                         <i class="fas fa-sync mr-2"></i>Refresh Token
                                     </button>
-                                    <button onclick="logout()" class="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded">
+                                    <button onclick="logout()"
+                                        class="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded">
                                         <i class="fas fa-sign-out-alt mr-2"></i>Logout
                                     </button>
                                 </div>
@@ -1200,29 +1269,21 @@
     </header>
 
     <!-- Notification Center -->
-    <div id="notification-center" class="fixed top-16 right-4 w-96 max-w-[calc(100vw-2rem)] glass-effect rounded-xl shadow-2xl hidden z-50">
+    <div id="notification-center"
+        class="fixed top-16 right-4 w-96 max-w-[calc(100vw-2rem)] glass-effect rounded-xl shadow-2xl hidden z-50">
         <div class="p-4 border-b flex justify-between items-center">
             <h3 class="text-lg font-bold">Notifications</h3>
             <div class="flex items-center space-x-2">
-                <button 
-                    onclick="markAllNotificationsAsRead()"
-                    class="text-sm text-purple-600 hover:text-purple-700 transition-colors"
-                    title="Mark all as read"
-                >
+                <button onclick="markAllNotificationsAsRead()"
+                    class="text-sm text-purple-600 hover:text-purple-700 transition-colors" title="Mark all as read">
                     <i class="fas fa-check-double mr-1" aria-hidden="true"></i>Mark all read
                 </button>
-                <button 
-                    onclick="clearAllNotifications()"
-                    class="text-sm text-red-600 hover:text-red-700 transition-colors"
-                    title="Clear all notifications"
-                >
+                <button onclick="clearAllNotifications()"
+                    class="text-sm text-red-600 hover:text-red-700 transition-colors" title="Clear all notifications">
                     <i class="fas fa-trash mr-1" aria-hidden="true"></i>Clear all
                 </button>
-                <button 
-                    onclick="closeNotificationCenter()"
-                    class="text-gray-500 hover:text-gray-700 transition-colors"
-                    title="Close"
-                >
+                <button onclick="closeNotificationCenter()" class="text-gray-500 hover:text-gray-700 transition-colors"
+                    title="Close">
                     <i class="fas fa-times" aria-hidden="true"></i>
                 </button>
             </div>
@@ -1231,17 +1292,16 @@
             <!-- Notifications will be rendered here -->
         </div>
         <div class="p-4 border-t">
-            <button 
-                onclick="openNotificationSettings()"
-                class="w-full text-left text-sm text-purple-600 hover:text-purple-700 transition-colors"
-            >
+            <button onclick="openNotificationSettings()"
+                class="w-full text-left text-sm text-purple-600 hover:text-purple-700 transition-colors">
                 <i class="fas fa-cog mr-2" aria-hidden="true"></i>Notification Settings
             </button>
         </div>
     </div>
 
     <!-- Notification Settings Modal -->
-    <div id="notification-settings-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+    <div id="notification-settings-modal"
+        class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
         <div class="glass-effect rounded-xl p-6 sm:p-8 max-w-md w-full max-h-[90vh] overflow-y-auto">
             <h2 class="text-xl sm:text-2xl font-bold mb-6">Notification Settings</h2>
             <div class="space-y-4">
@@ -1250,33 +1310,38 @@
                         <label class="font-semibold">Enable Notifications</label>
                         <p class="text-sm text-gray-500">Receive browser notifications</p>
                     </div>
-                    <input type="checkbox" id="enable-notifications" class="w-5 h-5" onchange="toggleNotificationPermissions()">
+                    <input type="checkbox" id="enable-notifications" class="w-5 h-5"
+                        onchange="toggleNotificationPermissions()">
                 </div>
-                
+
                 <div class="border-t pt-4">
                     <h3 class="font-semibold mb-3">Notification Types</h3>
                     <div class="space-y-2">
                         <div class="flex items-center justify-between">
                             <label for="notify-auctions">New Auctions</label>
-                            <input type="checkbox" id="notify-auctions" class="w-5 h-5" checked onchange="saveNotificationPreferences()">
+                            <input type="checkbox" id="notify-auctions" class="w-5 h-5" checked
+                                onchange="saveNotificationPreferences()">
                         </div>
                         <div class="flex items-center justify-between">
                             <label for="notify-bids">New Bids</label>
-                            <input type="checkbox" id="notify-bids" class="w-5 h-5" checked onchange="saveNotificationPreferences()">
+                            <input type="checkbox" id="notify-bids" class="w-5 h-5" checked
+                                onchange="saveNotificationPreferences()">
                         </div>
                         <div class="flex items-center justify-between">
                             <label for="notify-results">Auction Results</label>
-                            <input type="checkbox" id="notify-results" class="w-5 h-5" checked onchange="saveNotificationPreferences()">
+                            <input type="checkbox" id="notify-results" class="w-5 h-5" checked
+                                onchange="saveNotificationPreferences()">
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="border-t pt-4">
                     <h3 class="font-semibold mb-3">Storage</h3>
                     <div class="flex items-center justify-between">
                         <div>
                             <p class="text-sm">Keep notifications for</p>
-                            <select id="notification-retention" class="mt-1 p-2 rounded bg-white/50 w-full" onchange="saveNotificationPreferences()">
+                            <select id="notification-retention" class="mt-1 p-2 rounded bg-white/50 w-full"
+                                onchange="saveNotificationPreferences()">
                                 <option value="25">Last 25 notifications</option>
                                 <option value="50" selected>Last 50 notifications</option>
                                 <option value="100">Last 100 notifications</option>
@@ -1285,12 +1350,14 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="flex space-x-3 pt-4">
-                    <button onclick="closeNotificationSettings()" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors">
+                    <button onclick="closeNotificationSettings()"
+                        class="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors">
                         Close
                     </button>
-                    <button onclick="saveNotificationPreferences()" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors">
+                    <button onclick="saveNotificationPreferences()"
+                        class="flex-1 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors">
                         Save Changes
                     </button>
                 </div>
@@ -1301,16 +1368,17 @@
     <!-- Main Content -->
     <main id="main-content" role="main" class="container mx-auto px-4 py-8">
         <!-- Auth Modal -->
-        <div id="authModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div id="authModal"
+            class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
             <div class="glass-effect rounded-xl p-6 sm:p-8 max-w-md w-full max-h-[90vh] overflow-y-auto">
                 <h2 id="authTitle" class="text-xl sm:text-2xl font-bold mb-6">Login</h2>
                 <form id="authForm" class="space-y-4">
                     <div>
 
-                            <span id="authModeText">Register</span>
+                        <span id="authModeText">Register</span>
                         </button>
                     </div>
-                    
+
                     <!-- Social Login Divider -->
                     <div class="relative my-6">
                         <div class="absolute inset-0 flex items-center">
@@ -1320,27 +1388,35 @@
                             <span class="px-2 bg-transparent text-gray-300">Or continue with</span>
                         </div>
                     </div>
-                    
+
                     <!-- Social Login Buttons -->
                     <div id="socialLoginButtons" class="space-y-3">
                         <!-- Google Login Button -->
                         <div id="googleLoginBtn" class="hidden">
-                            <a href="/auth/google" class="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition">
+                            <a href="/auth/google"
+                                class="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition">
                                 <svg class="w-5 h-5 mr-2" viewBox="0 0 24 24">
-                                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                                    <path fill="#4285F4"
+                                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                                    <path fill="#34A853"
+                                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                                    <path fill="#FBBC05"
+                                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                                    <path fill="#EA4335"
+                                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
                                 </svg>
                                 Continue with Google
                             </a>
                         </div>
-                        
+
                         <!-- GitHub Login Button -->
                         <div id="githubLoginBtn" class="hidden">
-                            <a href="/auth/github" class="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition">
+                            <a href="/auth/github"
+                                class="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition">
                                 <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M10 0C4.477 0 0 4.484 0 10.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0110 4.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.203 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.942.359.31.678.921.678 1.856 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0020 10.017C20 4.484 15.522 0 10 0z" clip-rule="evenodd"/>
+                                    <path fill-rule="evenodd"
+                                        d="M10 0C4.477 0 0 4.484 0 10.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0110 4.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.203 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.942.359.31.678.921.678 1.856 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0020 10.017C20 4.484 15.522 0 10 0z"
+                                        clip-rule="evenodd" />
                                 </svg>
                                 Continue with GitHub
                             </a>
@@ -1348,13 +1424,14 @@
                     </div>
                 </form>
 
-                    <i class="fas fa-times mr-2" aria-hidden="true"></i>Close
+                <i class="fas fa-times mr-2" aria-hidden="true"></i>Close
                 </button>
             </div>
         </div>
 
         <!-- OAuth Accounts Modal -->
-        <div id="oauthAccountsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div id="oauthAccountsModal"
+            class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
             <div class="glass-effect rounded-xl p-6 sm:p-8 max-w-md w-full max-h-[90vh] overflow-y-auto">
                 <div class="flex justify-between items-center mb-6">
                     <h2 class="text-xl sm:text-2xl font-bold">Linked Accounts</h2>
@@ -1362,30 +1439,38 @@
                         <i class="fas fa-times text-xl"></i>
                     </button>
                 </div>
-                
+
                 <div id="oauthAccountsContainer" class="space-y-4">
                     <!-- OAuth accounts will be loaded here -->
                 </div>
-                
+
                 <div class="mt-6 pt-6 border-t">
                     <h3 class="text-lg font-semibold mb-3">Add More Accounts</h3>
                     <div class="space-y-3">
                         <div id="modalGoogleLoginBtn" class="hidden">
-                            <a href="/auth/google" class="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition">
+                            <a href="/auth/google"
+                                class="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition">
                                 <svg class="w-5 h-5 mr-2" viewBox="0 0 24 24">
-                                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                                    <path fill="#4285F4"
+                                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                                    <path fill="#34A853"
+                                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                                    <path fill="#FBBC05"
+                                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                                    <path fill="#EA4335"
+                                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
                                 </svg>
                                 Link Google Account
                             </a>
                         </div>
-                        
+
                         <div id="modalGithubLoginBtn" class="hidden">
-                            <a href="/auth/github" class="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition">
+                            <a href="/auth/github"
+                                class="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition">
                                 <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M10 0C4.477 0 0 4.484 0 10.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0110 4.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.203 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.942.359.31.678.921.678 1.856 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0020 10.017C20 4.484 15.522 0 10 0z" clip-rule="evenodd"/>
+                                    <path fill-rule="evenodd"
+                                        d="M10 0C4.477 0 0 4.484 0 10.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0110 4.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.203 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.942.359.31.678.921.678 1.856 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0020 10.017C20 4.484 15.522 0 10 0z"
+                                        clip-rule="evenodd" />
                                 </svg>
                                 Link GitHub Account
                             </a>
@@ -1398,34 +1483,61 @@
         <!-- Navigation Tabs -->
         <div class="glass-effect rounded-xl p-1 mb-8">
             <div role="tablist" aria-label="Auction sections" class="flex flex-wrap gap-1">
-                <button role="tab" aria-selected="true" aria-controls="auctionsContent" data-tab="auctions" onclick="switchTab('auctions')" class="bg-purple-600 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium" tabindex="0">
+                <button role="tab" aria-selected="true" aria-controls="auctionsContent" data-tab="auctions"
+                    onclick="switchTab('auctions')"
+                    class="bg-purple-600 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
+                    tabindex="0">
                     <i class="fas fa-gavel mr-2" aria-hidden="true"></i>Auctions
                 </button>
-                <button role="tab" aria-selected="false" aria-controls="createContent" data-tab="create" onclick="switchTab('create')" class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20" tabindex="-1">
+                <button role="tab" aria-selected="false" aria-controls="createContent" data-tab="create"
+                    onclick="switchTab('create')"
+                    class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20"
+                    tabindex="-1">
                     <i class="fas fa-plus mr-2" aria-hidden="true"></i>Create
                 </button>
-                <button role="tab" aria-selected="false" aria-controls="myBidsContent" data-tab="myBids" onclick="switchTab('myBids')" class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20" tabindex="-1">
+                <button role="tab" aria-selected="false" aria-controls="myBidsContent" data-tab="myBids"
+                    onclick="switchTab('myBids')"
+                    class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20"
+                    tabindex="-1">
                     <i class="fas fa-hand-paper mr-2" aria-hidden="true"></i>My Bids
                 </button>
-                <button role="tab" aria-selected="false" aria-controls="filterContent" data-tab="filter" onclick="switchTab('filter')" class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20" tabindex="-1">
+                <button role="tab" aria-selected="false" aria-controls="filterContent" data-tab="filter"
+                    onclick="switchTab('filter')"
+                    class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20"
+                    tabindex="-1">
                     <i class="fas fa-filter mr-2" aria-hidden="true"></i>Filter
                 </button>
-                <button role="tab" aria-selected="false" aria-controls="mapContent" data-tab="map" onclick="switchTab('map')" class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20" tabindex="-1">
+                <button role="tab" aria-selected="false" aria-controls="mapContent" data-tab="map"
+                    onclick="switchTab('map')"
+                    class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20"
+                    tabindex="-1">
                     <i class="fas fa-map-marker-alt mr-2" aria-hidden="true"></i>Map
                 </button>
-                <button role="tab" aria-selected="false" aria-controls="videoContent" data-tab="video" onclick="switchTab('video')" class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20" tabindex="-1">
+                <button role="tab" aria-selected="false" aria-controls="videoContent" data-tab="video"
+                    onclick="switchTab('video')"
+                    class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20"
+                    tabindex="-1">
                     <i class="fas fa-video mr-2" aria-hidden="true"></i>Video
                 </button>
-                <button role="tab" aria-selected="false" aria-controls="voiceContent" data-tab="voice" onclick="switchTab('voice')" class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20" tabindex="-1">
+                <button role="tab" aria-selected="false" aria-controls="voiceContent" data-tab="voice"
+                    onclick="switchTab('voice')"
+                    class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20"
+                    tabindex="-1">
                     <i class="fas fa-microphone mr-2" aria-hidden="true"></i>Voice
                 </button>
-                <button role="tab" aria-selected="false" aria-controls="networkContent" data-tab="network" onclick="switchTab('network')" class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20" tabindex="-1">
+                <button role="tab" aria-selected="false" aria-controls="networkContent" data-tab="network"
+                    onclick="switchTab('network')"
+                    class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20"
+                    tabindex="-1">
                     <i class="fas fa-network-wired mr-2" aria-hidden="true"></i>Network
                 </button>
-                <button data-tab="tokens" onclick="switchTab('tokens')" class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20">
+                <button data-tab="tokens" onclick="switchTab('tokens')"
+                    class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20">
                     <i class="fas fa-coins mr-2"></i>Tokens
                 </button>
-                <button data-tab="admin" onclick="switchTab('admin')" class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20" id="adminTab" style="display: none;">
+                <button data-tab="admin" onclick="switchTab('admin')"
+                    class="bg-transparent text-gray-600 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-white/20"
+                    id="adminTab" style="display: none;">
                     <i class="fas fa-shield-alt mr-2"></i>Admin
                 </button>
             </div>
@@ -1449,8 +1561,8 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
 
-                        <i class="fas fa-gavel mr-2" aria-hidden="true"></i>Create Auction
-                    </button>
+                            <i class="fas fa-gavel mr-2" aria-hidden="true"></i>Create Auction
+                            </button>
                 </form>
             </div>
         </div>
@@ -1458,21 +1570,23 @@
         <!-- My Bids Tab -->
         <div id="myBidsContent" role="tabpanel" aria-labelledby="myBids-tab" class="tab-content hidden">
 
-                    <!-- User's bids will be displayed here -->
-                </div>
-            </div>
+            <!-- User's bids will be displayed here -->
+        </div>
+        </div>
         </div>
 
         <!-- Advanced Filtering Tab (#106) -->
         <div id="filterContent" role="tabpanel" aria-labelledby="filter-tab" class="tab-content hidden">
             <div class="glass-effect rounded-xl p-4 sm:p-6 max-w-4xl mx-auto">
-                <h2 class="text-xl sm:text-2xl font-bold mb-6"><i class="fas fa-filter mr-2" aria-hidden="true"></i>Advanced Filtering</h2>
+                <h2 class="text-xl sm:text-2xl font-bold mb-6"><i class="fas fa-filter mr-2"
+                        aria-hidden="true"></i>Advanced Filtering</h2>
 
                 <!-- Saved Presets -->
                 <div class="mb-6">
                     <div class="flex items-center justify-between mb-3">
                         <h3 class="font-semibold text-lg">Saved Presets</h3>
-                        <button onclick="saveFilterPreset()" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-lg text-sm transition-colors">
+                        <button onclick="saveFilterPreset()"
+                            class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-lg text-sm transition-colors">
                             <i class="fas fa-save mr-1" aria-hidden="true"></i>Save Current
                         </button>
                     </div>
@@ -1487,12 +1601,18 @@
                     <div>
                         <label class="block font-semibold mb-2">Categories</label>
                         <div id="categoryFilters" class="flex flex-wrap gap-2">
-                            <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" value="electronics" class="filter-category"> Electronics</label>
-                            <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" value="art" class="filter-category"> Art</label>
-                            <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" value="collectibles" class="filter-category"> Collectibles</label>
-                            <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" value="vehicles" class="filter-category"> Vehicles</label>
-                            <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" value="real-estate" class="filter-category"> Real Estate</label>
-                            <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" value="other" class="filter-category"> Other</label>
+                            <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox"
+                                    value="electronics" class="filter-category"> Electronics</label>
+                            <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" value="art"
+                                    class="filter-category"> Art</label>
+                            <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox"
+                                    value="collectibles" class="filter-category"> Collectibles</label>
+                            <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox"
+                                    value="vehicles" class="filter-category"> Vehicles</label>
+                            <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox"
+                                    value="real-estate" class="filter-category"> Real Estate</label>
+                            <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" value="other"
+                                    class="filter-category"> Other</label>
                         </div>
                     </div>
 
@@ -1500,9 +1620,12 @@
                     <div>
                         <label class="block font-semibold mb-2">Status</label>
                         <div class="flex flex-wrap gap-2">
-                            <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" value="active" class="filter-status" checked> Active</label>
-                            <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" value="closed" class="filter-status"> Closed</label>
-                            <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" value="upcoming" class="filter-status"> Upcoming</label>
+                            <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" value="active"
+                                    class="filter-status" checked> Active</label>
+                            <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" value="closed"
+                                    class="filter-status"> Closed</label>
+                            <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox"
+                                    value="upcoming" class="filter-status"> Upcoming</label>
                         </div>
                     </div>
 
@@ -1510,13 +1633,18 @@
                     <div>
                         <label class="block font-semibold mb-2">Price Range ($)</label>
                         <div class="flex items-center gap-3">
-                            <input type="number" id="filterPriceMin" placeholder="Min" min="0" class="form-input w-full p-2 rounded-lg border" aria-label="Min">
+                            <input type="number" id="filterPriceMin" placeholder="Min" min="0"
+                                class="form-input w-full p-2 rounded-lg border" aria-label="Min">
                             <span>–</span>
-                            <input type="number" id="filterPriceMax" placeholder="Max" min="0" class="form-input w-full p-2 rounded-lg border" aria-label="Max">
+                            <input type="number" id="filterPriceMax" placeholder="Max" min="0"
+                                class="form-input w-full p-2 rounded-lg border" aria-label="Max">
                         </div>
                         <input type="range" id="filterPriceSlider" min="0" max="100000" step="100" value="100000"
-                            class="w-full mt-2 accent-purple-600" oninput="document.getElementById('filterPriceMax').value=this.value">
-                        <div class="flex justify-between text-xs text-gray-500 mt-1"><span>$0</span><span>$100,000</span></div>
+                            class="w-full mt-2 accent-purple-600"
+                            oninput="document.getElementById('filterPriceMax').value=this.value">
+                        <div class="flex justify-between text-xs text-gray-500 mt-1">
+                            <span>$0</span><span>$100,000</span>
+                        </div>
                     </div>
 
                     <!-- Date Range -->
@@ -1544,17 +1672,20 @@
 
                 <!-- Actions -->
                 <div class="flex gap-3">
-                    <button onclick="applyFilters()" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg transition-colors font-semibold">
+                    <button onclick="applyFilters()"
+                        class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg transition-colors font-semibold">
                         <i class="fas fa-search mr-2" aria-hidden="true"></i>Apply Filters
                     </button>
-                    <button onclick="resetFilters()" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg transition-colors">
+                    <button onclick="resetFilters()"
+                        class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg transition-colors">
                         <i class="fas fa-undo mr-2" aria-hidden="true"></i>Reset
                     </button>
                 </div>
 
                 <!-- Filter Results -->
                 <div id="filterResults" class="mt-8 hidden">
-                    <h3 class="font-semibold text-lg mb-4">Results <span id="filterResultCount" class="text-purple-600"></span></h3>
+                    <h3 class="font-semibold text-lg mb-4">Results <span id="filterResultCount"
+                            class="text-purple-600"></span></h3>
                     <div id="filterResultsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
                 </div>
             </div>
@@ -1563,15 +1694,18 @@
         <!-- Map Integration Tab (#107) -->
         <div id="mapContent" role="tabpanel" aria-labelledby="map-tab" class="tab-content hidden">
             <div class="glass-effect rounded-xl p-4 sm:p-6">
-                <h2 class="text-xl sm:text-2xl font-bold mb-4"><i class="fas fa-map-marker-alt mr-2" aria-hidden="true"></i>Auction Map</h2>
+                <h2 class="text-xl sm:text-2xl font-bold mb-4"><i class="fas fa-map-marker-alt mr-2"
+                        aria-hidden="true"></i>Auction Map</h2>
 
                 <!-- Search & Controls -->
                 <div class="flex flex-col sm:flex-row gap-3 mb-4">
                     <div class="flex-1 relative">
-                        <input type="text" id="mapLocationSearch" placeholder="Search location..." class="form-input w-full p-2 pl-9 rounded-lg border" aria-label="Search location...">
+                        <input type="text" id="mapLocationSearch" placeholder="Search location..."
+                            class="form-input w-full p-2 pl-9 rounded-lg border" aria-label="Search location...">
                         <i class="fas fa-search absolute left-3 top-3 text-gray-400" aria-hidden="true"></i>
                     </div>
-                    <button onclick="locateMe()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors whitespace-nowrap">
+                    <button onclick="locateMe()"
+                        class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors whitespace-nowrap">
                         <i class="fas fa-crosshairs mr-2" aria-hidden="true"></i>My Location
                     </button>
                     <select id="mapRadiusFilter" class="form-input p-2 rounded-lg border" onchange="updateMapRadius()">
@@ -1584,11 +1718,13 @@
                 </div>
 
                 <!-- Map Container -->
-                <div id="mapContainer" class="w-full rounded-xl overflow-hidden border border-white/20 mb-4" style="height:420px; background: linear-gradient(135deg,#1a1a2e,#16213e);">
+                <div id="mapContainer" class="w-full rounded-xl overflow-hidden border border-white/20 mb-4"
+                    style="height:420px; background: linear-gradient(135deg,#1a1a2e,#16213e);">
                     <div class="flex flex-col items-center justify-center h-full text-center p-6">
                         <i class="fas fa-map text-6xl text-purple-400 mb-4" aria-hidden="true"></i>
                         <p class="text-lg font-semibold mb-2">Interactive Map</p>
-                        <p class="text-gray-400 text-sm mb-4">Click "My Location" to center the map on your position, or search for a location above.</p>
+                        <p class="text-gray-400 text-sm mb-4">Click "My Location" to center the map on your position, or
+                            search for a location above.</p>
                         <div id="mapStatus" class="text-sm text-purple-300"></div>
                         <!-- Map markers will be rendered here via canvas/SVG in a real integration -->
                         <div id="mapMarkers" class="mt-4 w-full max-w-md"></div>
@@ -1608,22 +1744,26 @@
         <!-- Video Streaming Tab (#108) -->
         <div id="videoContent" role="tabpanel" aria-labelledby="video-tab" class="tab-content hidden">
             <div class="glass-effect rounded-xl p-4 sm:p-6">
-                <h2 class="text-xl sm:text-2xl font-bold mb-4"><i class="fas fa-video mr-2" aria-hidden="true"></i>Auction Video Previews</h2>
+                <h2 class="text-xl sm:text-2xl font-bold mb-4"><i class="fas fa-video mr-2"
+                        aria-hidden="true"></i>Auction Video Previews</h2>
 
                 <!-- Video Player -->
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div class="lg:col-span-2">
-                        <div id="videoPlayer" class="w-full rounded-xl overflow-hidden bg-black aspect-video flex items-center justify-center relative">
+                        <div id="videoPlayer"
+                            class="w-full rounded-xl overflow-hidden bg-black aspect-video flex items-center justify-center relative">
                             <video id="mainVideo" class="w-full h-full hidden" controls preload="metadata">
                                 Your browser does not support the video tag.
                             </video>
-                            <div id="videoPlaceholder" class="flex flex-col items-center justify-center text-center p-8">
+                            <div id="videoPlaceholder"
+                                class="flex flex-col items-center justify-center text-center p-8">
                                 <i class="fas fa-play-circle text-6xl text-purple-400 mb-4" aria-hidden="true"></i>
                                 <p class="text-lg font-semibold">Select a video to play</p>
                                 <p class="text-gray-400 text-sm mt-2">Choose an auction preview from the list</p>
                             </div>
                             <!-- Video overlay controls -->
-                            <div id="videoOverlay" class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 hidden">
+                            <div id="videoOverlay"
+                                class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 hidden">
                                 <p id="videoTitle" class="font-semibold text-white text-sm"></p>
                                 <div class="flex items-center gap-2 mt-1">
                                     <span id="videoQuality" class="text-xs bg-purple-600 px-2 py-0.5 rounded">HD</span>
@@ -1634,7 +1774,8 @@
 
                         <!-- Playback Controls -->
                         <div class="mt-3 flex items-center gap-3 flex-wrap">
-                            <select id="videoQualitySelect" class="form-input p-1.5 rounded-lg border text-sm" onchange="changeVideoQuality()">
+                            <select id="videoQualitySelect" class="form-input p-1.5 rounded-lg border text-sm"
+                                onchange="changeVideoQuality()">
                                 <option value="auto">Auto Quality</option>
                                 <option value="1080p">1080p HD</option>
                                 <option value="720p" selected>720p HD</option>
@@ -1654,7 +1795,8 @@
                         <div id="videoPlaylist" class="space-y-3 max-h-96 overflow-y-auto pr-1">
                             <!-- Populated by JS -->
                         </div>
-                        <button onclick="loadVideoPlaylist()" class="mt-3 w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg transition-colors text-sm">
+                        <button onclick="loadVideoPlaylist()"
+                            class="mt-3 w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg transition-colors text-sm">
                             <i class="fas fa-sync mr-2" aria-hidden="true"></i>Refresh Previews
                         </button>
                     </div>
@@ -1673,11 +1815,14 @@
         <!-- Voice Commands Tab (#109) -->
         <div id="voiceContent" role="tabpanel" aria-labelledby="voice-tab" class="tab-content hidden">
             <div class="glass-effect rounded-xl p-4 sm:p-6 max-w-2xl mx-auto">
-                <h2 class="text-xl sm:text-2xl font-bold mb-4"><i class="fas fa-microphone mr-2" aria-hidden="true"></i>Voice Commands</h2>
+                <h2 class="text-xl sm:text-2xl font-bold mb-4"><i class="fas fa-microphone mr-2"
+                        aria-hidden="true"></i>Voice Commands</h2>
 
                 <!-- Microphone Status -->
                 <div class="flex flex-col items-center py-8">
-                    <button id="voiceBtn" onclick="toggleVoiceRecognition()" class="w-24 h-24 rounded-full bg-purple-600 hover:bg-purple-700 text-white text-4xl flex items-center justify-center transition-all shadow-lg mb-4" title="Start voice recognition">
+                    <button id="voiceBtn" onclick="toggleVoiceRecognition()"
+                        class="w-24 h-24 rounded-full bg-purple-600 hover:bg-purple-700 text-white text-4xl flex items-center justify-center transition-all shadow-lg mb-4"
+                        title="Start voice recognition">
                         <i class="fas fa-microphone" aria-hidden="true"></i>
                     </button>
                     <p id="voiceStatus" class="text-lg font-semibold mb-1">Click to start listening</p>
@@ -1695,23 +1840,34 @@
                 <div class="mb-6">
                     <h3 class="font-semibold mb-3">Available Commands</h3>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2" aria-hidden="true"></i>"show auctions"</div>
-                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2" aria-hidden="true"></i>"create auction"</div>
-                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2" aria-hidden="true"></i>"my bids"</div>
-                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2" aria-hidden="true"></i>"open filter"</div>
-                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2" aria-hidden="true"></i>"open map"</div>
-                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2" aria-hidden="true"></i>"open video"</div>
-                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2" aria-hidden="true"></i>"scroll down / up"</div>
-                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2" aria-hidden="true"></i>"search [term]"</div>
-                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2" aria-hidden="true"></i>"stop listening"</div>
-                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2" aria-hidden="true"></i>"help"</div>
+                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2"
+                                aria-hidden="true"></i>"show auctions"</div>
+                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2"
+                                aria-hidden="true"></i>"create auction"</div>
+                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2"
+                                aria-hidden="true"></i>"my bids"</div>
+                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2"
+                                aria-hidden="true"></i>"open filter"</div>
+                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2"
+                                aria-hidden="true"></i>"open map"</div>
+                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2"
+                                aria-hidden="true"></i>"open video"</div>
+                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2"
+                                aria-hidden="true"></i>"scroll down / up"</div>
+                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2"
+                                aria-hidden="true"></i>"search [term]"</div>
+                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2"
+                                aria-hidden="true"></i>"stop listening"</div>
+                        <div class="p-2 rounded-lg bg-white/10"><i class="fas fa-chevron-right text-purple-400 mr-2"
+                                aria-hidden="true"></i>"help"</div>
                     </div>
                 </div>
 
                 <!-- Privacy Notice -->
                 <div class="p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-sm">
                     <i class="fas fa-shield-alt text-yellow-400 mr-2" aria-hidden="true"></i>
-                    <strong>Privacy:</strong> Voice recognition runs entirely in your browser. No audio is sent to our servers.
+                    <strong>Privacy:</strong> Voice recognition runs entirely in your browser. No audio is sent to our
+                    servers.
                     <span id="voiceSupportNote" class="block mt-1 text-gray-400"></span>
                 </div>
 
@@ -1719,7 +1875,8 @@
                 <div class="mt-6">
                     <div class="flex items-center justify-between mb-2">
                         <h3 class="font-semibold">Command History</h3>
-                        <button onclick="clearVoiceHistory()" class="text-xs text-red-400 hover:text-red-300">Clear</button>
+                        <button onclick="clearVoiceHistory()"
+                            class="text-xs text-red-400 hover:text-red-300">Clear</button>
                     </div>
                     <div id="voiceHistory" class="space-y-1 max-h-40 overflow-y-auto text-sm text-gray-400">
                         <p class="text-gray-500">No commands yet.</p>
@@ -1732,7 +1889,8 @@
         <div id="networkContent" role="tabpanel" aria-labelledby="network-tab" class="tab-content hidden">
             <div class="glass-effect rounded-xl p-4 sm:p-6">
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
-                    <h2 class="text-xl sm:text-2xl font-bold"><i class="fas fa-network-wired mr-2" aria-hidden="true"></i>Network Status Monitor</h2>
+                    <h2 class="text-xl sm:text-2xl font-bold"><i class="fas fa-network-wired mr-2"
+                            aria-hidden="true"></i>Network Status Monitor</h2>
                     <div class="flex items-center space-x-3 mt-3 sm:mt-0">
                         <select id="timeRange" class="bg-white/20 border border-white/30 rounded-lg px-3 py-2 text-sm">
                             <option value="1">Last Hour</option>
@@ -1740,7 +1898,8 @@
                             <option value="24" selected>Last 24 Hours</option>
                             <option value="168">Last Week</option>
                         </select>
-                        <button id="refreshNetwork" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium">
+                        <button id="refreshNetwork"
+                            class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium">
                             <i class="fas fa-sync mr-2" aria-hidden="true"></i>Refresh
                         </button>
                     </div>
@@ -1898,7 +2057,8 @@
 
                         <!-- Bridge Arrow -->
                         <div class="flex items-center justify-center md:col-span-2">
-                            <button id="bridgeSwapChains" class="text-3xl text-purple-500 hover:text-purple-600 transition-colors">
+                            <button id="bridgeSwapChains"
+                                class="text-3xl text-purple-500 hover:text-purple-600 transition-colors">
                                 <i class="fas fa-exchange-alt"></i>
                             </button>
                         </div>
@@ -1918,16 +2078,18 @@
                         <div class="grid md:grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-xs text-gray-500 mb-1">Available Assets</label>
-                                <select id="bridgeAssetSelect" class="w-full p-3 border rounded-lg bg-white/10 border-white/20 text-white">
+                                <select id="bridgeAssetSelect"
+                                    class="w-full p-3 border rounded-lg bg-white/10 border-white/20 text-white">
                                     <option value="">Select an asset...</option>
                                 </select>
                             </div>
                             <div>
                                 <label class="block text-xs text-gray-500 mb-1">Amount</label>
                                 <div class="flex gap-2">
-                                    <input type="number" id="bridgeAmountInput" placeholder="0.00" min="0" step="0.01" 
-                                           class="flex-1 p-3 border rounded-lg bg-white/10 border-white/20 text-white">
-                                    <button id="bridgeMaxButton" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors">MAX</button>
+                                    <input type="number" id="bridgeAmountInput" placeholder="0.00" min="0" step="0.01"
+                                        class="flex-1 p-3 border rounded-lg bg-white/10 border-white/20 text-white">
+                                    <button id="bridgeMaxButton"
+                                        class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors">MAX</button>
                                 </div>
                             </div>
                         </div>
@@ -1971,11 +2133,14 @@
 
                     <!-- Action Buttons -->
                     <div class="flex gap-4">
-                        <button id="bridgeButton" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg transition-colors flex-1 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        <button id="bridgeButton"
+                            class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg transition-colors flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled>
                             <i class="fas fa-paper-plane mr-2"></i>
                             Bridge Assets
                         </button>
-                        <button id="bridgePreviewButton" class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg transition-colors">
+                        <button id="bridgePreviewButton"
+                            class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg transition-colors">
                             <i class="fas fa-eye mr-2"></i>
                             Preview
                         </button>
@@ -2009,8 +2174,9 @@
         <!-- Admin Dashboard Tab -->
         <div id="adminContent" role="tabpanel" aria-labelledby="admin-tab" class="tab-content hidden">
             <div class="glass-effect rounded-xl p-4 sm:p-6">
-                <h2 class="text-xl sm:text-2xl font-bold mb-6"><i class="fas fa-shield-alt mr-2" aria-hidden="true"></i>Admin Dashboard</h2>
-                
+                <h2 class="text-xl sm:text-2xl font-bold mb-6"><i class="fas fa-shield-alt mr-2"
+                        aria-hidden="true"></i>Admin Dashboard</h2>
+
                 <!-- Dashboard Stats -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8" id="adminStats">
                     <div class="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
@@ -2053,22 +2219,28 @@
 
                 <!-- Admin Navigation -->
                 <div class="flex flex-wrap gap-2 mb-6">
-                    <button onclick="showAdminSection('users')" class="admin-nav-btn bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                    <button onclick="showAdminSection('users')"
+                        class="admin-nav-btn bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
                         <i class="fas fa-users mr-2" aria-hidden="true"></i>Users
                     </button>
-                    <button onclick="showAdminSection('auctions')" class="admin-nav-btn bg-transparent text-gray-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/20">
+                    <button onclick="showAdminSection('auctions')"
+                        class="admin-nav-btn bg-transparent text-gray-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/20">
                         <i class="fas fa-gavel mr-2" aria-hidden="true"></i>Auctions
                     </button>
-                    <button onclick="showAdminSection('revenue')" class="admin-nav-btn bg-transparent text-gray-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/20">
+                    <button onclick="showAdminSection('revenue')"
+                        class="admin-nav-btn bg-transparent text-gray-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/20">
                         <i class="fas fa-dollar-sign mr-2" aria-hidden="true"></i>Revenue
                     </button>
-                    <button onclick="showAdminSection('security')" class="admin-nav-btn bg-transparent text-gray-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/20">
+                    <button onclick="showAdminSection('security')"
+                        class="admin-nav-btn bg-transparent text-gray-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/20">
                         <i class="fas fa-shield-alt mr-2" aria-hidden="true"></i>Security
                     </button>
-                    <button onclick="showAdminSection('config')" class="admin-nav-btn bg-transparent text-gray-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/20">
+                    <button onclick="showAdminSection('config')"
+                        class="admin-nav-btn bg-transparent text-gray-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/20">
                         <i class="fas fa-cog mr-2" aria-hidden="true"></i>Config
                     </button>
-                    <button onclick="showAdminSection('audit')" class="admin-nav-btn bg-transparent text-gray-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/20">
+                    <button onclick="showAdminSection('audit')"
+                        class="admin-nav-btn bg-transparent text-gray-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/20">
                         <i class="fas fa-history mr-2" aria-hidden="true"></i>Audit
                     </button>
                 </div>
@@ -2080,14 +2252,18 @@
                         <div class="flex items-center justify-between mb-4">
                             <h3 class="text-lg font-semibold">User Management</h3>
                             <div class="flex gap-2">
-                                <input type="text" id="userSearch" placeholder="Search users..." class="px-3 py-1 rounded-lg bg-white/10 border border-white/20 text-sm" aria-label="Search users...">
-                                <select id="userRoleFilter" class="px-3 py-1 rounded-lg bg-white/10 border border-white/20 text-sm">
+                                <input type="text" id="userSearch" placeholder="Search users..."
+                                    class="px-3 py-1 rounded-lg bg-white/10 border border-white/20 text-sm"
+                                    aria-label="Search users...">
+                                <select id="userRoleFilter"
+                                    class="px-3 py-1 rounded-lg bg-white/10 border border-white/20 text-sm">
                                     <option value="">All Roles</option>
                                     <option value="user">User</option>
                                     <option value="admin">Admin</option>
                                     <option value="moderator">Moderator</option>
                                 </select>
-                                <select id="userStatusFilter" class="px-3 py-1 rounded-lg bg-white/10 border border-white/20 text-sm">
+                                <select id="userStatusFilter"
+                                    class="px-3 py-1 rounded-lg bg-white/10 border border-white/20 text-sm">
                                     <option value="">All Status</option>
                                     <option value="active">Active</option>
                                     <option value="inactive">Inactive</option>
@@ -2137,13 +2313,14 @@
         </div>
 
         <!-- Bid Modal -->
-        <div id="bidModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div id="bidModal"
+            class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
             <div class="glass-effect rounded-xl p-6 sm:p-8 max-w-md w-full max-h-[90vh] overflow-y-auto">
                 <h2 class="text-xl sm:text-2xl font-bold mb-6">Place Sealed Bid</h2>
                 <form id="bidForm" class="space-y-4">
                     <div>
 
-                            Cancel
+                        Cancel
                         </button>
                     </div>
                 </form>
@@ -2151,10 +2328,11 @@
         </div>
 
         <!-- Social Sharing Modal -->
-        <div id="shareModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div id="shareModal"
+            class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
             <div class="glass-effect rounded-xl p-6 sm:p-8 max-w-md w-full max-h-[90vh] overflow-y-auto">
                 <h2 class="text-xl sm:text-2xl font-bold mb-6">Share Auction</h2>
-                
+
                 <div class="mb-6">
                     <h3 class="text-lg font-semibold mb-2" id="shareAuctionTitle">Auction Title</h3>
                     <p class="text-sm text-gray-400 mb-4">Share this auction with others on social media</p>
@@ -2163,7 +2341,9 @@
                 <!-- Custom Message -->
                 <div class="mb-6">
                     <label class="block text-sm font-medium mb-2">Custom Message (optional)</label>
-                    <textarea id="customShareMessage" rows="3" class="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-sm" placeholder="Add your own message..."></textarea>
+                    <textarea id="customShareMessage" rows="3"
+                        class="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-sm"
+                        placeholder="Add your own message..."></textarea>
                 </div>
 
                 <!-- Share Options -->
@@ -2176,36 +2356,44 @@
 
                 <!-- Social Media Buttons -->
                 <div class="grid grid-cols-2 gap-3 mb-6">
-                    <button onclick="shareOnSocial('twitter')" class="twitter-btn text-white px-4 py-3 rounded-lg flex items-center justify-center transition-colors">
+                    <button onclick="shareOnSocial('twitter')"
+                        class="twitter-btn text-white px-4 py-3 rounded-lg flex items-center justify-center transition-colors">
                         <i class="fab fa-twitter mr-2" aria-hidden="true"></i>Twitter
                     </button>
-                    <button onclick="shareOnSocial('facebook')" class="facebook-btn text-white px-4 py-3 rounded-lg flex items-center justify-center transition-colors">
+                    <button onclick="shareOnSocial('facebook')"
+                        class="facebook-btn text-white px-4 py-3 rounded-lg flex items-center justify-center transition-colors">
                         <i class="fab fa-facebook mr-2" aria-hidden="true"></i>Facebook
                     </button>
-                    <button onclick="shareOnSocial('linkedin')" class="linkedin-btn text-white px-4 py-3 rounded-lg flex items-center justify-center transition-colors">
+                    <button onclick="shareOnSocial('linkedin')"
+                        class="linkedin-btn text-white px-4 py-3 rounded-lg flex items-center justify-center transition-colors">
                         <i class="fab fa-linkedin mr-2" aria-hidden="true"></i>LinkedIn
                     </button>
-                    <button onclick="shareOnSocial('whatsapp')" class="whatsapp-btn text-white px-4 py-3 rounded-lg flex items-center justify-center transition-colors">
+                    <button onclick="shareOnSocial('whatsapp')"
+                        class="whatsapp-btn text-white px-4 py-3 rounded-lg flex items-center justify-center transition-colors">
                         <i class="fab fa-whatsapp mr-2" aria-hidden="true"></i>WhatsApp
                     </button>
-                    <button onclick="shareOnSocial('telegram')" class="telegram-btn text-white px-4 py-3 rounded-lg flex items-center justify-center transition-colors">
+                    <button onclick="shareOnSocial('telegram')"
+                        class="telegram-btn text-white px-4 py-3 rounded-lg flex items-center justify-center transition-colors">
                         <i class="fab fa-telegram mr-2" aria-hidden="true"></i>Telegram
                     </button>
-                    <button onclick="shareOnSocial('email')" class="email-btn text-white px-4 py-3 rounded-lg flex items-center justify-center transition-colors">
+                    <button onclick="shareOnSocial('email')"
+                        class="email-btn text-white px-4 py-3 rounded-lg flex items-center justify-center transition-colors">
                         <i class="fas fa-envelope mr-2" aria-hidden="true"></i>Email
                     </button>
                 </div>
 
                 <!-- Copy Link -->
                 <div class="mb-6">
-                    <button onclick="shareOnSocial('copy_link')" class="copy-btn text-white w-full px-4 py-3 rounded-lg flex items-center justify-center transition-colors">
+                    <button onclick="shareOnSocial('copy_link')"
+                        class="copy-btn text-white w-full px-4 py-3 rounded-lg flex items-center justify-center transition-colors">
                         <i class="fas fa-link mr-2" aria-hidden="true"></i>Copy Link
                     </button>
                 </div>
 
                 <!-- Mobile Native Sharing -->
                 <div class="mb-6" id="nativeShareContainer" style="display: none;">
-                    <button onclick="shareNatively()" class="native-btn text-white w-full px-4 py-3 rounded-lg flex items-center justify-center transition-colors">
+                    <button onclick="shareNatively()"
+                        class="native-btn text-white w-full px-4 py-3 rounded-lg flex items-center justify-center transition-colors">
                         <i class="fas fa-share mr-2" aria-hidden="true"></i>Share (Native)
                     </button>
                 </div>
@@ -2218,9 +2406,264 @@
 
                 <!-- Actions -->
                 <div class="flex space-x-3">
-                    <button onclick="closeShareModal()" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors">
+                    <button onclick="closeShareModal()"
+                        class="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors">
                         Cancel
                     </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Auction Detail Modal -->
+        <div id="auctionDetailModal"
+            class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4 overflow-y-auto">
+            <div class="glass-effect rounded-xl w-full max-w-4xl my-8"
+                style="max-height: calc(100vh - 2rem); overflow-y-auto;">
+                <!-- Close Button -->
+                <div
+                    class="sticky top-0 flex justify-between items-center p-4 sm:p-6 border-b border-white/20 bg-gradient-to-r from-purple-600/20 to-transparent z-10">
+                    <h2 class="text-2xl sm:text-3xl font-bold" id="detailAuctionTitle">Auction Details</h2>
+                    <button onclick="closeAuctionDetail()"
+                        class="text-gray-400 hover:text-white text-2xl transition-colors" aria-label="Close modal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+
+                <!-- Main Content -->
+                <div class="p-4 sm:p-6 space-y-6">
+                    <!-- Auction Header Section -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <!-- Auction Info -->
+                        <div class="md:col-span-2">
+                            <div class="mb-4">
+                                <h3 class="text-sm font-semibold text-purple-400 uppercase tracking-wider mb-2">Auction
+                                    Details</h3>
+                                <p class="text-gray-300" id="detailDescription">Loading description...</p>
+                            </div>
+
+                            <!-- Creator Info -->
+                            <div class="mt-4 p-4 rounded-lg bg-white/5 border border-white/10">
+                                <h4 class="text-sm font-semibold mb-3 flex items-center gap-2">
+                                    <i class="fas fa-user text-purple-400"></i>
+                                    Creator Information
+                                </h4>
+                                <div class="flex items-center gap-3">
+                                    <div
+                                        class="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-lg font-bold">
+                                        <i class="fas fa-user text-white"></i>
+                                    </div>
+                                    <div>
+                                        <p class="font-semibold" id="detailCreatorName">Anonymous Creator</p>
+                                        <p class="text-xs text-gray-400">Seller</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Countdown Timer -->
+                            <div class="mt-4 p-4 rounded-lg" id="timerSection">
+                                <h4 class="text-sm font-semibold mb-3 flex items-center gap-2">
+                                    <i class="fas fa-hourglass-end text-orange-400"></i>
+                                    Auction Ends In
+                                </h4>
+                                <div class="grid grid-cols-4 gap-2">
+                                    <div class="text-center p-3 rounded-lg bg-white/10 border border-white/20">
+                                        <div class="text-2xl font-bold text-orange-400" id="timerDays">0</div>
+                                        <div class="text-xs text-gray-400">Days</div>
+                                    </div>
+                                    <div class="text-center p-3 rounded-lg bg-white/10 border border-white/20">
+                                        <div class="text-2xl font-bold text-orange-400" id="timerHours">0</div>
+                                        <div class="text-xs text-gray-400">Hours</div>
+                                    </div>
+                                    <div class="text-center p-3 rounded-lg bg-white/10 border border-white/20">
+                                        <div class="text-2xl font-bold text-orange-400" id="timerMinutes">0</div>
+                                        <div class="text-xs text-gray-400">Minutes</div>
+                                    </div>
+                                    <div class="text-center p-3 rounded-lg bg-white/10 border border-white/20">
+                                        <div class="text-2xl font-bold text-orange-400" id="timerSeconds">0</div>
+                                        <div class="text-xs text-gray-400">Seconds</div>
+                                    </div>
+                                </div>
+                                <p id="auctionStatus" class="text-sm text-gray-400 mt-2 text-center font-semibold"></p>
+                            </div>
+                        </div>
+
+                        <!-- Bid Info Panel -->
+                        <div class="space-y-4">
+                            <!-- Current Bid -->
+                            <div
+                                class="p-4 rounded-lg bg-gradient-to-br from-green-500/10 to-emerald-500/10 border border-green-500/30">
+                                <p class="text-xs text-green-400 uppercase tracking-wider mb-1">Current Highest Bid</p>
+                                <p class="text-3xl font-bold text-green-400" id="detailCurrentBid">0 XLM</p>
+                                <p class="text-xs text-gray-400 mt-1" id="bidCount">0 Bids Placed</p>
+                            </div>
+
+                            <!-- Starting Bid -->
+                            <div class="p-4 rounded-lg bg-white/5 border border-white/20">
+                                <p class="text-xs text-gray-400 uppercase tracking-wider mb-1">Starting Bid</p>
+                                <p class="text-2xl font-bold text-blue-400" id="detailStartingBid">0 XLM</p>
+                            </div>
+
+                            <!-- Status Badge -->
+                            <div class="p-4 rounded-lg bg-white/5 border border-white/20">
+                                <p class="text-xs text-gray-400 uppercase tracking-wider mb-2">Status</p>
+                                <div class="flex items-center gap-2">
+                                    <span class="w-3 h-3 rounded-full bg-green-500" id="statusDot"></span>
+                                    <span class="font-semibold" id="detailStatus">Active</span>
+                                </div>
+                            </div>
+
+                            <!-- Action Buttons -->
+                            <div class="space-y-2">
+                                <button onclick="openBidForm()"
+                                    class="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-semibold py-3 rounded-lg transition-all transform hover:scale-105"
+                                    id="placeBidBtn">
+                                    <i class="fas fa-gavel mr-2"></i>Place Bid
+                                </button>
+                                <div class="flex gap-2">
+                                    <button onclick="toggleBookmark()"
+                                        class="flex-1 bg-white/10 hover:bg-white/20 text-white py-2 rounded-lg transition-colors border border-white/20"
+                                        id="bookmarkBtn" title="Add to favorites">
+                                        <i class="far fa-heart"></i>
+                                        <span class="hidden sm:inline ml-1">Bookmark</span>
+                                    </button>
+                                    <button onclick="openShareModal()"
+                                        class="flex-1 bg-white/10 hover:bg-white/20 text-white py-2 rounded-lg transition-colors border border-white/20"
+                                        title="Share this auction">
+                                        <i class="fas fa-share-alt"></i>
+                                        <span class="hidden sm:inline ml-1">Share</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Bid Placement Form (Hidden Initially) -->
+                    <div id="bidFormSection" class="hidden p-4 rounded-lg bg-white/5 border border-white/20">
+                        <h4 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                            <i class="fas fa-lock text-purple-400"></i>
+                            Place Your Sealed Bid
+                        </h4>
+                        <form id="detailBidForm" class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Bid Amount (XLM)</label>
+                                <input type="number" id="bidAmount" placeholder="Enter bid amount" min="0" step="0.01"
+                                    class="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20"
+                                    required>
+                                <p class="text-xs text-gray-400 mt-1" id="minimumBidInfo">Minimum bid: <span
+                                        id="minBidAmount">0</span> XLM</p>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Secret Key (for encryption)</label>
+                                <div class="relative">
+                                    <input type="password" id="secretKey" placeholder="Create a secure secret key"
+                                        class="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20"
+                                        required>
+                                    <button type="button" onclick="toggleSecretKeyVisibility()"
+                                        class="absolute right-3 top-2.5 text-gray-400 hover:text-white">
+                                        <i class="fas fa-eye" id="keyVisibilityIcon"></i>
+                                    </button>
+                                </div>
+                                <p class="text-xs text-yellow-400 mt-1">
+                                    <i class="fas fa-exclamation-triangle mr-1"></i>
+                                    Save your secret key securely. You cannot recover it!
+                                </p>
+                            </div>
+
+                            <div class="flex items-center gap-2">
+                                <input type="checkbox" id="confirmSecretKey" class="w-4 h-4 rounded">
+                                <label for="confirmSecretKey" class="text-sm">I have saved my secret key
+                                    securely</label>
+                            </div>
+
+                            <div class="flex gap-3">
+                                <button type="submit"
+                                    class="flex-1 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold py-2 rounded-lg transition-all"
+                                    id="submitBidBtn">
+                                    <i class="fas fa-check mr-2"></i>Submit Bid
+                                </button>
+                                <button type="button" onclick="closeBidForm()"
+                                    class="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 rounded-lg transition-all">
+                                    Cancel
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Bid History Section -->
+                    <div class="p-4 rounded-lg bg-white/5 border border-white/20">
+                        <div class="flex items-center justify-between mb-4">
+                            <h4 class="text-lg font-semibold flex items-center gap-2">
+                                <i class="fas fa-history text-blue-400"></i>
+                                Bid History (Anonymous)
+                            </h4>
+                            <div class="text-sm text-gray-400" id="bidHistoryCount">0 bids</div>
+                        </div>
+
+                        <div id="bidHistoryContainer" class="space-y-2 max-h-80 overflow-y-auto">
+                            <div class="text-center py-8 text-gray-400">
+                                <i class="fas fa-inbox text-3xl mb-2 opacity-50"></i>
+                                <p>No bids placed yet</p>
+                            </div>
+                        </div>
+
+                        <p class="text-xs text-gray-500 mt-3 p-2 rounded bg-white/5">
+                            <i class="fas fa-shield-alt mr-1"></i>
+                            Bid amounts are encrypted and remain anonymous until the auction ends and results are
+                            revealed.
+                        </p>
+                    </div>
+
+                    <!-- Related Auctions Section -->
+                    <div>
+                        <h4 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                            <i class="fas fa-link text-indigo-400"></i>
+                            Related Auctions
+                        </h4>
+                        <div id="relatedAuctionsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <p class="text-center text-gray-400 col-span-full">Loading related auctions...</p>
+                        </div>
+                    </div>
+
+                    <!-- Sharing Section -->
+                    <div class="p-4 rounded-lg bg-white/5 border border-white/20">
+                        <h4 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                            <i class="fas fa-share-nodes text-pink-400"></i>
+                            Share This Auction
+                        </h4>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            <button onclick="shareAuction('twitter')"
+                                class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-3 rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-1">
+                                <i class="fab fa-twitter"></i>
+                                <span class="hidden sm:inline">Twitter</span>
+                            </button>
+                            <button onclick="shareAuction('facebook')"
+                                class="bg-blue-700 hover:bg-blue-800 text-white py-2 px-3 rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-1">
+                                <i class="fab fa-facebook"></i>
+                                <span class="hidden sm:inline">Facebook</span>
+                            </button>
+                            <button onclick="shareAuction('linkedin')"
+                                class="bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-1">
+                                <i class="fab fa-linkedin"></i>
+                                <span class="hidden sm:inline">LinkedIn</span>
+                            </button>
+                            <button onclick="shareAuction('whatsapp')"
+                                class="bg-green-500 hover:bg-green-600 text-white py-2 px-3 rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-1">
+                                <i class="fab fa-whatsapp"></i>
+                                <span class="hidden sm:inline">WhatsApp</span>
+                            </button>
+                            <button onclick="shareAuction('telegram')"
+                                class="bg-cyan-500 hover:bg-cyan-600 text-white py-2 px-3 rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-1">
+                                <i class="fab fa-telegram"></i>
+                                <span class="hidden sm:inline">Telegram</span>
+                            </button>
+                            <button onclick="copyAuctionLink()"
+                                class="bg-gray-600 hover:bg-gray-700 text-white py-2 px-3 rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-1">
+                                <i class="fas fa-link"></i>
+                                <span class="hidden sm:inline">Copy Link</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -2233,19 +2676,27 @@
             <div class="wizard-container w-full">
                 <!-- Progress Bar -->
                 <div class="bg-gray-200 h-2 rounded-full overflow-hidden">
-                    <div id="progressBar" class="progress-bar bg-gradient-to-r from-purple-500 to-indigo-600 h-full rounded-full" style="width: 0%"></div>
+                    <div id="progressBar"
+                        class="progress-bar bg-gradient-to-r from-purple-500 to-indigo-600 h-full rounded-full"
+                        style="width: 0%"></div>
                 </div>
-                
+
                 <!-- Step Indicators -->
                 <div class="flex justify-between p-6 pb-0">
-                    <div class="step-indicator w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-sm font-semibold" data-step="1">1</div>
-                    <div class="step-indicator w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-sm font-semibold" data-step="2">2</div>
-                    <div class="step-indicator w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-sm font-semibold" data-step="3">3</div>
-                    <div class="step-indicator w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-sm font-semibold" data-step="4">4</div>
-                    <div class="step-indicator w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-sm font-semibold" data-step="5">5</div>
-                    <div class="step-indicator w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-sm font-semibold" data-step="6">6</div>
+                    <div class="step-indicator w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-sm font-semibold"
+                        data-step="1">1</div>
+                    <div class="step-indicator w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-sm font-semibold"
+                        data-step="2">2</div>
+                    <div class="step-indicator w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-sm font-semibold"
+                        data-step="3">3</div>
+                    <div class="step-indicator w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-sm font-semibold"
+                        data-step="4">4</div>
+                    <div class="step-indicator w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-sm font-semibold"
+                        data-step="5">5</div>
+                    <div class="step-indicator w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-sm font-semibold"
+                        data-step="6">6</div>
                 </div>
-                
+
                 <!-- Main Content -->
                 <div class="p-6">
                     <!-- Skip Button -->
@@ -2255,24 +2706,27 @@
                             Skip Tutorial
                         </button>
                     </div>
-                    
+
                     <!-- Step Content -->
                     <div id="stepContent" class="min-h-[300px]">
                         <!-- Content will be dynamically loaded here -->
                     </div>
-                    
+
                     <!-- Navigation Buttons -->
                     <div class="flex justify-between mt-6">
-                        <button id="prevBtn" class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        <button id="prevBtn"
+                            class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled>
                             <i class="fas fa-arrow-left mr-2" aria-hidden="true"></i>
                             Previous
                         </button>
-                        <button id="nextBtn" class="px-6 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-lg hover:from-purple-600 hover:to-indigo-700 transition">
+                        <button id="nextBtn"
+                            class="px-6 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-lg hover:from-purple-600 hover:to-indigo-700 transition">
                             Next
                             <i class="fas fa-arrow-right ml-2" aria-hidden="true"></i>
                         </button>
                     </div>
-                    
+
                     <!-- Help Resources -->
                     <div class="mt-6 p-4 bg-blue-50 rounded-lg">
                         <h4 class="font-semibold text-blue-900 mb-2">
@@ -2304,13 +2758,16 @@
                 <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
                     <div>
                         <h2 class="text-xl sm:text-2xl font-bold mb-2"><i class="fas fa-image mr-2"></i>NFT Gallery</h2>
-                        <p class="text-gray-600 dark:text-gray-400">Discover, collect, and trade unique digital assets</p>
+                        <p class="text-gray-600 dark:text-gray-400">Discover, collect, and trade unique digital assets
+                        </p>
                     </div>
                     <div class="mt-4 md:mt-0 flex space-x-3">
-                        <button onclick="window.location.href='nft-gallery.html'" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                        <button onclick="window.location.href='nft-gallery.html'"
+                            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
                             <i class="fas fa-external-link-alt mr-2"></i>Open Full Gallery
                         </button>
-                        <button onclick="nftDisplay.createNFT()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                        <button onclick="nftDisplay.createNFT()"
+                            class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
                             <i class="fas fa-plus mr-2"></i>Create NFT
                         </button>
                     </div>
@@ -2338,12 +2795,18 @@
 
                 <!-- Quick Filters -->
                 <div class="flex flex-wrap gap-2 mb-6">
-                    <button onclick="filterNFTs('all')" class="px-3 py-1 bg-blue-600 text-white rounded-full text-sm">All</button>
-                    <button onclick="filterNFTs('verified')" class="px-3 py-1 bg-white/20 text-gray-300 rounded-full text-sm hover:bg-white/30">Verified</button>
-                    <button onclick="filterNFTs('art')" class="px-3 py-1 bg-white/20 text-gray-300 rounded-full text-sm hover:bg-white/30">Art</button>
-                    <button onclick="filterNFTs('gaming')" class="px-3 py-1 bg-white/20 text-gray-300 rounded-full text-sm hover:bg-white/30">Gaming</button>
-                    <button onclick="filterNFTs('music')" class="px-3 py-1 bg-white/20 text-gray-300 rounded-full text-sm hover:bg-white/30">Music</button>
-                    <button onclick="filterNFTs('owned')" class="px-3 py-1 bg-white/20 text-gray-300 rounded-full text-sm hover:bg-white/30">Owned</button>
+                    <button onclick="filterNFTs('all')"
+                        class="px-3 py-1 bg-blue-600 text-white rounded-full text-sm">All</button>
+                    <button onclick="filterNFTs('verified')"
+                        class="px-3 py-1 bg-white/20 text-gray-300 rounded-full text-sm hover:bg-white/30">Verified</button>
+                    <button onclick="filterNFTs('art')"
+                        class="px-3 py-1 bg-white/20 text-gray-300 rounded-full text-sm hover:bg-white/30">Art</button>
+                    <button onclick="filterNFTs('gaming')"
+                        class="px-3 py-1 bg-white/20 text-gray-300 rounded-full text-sm hover:bg-white/30">Gaming</button>
+                    <button onclick="filterNFTs('music')"
+                        class="px-3 py-1 bg-white/20 text-gray-300 rounded-full text-sm hover:bg-white/30">Music</button>
+                    <button onclick="filterNFTs('owned')"
+                        class="px-3 py-1 bg-white/20 text-gray-300 rounded-full text-sm hover:bg-white/30">Owned</button>
                 </div>
 
                 <!-- NFT Grid Preview -->
@@ -2357,14 +2820,15 @@
 
                 <!-- View More Button -->
                 <div class="text-center">
-                    <button onclick="window.location.href='nft-gallery.html'" class="px-6 py-3 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-lg hover:from-purple-600 hover:to-indigo-700 transition-all transform hover:scale-105">
+                    <button onclick="window.location.href='nft-gallery.html'"
+                        class="px-6 py-3 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-lg hover:from-purple-600 hover:to-indigo-700 transition-all transform hover:scale-105">
                         <i class="fas fa-th mr-2"></i>View Full Gallery
                     </button>
                 </div>
             </div>
         </div>
     </div>
-    
+
     <!-- Tutorial Tooltip (for interactive tutorials) -->
     <div id="tutorialTooltip" class="tutorial-tooltip hidden">
         <div class="flex items-start gap-3">
@@ -2375,21 +2839,24 @@
                 <h4 id="tooltipTitle" class="font-semibold text-gray-900 mb-1"></h4>
                 <p id="tooltipContent" class="text-sm text-gray-600"></p>
                 <div class="mt-3 flex gap-2">
-                    <button id="tooltipAction" class="px-3 py-1 bg-purple-500 text-white text-sm rounded hover:bg-purple-600">
+                    <button id="tooltipAction"
+                        class="px-3 py-1 bg-purple-500 text-white text-sm rounded hover:bg-purple-600">
                         Try it
                     </button>
-                    <button id="tooltipNext" class="px-3 py-1 bg-gray-200 text-gray-700 text-sm rounded hover:bg-gray-300">
+                    <button id="tooltipNext"
+                        class="px-3 py-1 bg-gray-200 text-gray-700 text-sm rounded hover:bg-gray-300">
                         Next
                     </button>
                 </div>
             </div>
         </div>
     </div>
-    
+
     <!-- Reward Modal -->
     <div id="rewardModal" class="fixed inset-0 z-50 hidden bg-black bg-opacity-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl p-8 max-w-md w-full text-center reward-badge">
-            <div class="w-20 h-20 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div
+                class="w-20 h-20 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4">
                 <i class="fas fa-trophy text-white text-3xl" aria-hidden="true"></i>
             </div>
             <h3 class="text-2xl font-bold text-gray-900 mb-2">Congratulations!</h3>
@@ -2408,7 +2875,8 @@
                     <span class="font-semibold">Ready to Bid!</span>
                 </div>
             </div>
-            <button id="closeRewardBtn" class="px-8 py-3 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-lg hover:from-purple-600 hover:to-indigo-700 transition">
+            <button id="closeRewardBtn"
+                class="px-8 py-3 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-lg hover:from-purple-600 hover:to-indigo-700 transition">
                 Start Using Platform
             </button>
         </div>
@@ -2418,9 +2886,10 @@
     <script src="error-boundary.js"></script>
     <script src="network-error-handler.js"></script>
     <script src="form-validation.js"></script>
-    
+
     <!-- Application Scripts -->
     <script src="app.js"></script>
+    <script src="auction-detail.js"></script>
     <script src="app-error-integration.js"></script>
     <script src="theme-system.js"></script>
     <script src="theme-integration.js"></script>
@@ -2433,4 +2902,5 @@
     <script src="network-monitor.js"></script>
     <script src="token-management.js"></script>
 </body>
+
 </html>
