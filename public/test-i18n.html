@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Internationalization Test - Auction Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/rtl-support.css">
+    <style>
+        .test-section {
+            margin-bottom: 2rem;
+            padding: 1.5rem;
+            background: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .test-item {
+            padding: 0.75rem;
+            margin: 0.5rem 0;
+            background: #f8fafc;
+            border-left: 3px solid #667eea;
+            border-radius: 0.25rem;
+        }
+        [dir="rtl"] .test-item {
+            border-left: none;
+            border-right: 3px solid #667eea;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-6xl mx-auto">
+        <header class="mb-8 text-center">
+            <h1 class="text-4xl font-bold mb-2" data-i18n="app.title">Sealed Bid Auction Platform</h1>
+            <p class="text-gray-600" data-i18n="app.subtitle">Secure blockchain-powered auctions on Stellar</p>
+        </header>
+
+        <!-- Language Switcher -->
+        <div class="test-section">
+            <h2 class="text-2xl font-bold mb-4">Language Switcher</h2>
+            <div class="flex items-center space-x-4 mb-4">
+                <label class="font-semibold" data-i18n="settings.language">Language:</label>
+                <select id="languageSelector" class="px-4 py-2 border rounded-lg">
+                    <option value="en">English</option>
+                    <option value="es">Español</option>
+                    <option value="fr">Français</option>
+                    <option value="de">Deutsch</option>
+                    <option value="ar">العربية</option>
+                    <option value="zh">中文</option>
+                    <option value="ja">日本語</option>
+                    <option value="pt">Português</option>
+                    <option value="ru">Русский</option>
+                    <option value="hi">हिन्दी</option>
+                </select>
+            </div>
+            <div id="flagSelector" class="mt-4"></div>
+        </div>
+
+        <!-- Text Translation Test -->
+        <div class="test-section">
+            <h2 class="text-2xl font-bold mb-4">Text Translation</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="test-item">
+                    <strong data-i18n="auth.login">Login</strong>
+                </div>
+                <div class="test-item">
+                    <strong data-i18n="auth.register">Register</strong>
+                </div>
+                <div class="test-item">
+                    <strong data-i18n="auction.placeBid">Place Bid</strong>
+                </div>
+                <div class="test-item">
+                    <strong data-i18n="auction.viewDetails">View Details</strong>
+                </div>
+                <div class="test-item">
+                    <strong data-i18n="common.save">Save</strong>
+                </div>
+                <div class="test-item">
+                    <strong data-i18n="common.cancel">Cancel</strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- Currency Formatting Test -->
+        <div class="test-section">
+            <h2 class="text-2xl font-bold mb-4">Currency Formatting</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="test-item">
+                    <strong>XLM:</strong> <span id="currency-xlm"></span>
+                </div>
+                <div class="test-item">
+                    <strong>USD:</strong> <span id="currency-usd"></span>
+                </div>
+                <div class="test-item">
+                    <strong>EUR:</strong> <span id="currency-eur"></span>
+                </div>
+                <div class="test-item">
+                    <strong>GBP:</strong> <span id="currency-gbp"></span>
+                </div>
+                <div class="test-item">
+                    <strong>JPY:</strong> <span id="currency-jpy"></span>
+                </div>
+                <div class="test-item">
+                    <strong>CNY:</strong> <span id="currency-cny"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Date/Time Formatting Test -->
+        <div class="test-section">
+            <h2 class="text-2xl font-bold mb-4">Date/Time Localization</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="test-item">
+                    <strong>Short:</strong> <span id="date-short"></span>
+                </div>
+                <div class="test-item">
+                    <strong>Medium:</strong> <span id="date-medium"></span>
+                </div>
+                <div class="test-item">
+                    <strong>Long:</strong> <span id="date-long"></span>
+                </div>
+                <div class="test-item">
+                    <strong>Full:</strong> <span id="date-full"></span>
+                </div>
+                <div class="test-item">
+                    <strong>DateTime:</strong> <span id="date-datetime"></span>
+                </div>
+                <div class="test-item">
+                    <strong>Relative:</strong> <span id="date-relative"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Number Formatting Test -->
+        <div class="test-section">
+            <h2 class="text-2xl font-bold mb-4">Number Formatting</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="test-item">
+                    <strong>Integer:</strong> <span id="number-integer"></span>
+                </div>
+                <div class="test-item">
+                    <strong>Decimal:</strong> <span id="number-decimal"></span>
+                </div>
+                <div class="test-item">
+                    <strong>Large Number:</strong> <span id="number-large"></span>
+                </div>
+                <div class="test-item">
+                    <strong>Percentage:</strong> <span id="number-percent"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- RTL Test -->
+        <div class="test-section">
+            <h2 class="text-2xl font-bold mb-4">RTL Language Support</h2>
+            <div class="bg-blue-50 p-4 rounded-lg">
+                <p class="mb-2"><strong>Current Direction:</strong> <span id="current-direction"></span></p>
+                <p class="mb-2"><strong>Is RTL:</strong> <span id="is-rtl"></span></p>
+                <div class="mt-4 flex space-x-2">
+                    <button class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
+                        <i class="fas fa-arrow-left mr-2"></i>
+                        <span data-i18n="common.save">Save</span>
+                    </button>
+                    <button class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">
+                        <span data-i18n="common.cancel">Cancel</span>
+                        <i class="fas fa-arrow-right ml-2"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sample Auction Card -->
+        <div class="test-section">
+            <h2 class="text-2xl font-bold mb-4">Sample Auction Card</h2>
+            <div class="bg-white rounded-xl p-6 shadow-lg max-w-md">
+                <div class="flex justify-between items-start mb-4">
+                    <h3 class="text-lg font-semibold">Vintage Watch Collection</h3>
+                    <span class="bg-green-500 text-white text-xs px-2 py-1 rounded-full" data-i18n="auction.active">Active</span>
+                </div>
+                
+                <p class="text-sm text-gray-600 mb-4">Rare vintage watches from the 1960s</p>
+                
+                <div class="space-y-2 mb-4">
+                    <div class="flex justify-between text-sm">
+                        <span data-i18n="auction.startingBid">Starting Bid:</span>
+                        <span class="font-semibold" id="sample-starting-bid"></span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span data-i18n="auction.currentHighest">Current Highest:</span>
+                        <span class="font-semibold text-green-500" id="sample-current-bid"></span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span data-i18n="auction.bids">Bids:</span>
+                        <span class="font-semibold" id="sample-bid-count"></span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span data-i18n="auction.ends">Ends:</span>
+                        <span class="font-semibold" id="sample-end-date"></span>
+                    </div>
+                </div>
+                
+                <div class="flex space-x-2">
+                    <button class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg text-sm transition-colors">
+                        <i class="fas fa-hand-holding-usd mr-1"></i>
+                        <span data-i18n="auction.placeBid">Place Bid</span>
+                    </button>
+                    <button class="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-3 py-2 rounded-lg text-sm transition-colors">
+                        <i class="fas fa-eye mr-1"></i>
+                        <span data-i18n="auction.viewDetails">View Details</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Test Results -->
+        <div class="test-section">
+            <h2 class="text-2xl font-bold mb-4">Test Results</h2>
+            <div id="test-results" class="space-y-2"></div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/i18n.js"></script>
+    <script src="/language-switcher.js"></script>
+    <script>
+        // Wait for i18n to initialize
+        setTimeout(() => {
+            initializeTests();
+            
+            // Listen for language changes
+            window.addEventListener('languageChanged', () => {
+                updateTests();
+            });
+        }, 500);
+
+        function initializeTests() {
+            updateTests();
+            LanguageSwitcher.createFlagSelector('flagSelector');
+        }
+
+        function updateTests() {
+            // Currency tests
+            document.getElementById('currency-xlm').textContent = window.i18n.formatCurrency(1234.5678, 'XLM');
+            document.getElementById('currency-usd').textContent = window.i18n.formatCurrency(1234.56, 'USD');
+            document.getElementById('currency-eur').textContent = window.i18n.formatCurrency(1234.56, 'EUR');
+            document.getElementById('currency-gbp').textContent = window.i18n.formatCurrency(1234.56, 'GBP');
+            document.getElementById('currency-jpy').textContent = window.i18n.formatCurrency(123456, 'JPY');
+            document.getElementById('currency-cny').textContent = window.i18n.formatCurrency(1234.56, 'CNY');
+
+            // Date tests
+            const testDate = new Date('2024-12-25T15:30:00');
+            document.getElementById('date-short').textContent = window.i18n.formatDate(testDate, 'short');
+            document.getElementById('date-medium').textContent = window.i18n.formatDate(testDate, 'medium');
+            document.getElementById('date-long').textContent = window.i18n.formatDate(testDate, 'long');
+            document.getElementById('date-full').textContent = window.i18n.formatDate(testDate, 'full');
+            document.getElementById('date-datetime').textContent = window.i18n.formatDate(testDate, 'datetime');
+            
+            const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+            document.getElementById('date-relative').textContent = window.i18n.formatRelativeTime(twoHoursAgo);
+
+            // Number tests
+            document.getElementById('number-integer').textContent = window.i18n.formatNumber(12345);
+            document.getElementById('number-decimal').textContent = window.i18n.formatNumber(12345.6789, { maxDecimals: 2 });
+            document.getElementById('number-large').textContent = window.i18n.formatNumber(1234567890);
+            document.getElementById('number-percent').textContent = window.i18n.formatPercent(75.5);
+
+            // RTL tests
+            document.getElementById('current-direction').textContent = document.documentElement.dir;
+            document.getElementById('is-rtl').textContent = window.i18n.isRTL() ? 'Yes' : 'No';
+
+            // Sample auction card
+            document.getElementById('sample-starting-bid').textContent = window.i18n.formatCurrency(500, 'XLM');
+            document.getElementById('sample-current-bid').textContent = window.i18n.formatCurrency(750, 'XLM');
+            document.getElementById('sample-bid-count').textContent = window.i18n.formatNumber(23);
+            
+            const endDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+            document.getElementById('sample-end-date').textContent = window.i18n.formatDate(endDate, 'short');
+
+            // Run tests
+            runTests();
+        }
+
+        function runTests() {
+            const results = [];
+            
+            // Test 1: Language detection
+            results.push({
+                name: 'Language Detection',
+                passed: window.i18n.currentLanguage !== undefined,
+                message: `Current language: ${window.i18n.currentLanguage}`
+            });
+
+            // Test 2: Translation loading
+            results.push({
+                name: 'Translation Loading',
+                passed: Object.keys(window.i18n.translations).length > 0,
+                message: `Loaded ${Object.keys(window.i18n.translations).length} translation keys`
+            });
+
+            // Test 3: RTL detection
+            results.push({
+                name: 'RTL Detection',
+                passed: typeof window.i18n.isRTL() === 'boolean',
+                message: `RTL: ${window.i18n.isRTL()}`
+            });
+
+            // Test 4: Currency formatting
+            const currencyTest = window.i18n.formatCurrency(100, 'XLM');
+            results.push({
+                name: 'Currency Formatting',
+                passed: currencyTest.includes('100') && currencyTest.includes('XLM'),
+                message: `Formatted: ${currencyTest}`
+            });
+
+            // Test 5: Date formatting
+            const dateTest = window.i18n.formatDate(new Date());
+            results.push({
+                name: 'Date Formatting',
+                passed: dateTest.length > 0,
+                message: `Formatted: ${dateTest}`
+            });
+
+            // Test 6: Number formatting
+            const numberTest = window.i18n.formatNumber(1234567.89);
+            results.push({
+                name: 'Number Formatting',
+                passed: numberTest.length > 0,
+                message: `Formatted: ${numberTest}`
+            });
+
+            // Test 7: Language persistence
+            const savedLang = localStorage.getItem('preferredLanguage');
+            results.push({
+                name: 'Language Persistence',
+                passed: savedLang !== null,
+                message: `Saved language: ${savedLang || 'None'}`
+            });
+
+            // Display results
+            const resultsContainer = document.getElementById('test-results');
+            resultsContainer.innerHTML = results.map(result => `
+                <div class="test-item ${result.passed ? 'border-green-500' : 'border-red-500'}">
+                    <div class="flex items-center justify-between">
+                        <strong>${result.name}</strong>
+                        <span class="${result.passed ? 'text-green-600' : 'text-red-600'}">
+                            <i class="fas fa-${result.passed ? 'check-circle' : 'times-circle'}"></i>
+                            ${result.passed ? 'PASS' : 'FAIL'}
+                        </span>
+                    </div>
+                    <p class="text-sm text-gray-600 mt-1">${result.message}</p>
+                </div>
+            `).join('');
+        }
+    </script>
+</body>
+</html>

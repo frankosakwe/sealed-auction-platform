@@ -1,0 +1,150 @@
+{
+  "app": {
+    "title": "Plataforma de Subasta de Oferta Sellada",
+    "subtitle": "Subastas seguras impulsadas por blockchain en Stellar"
+  },
+  "nav": {
+    "auctions": "Subastas",
+    "create": "Crear Subasta",
+    "myBids": "Mis Ofertas",
+    "dashboard": "Panel",
+    "analytics": "Analíticas",
+    "bookmarks": "Marcadores",
+    "wallet": "Cartera",
+    "network": "Red",
+    "ai": "Recomendaciones IA",
+    "filter": "Filtrar"
+  },
+  "auth": {
+    "login": "Iniciar Sesión",
+    "register": "Registrarse",
+    "logout": "Cerrar Sesión",
+    "username": "Nombre de Usuario",
+    "password": "Contraseña",
+    "loginPrompt": "¿Ya tienes una cuenta?",
+    "registerPrompt": "¿No tienes una cuenta?",
+    "loginSuccess": "¡Sesión iniciada exitosamente!",
+    "registerSuccess": "¡Registro exitoso!",
+    "loginError": "Error de autenticación",
+    "required": "Este campo es obligatorio"
+  },
+  "auction": {
+    "title": "Título",
+    "description": "Descripción",
+    "startingBid": "Oferta Inicial",
+    "currentHighest": "Oferta Más Alta",
+    "endTime": "Hora de Finalización",
+    "status": "Estado",
+    "bids": "Ofertas",
+    "winner": "Ganador",
+    "active": "Activa",
+    "closed": "Cerrada",
+    "expired": "Expirada",
+    "placeBid": "Hacer Oferta",
+    "viewDetails": "Ver Detalles",
+    "share": "Compartir",
+    "arPreview": "Vista AR",
+    "createAuction": "Crear Subasta",
+    "noAuctions": "No hay subastas disponibles",
+    "loadingMore": "Cargando más subastas...",
+    "ends": "Termina",
+    "created": "Creada"
+  },
+  "bid": {
+    "amount": "Monto de Oferta",
+    "secretKey": "Clave Secreta",
+    "placeBid": "Hacer Oferta",
+    "bidSuccess": "¡Oferta realizada exitosamente!",
+    "bidError": "Error al realizar la oferta",
+    "minimumBid": "Oferta mínima",
+    "yourBid": "Tu Oferta",
+    "highestBid": "Oferta Más Alta"
+  },
+  "filter": {
+    "title": "Filtrar Subastas",
+    "category": "Categoría",
+    "status": "Estado",
+    "priceRange": "Rango de Precio",
+    "dateRange": "Rango de Fecha",
+    "sortBy": "Ordenar Por",
+    "apply": "Aplicar Filtros",
+    "reset": "Restablecer",
+    "savePreset": "Guardar Preset",
+    "results": "resultados encontrados",
+    "categories": {
+      "art": "Arte",
+      "collectibles": "Coleccionables",
+      "electronics": "Electrónica",
+      "fashion": "Moda",
+      "jewelry": "Joyería",
+      "vehicles": "Vehículos",
+      "realestate": "Bienes Raíces",
+      "other": "Otro"
+    },
+    "sortOptions": {
+      "newest": "Más Recientes",
+      "oldest": "Más Antiguos",
+      "priceAsc": "Precio: Menor a Mayor",
+      "priceDesc": "Precio: Mayor a Menor",
+      "endingSoon": "Terminando Pronto",
+      "mostBids": "Más Ofertas"
+    }
+  },
+  "notifications": {
+    "title": "Notificaciones",
+    "markAllRead": "Marcar Todo Leído",
+    "clearAll": "Limpiar Todo",
+    "noNotifications": "Sin notificaciones",
+    "newAuction": "Nueva subasta",
+    "auctionClosed": "Subasta cerrada",
+    "bidPlaced": "Nueva oferta realizada",
+    "youWon": "¡Ganaste la subasta!",
+    "outbid": "Te han superado"
+  },
+  "settings": {
+    "language": "Idioma",
+    "theme": "Tema",
+    "currency": "Moneda",
+    "notifications": "Notificaciones",
+    "privacy": "Privacidad",
+    "security": "Seguridad"
+  },
+  "common": {
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "close": "Cerrar",
+    "confirm": "Confirmar",
+    "loading": "Cargando...",
+    "error": "Error",
+    "success": "Éxito",
+    "warning": "Advertencia",
+    "info": "Información",
+    "search": "Buscar",
+    "filter": "Filtrar",
+    "sort": "Ordenar",
+    "more": "Más",
+    "less": "Menos",
+    "yes": "Sí",
+    "no": "No",
+    "ok": "OK"
+  },
+  "time": {
+    "justNow": "Justo ahora",
+    "minutesAgo": "hace {{count}} minutos",
+    "hoursAgo": "hace {{count}} horas",
+    "daysAgo": "hace {{count}} días",
+    "weeksAgo": "hace {{count}} semanas",
+    "monthsAgo": "hace {{count}} meses"
+  },
+  "errors": {
+    "networkError": "Error de red. Por favor verifica tu conexión.",
+    "serverError": "Error del servidor. Por favor intenta más tarde.",
+    "notFound": "Recurso no encontrado",
+    "unauthorized": "Acceso no autorizado",
+    "forbidden": "Acceso prohibido",
+    "validationError": "Error de validación",
+    "unknownError": "Ocurrió un error desconocido"
+  }
+}

@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Analytics Dashboard - Sealed Auction Platform</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <!-- Accessibility Styles -->
+    <link rel="stylesheet" href="accessibility.css">
+</main>
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * {
@@ -996,11 +1001,15 @@
     </style>
 </head>
 <body>
+    <!-- Skip Navigation Link -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    
+    <main id="main-content" role="main">
     <div class="container">
-        <header>
+        <header role="banner">
             <div class="header-content">
                 <h1>
-                    <i class="fas fa-chart-line"></i>
+                    <i class="fas fa-chart-line" aria-hidden="true"></i>
                     Analytics Dashboard
                 </h1>
                 <div class="controls">
@@ -1023,15 +1032,15 @@
                         <label for="auto-refresh-toggle">Auto Refresh</label>
                     </div>
                     <button class="btn btn-secondary" id="refresh-btn">
-                        <i class="fas fa-sync-alt"></i>
+                        <i class="fas fa-sync-alt" aria-hidden="true"></i>
                         Refresh
                     </button>
                     <button class="btn btn-success" id="export-btn">
-                        <i class="fas fa-download"></i>
+                        <i class="fas fa-download" aria-hidden="true"></i>
                         Export
                     </button>
                     <button class="btn btn-primary" id="mobile-view-toggle">
-                        <i class="fas fa-mobile-alt"></i>
+                        <i class="fas fa-mobile-alt" aria-hidden="true"></i>
                         Mobile View
                     </button>
                 </div>
@@ -1076,7 +1085,7 @@
         <div class="section">
             <div class="section-header">
                 <h2 class="section-title">
-                    <i class="fas fa-bolt"></i>
+                    <i class="fas fa-bolt" aria-hidden="true"></i>
                     Real-time Status
                     <span class="real-time-indicator">LIVE</span>
                 </h2>
@@ -1106,13 +1115,13 @@
         <div class="section">
             <div class="section-header">
                 <h2 class="section-title">
-                    <i class="fas fa-exclamation-triangle"></i>
+                    <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
                     Alerts & Notifications
                 </h2>
             </div>
             <div class="card" id="alerts-container">
                 <div class="empty-state">
-                    <i class="fas fa-bell-slash"></i>
+                    <i class="fas fa-bell-slash" aria-hidden="true"></i>
                     <p>No alerts at this time</p>
                 </div>
             </div>
@@ -1122,7 +1131,7 @@
         <div class="section">
             <div class="section-header">
                 <h2 class="section-title">
-                    <i class="fas fa-exchange-alt"></i>
+                    <i class="fas fa-exchange-alt" aria-hidden="true"></i>
                     Transaction Analytics
                 </h2>
             </div>
@@ -1161,7 +1170,7 @@
         <div class="section">
             <div class="section-header">
                 <h2 class="section-title">
-                    <i class="fas fa-network-wired"></i>
+                    <i class="fas fa-network-wired" aria-hidden="true"></i>
                     Network Statistics
                 </h2>
             </div>
@@ -1208,7 +1217,7 @@
         <div class="section">
             <div class="section-header">
                 <h2 class="section-title">
-                    <i class="fas fa-tachometer-alt"></i>
+                    <i class="fas fa-tachometer-alt" aria-hidden="true"></i>
                     Performance Metrics
                 </h2>
             </div>
@@ -1257,7 +1266,7 @@
         <div class="section">
             <div class="section-header">
                 <h2 class="section-title">
-                    <i class="fas fa-dollar-sign"></i>
+                    <i class="fas fa-dollar-sign" aria-hidden="true"></i>
                     Cost Analysis
                 </h2>
             </div>
@@ -1304,7 +1313,7 @@
         <div class="section" id="mobile-analytics" style="display: none;">
             <div class="section-header">
                 <h2 class="section-title">
-                    <i class="fas fa-mobile-alt"></i>
+                    <i class="fas fa-mobile-alt" aria-hidden="true"></i>
                     Mobile Analytics
                 </h2>
             </div>
@@ -1317,7 +1326,7 @@
     </div>
 
     <!-- Export Modal -->
-    <div class="modal" id="export-modal">
+    <div class="modal" id="export-modal" role="dialog" aria-modal="true">
         <!-- Content will be populated dynamically -->
     </div>
 
@@ -1355,5 +1364,12 @@
             });
         });
     </script>
+    
+    <!-- ARIA Live Regions -->
+    <div id="aria-live-polite" role="status" aria-live="polite" aria-atomic="true" class="sr-only"></div>
+    <div id="aria-live-assertive" role="alert" aria-live="assertive" aria-atomic="true" class="sr-only"></div>
+    
+    <!-- Accessibility JavaScript -->
+    <script src="accessibility.js"></script>
 </body>
 </html>

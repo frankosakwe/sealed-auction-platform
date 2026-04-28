@@ -151,9 +151,15 @@
     
     <!-- Load Font Awesome asynchronously -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'">
+    
+    <!-- Accessibility Styles -->
+    <link rel="stylesheet" href="accessibility.css">
     <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
 </head>
 <body>
+    <!-- Skip Navigation Link -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    
     <!-- Loading indicator -->
     <div id="initialLoader" class="fixed inset-0 bg-white z-50 flex items-center justify-center">
         <div class="text-center">
@@ -163,22 +169,22 @@
     </div>
 
     <!-- Header -->
-    <header class="header">
+    <header role="banner" class="header">
         <div class="container">
             <nav class="nav">
                 <div class="logo">
                     <h1 class="text-2xl font-bold">
-                        <i class="fas fa-gavel mr-2"></i>
+                        <i class="fas fa-gavel mr-2" aria-hidden="true"></i>
                         Sealed Auction Platform
                     </h1>
                 </div>
                 <div class="nav-actions">
                     <button id="authBtn" class="btn">
-                        <i class="fas fa-sign-in-alt mr-2"></i>
+                        <i class="fas fa-sign-in-alt mr-2" aria-hidden="true"></i>
                         Sign In
                     </button>
-                    <button id="themeToggle" class="btn ml-2">
-                        <i class="fas fa-moon"></i>
+                    <button aria-label="moon" id="themeToggle" class="btn ml-2">
+                        <i class="fas fa-moon" aria-hidden="true"></i>
                     </button>
                 </div>
             </nav>
@@ -186,18 +192,18 @@
     </header>
 
     <!-- Main Content -->
-    <main class="container my-8">
+    <main id="main-content" role="main" class="container my-8">
         <!-- Hero Section -->
         <section class="hero text-center py-12">
             <h2 class="text-4xl font-bold mb-4">Secure Sealed-Bid Auctions</h2>
             <p class="text-xl text-gray-600 mb-8">Powered by Stellar Blockchain Technology</p>
             <div class="hero-actions">
                 <button id="startAuctionBtn" class="btn btn-lg mr-4">
-                    <i class="fas fa-plus-circle mr-2"></i>
+                    <i class="fas fa-plus-circle mr-2" aria-hidden="true"></i>
                     Start Auction
                 </button>
                 <button id="viewAuctionsBtn" class="btn btn-lg">
-                    <i class="fas fa-eye mr-2"></i>
+                    <i class="fas fa-eye mr-2" aria-hidden="true"></i>
                     View Auctions
                 </button>
             </div>
@@ -259,9 +265,9 @@
                 <div>
                     <h4 class="font-bold mb-4">Connect</h4>
                     <div class="flex space-x-4">
-                        <a href="#" class="hover:text-gray-300"><i class="fab fa-twitter"></i></a>
-                        <a href="#" class="hover:text-gray-300"><i class="fab fa-github"></i></a>
-                        <a href="#" class="hover:text-gray-300"><i class="fab fa-discord"></i></a>
+                        <a href="#" class="hover:text-gray-300"><i class="fab fa-twitter" aria-hidden="true"></i></a>
+                        <a href="#" class="hover:text-gray-300"><i class="fab fa-github" aria-hidden="true"></i></a>
+                        <a href="#" class="hover:text-gray-300"><i class="fab fa-discord" aria-hidden="true"></i></a>
                     </div>
                 </div>
             </div>
@@ -331,5 +337,12 @@
     </script>
 
     <!-- Non-critical scripts will be loaded by the performance optimizer -->
+    
+    <!-- ARIA Live Regions -->
+    <div id="aria-live-polite" role="status" aria-live="polite" aria-atomic="true" class="sr-only"></div>
+    <div id="aria-live-assertive" role="alert" aria-live="assertive" aria-atomic="true" class="sr-only"></div>
+    
+    <!-- Accessibility JavaScript -->
+    <script src="accessibility.js"></script>
 </body>
 </html>

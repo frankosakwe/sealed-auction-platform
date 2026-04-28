@@ -1,0 +1,150 @@
+{
+  "app": {
+    "title": "منصة المزاد المغلق",
+    "subtitle": "مزادات آمنة مدعومة بتقنية البلوكشين على ستيلار"
+  },
+  "nav": {
+    "auctions": "المزادات",
+    "create": "إنشاء مزاد",
+    "myBids": "عروضي",
+    "dashboard": "لوحة التحكم",
+    "analytics": "التحليلات",
+    "bookmarks": "المفضلة",
+    "wallet": "المحفظة",
+    "network": "الشبكة",
+    "ai": "توصيات الذكاء الاصطناعي",
+    "filter": "تصفية"
+  },
+  "auth": {
+    "login": "تسجيل الدخول",
+    "register": "التسجيل",
+    "logout": "تسجيل الخروج",
+    "username": "اسم المستخدم",
+    "password": "كلمة المرور",
+    "loginPrompt": "هل لديك حساب بالفعل؟",
+    "registerPrompt": "ليس لديك حساب؟",
+    "loginSuccess": "تم تسجيل الدخول بنجاح!",
+    "registerSuccess": "تم التسجيل بنجاح!",
+    "loginError": "فشل المصادقة",
+    "required": "هذا الحقل مطلوب"
+  },
+  "auction": {
+    "title": "العنوان",
+    "description": "الوصف",
+    "startingBid": "العرض الابتدائي",
+    "currentHighest": "أعلى عرض حالي",
+    "endTime": "وقت الانتهاء",
+    "status": "الحالة",
+    "bids": "العروض",
+    "winner": "الفائز",
+    "active": "نشط",
+    "closed": "مغلق",
+    "expired": "منتهي",
+    "placeBid": "تقديم عرض",
+    "viewDetails": "عرض التفاصيل",
+    "share": "مشاركة",
+    "arPreview": "معاينة الواقع المعزز",
+    "createAuction": "إنشاء مزاد",
+    "noAuctions": "لا توجد مزادات متاحة",
+    "loadingMore": "تحميل المزيد من المزادات...",
+    "ends": "ينتهي",
+    "created": "تم الإنشاء"
+  },
+  "bid": {
+    "amount": "مبلغ العرض",
+    "secretKey": "المفتاح السري",
+    "placeBid": "تقديم عرض",
+    "bidSuccess": "تم تقديم العرض بنجاح!",
+    "bidError": "فشل تقديم العرض",
+    "minimumBid": "الحد الأدنى للعرض",
+    "yourBid": "عرضك",
+    "highestBid": "أعلى عرض"
+  },
+  "filter": {
+    "title": "تصفية المزادات",
+    "category": "الفئة",
+    "status": "الحالة",
+    "priceRange": "نطاق السعر",
+    "dateRange": "نطاق التاريخ",
+    "sortBy": "ترتيب حسب",
+    "apply": "تطبيق الفلاتر",
+    "reset": "إعادة تعيين",
+    "savePreset": "حفظ الإعداد",
+    "results": "نتيجة",
+    "categories": {
+      "art": "فن",
+      "collectibles": "مقتنيات",
+      "electronics": "إلكترونيات",
+      "fashion": "أزياء",
+      "jewelry": "مجوهرات",
+      "vehicles": "مركبات",
+      "realestate": "عقارات",
+      "other": "أخرى"
+    },
+    "sortOptions": {
+      "newest": "الأحدث أولاً",
+      "oldest": "الأقدم أولاً",
+      "priceAsc": "السعر: من الأقل إلى الأعلى",
+      "priceDesc": "السعر: من الأعلى إلى الأقل",
+      "endingSoon": "ينتهي قريباً",
+      "mostBids": "الأكثر عروضاً"
+    }
+  },
+  "notifications": {
+    "title": "الإشعارات",
+    "markAllRead": "تحديد الكل كمقروء",
+    "clearAll": "مسح الكل",
+    "noNotifications": "لا توجد إشعارات",
+    "newAuction": "مزاد جديد",
+    "auctionClosed": "تم إغلاق المزاد",
+    "bidPlaced": "تم تقديم عرض جديد",
+    "youWon": "لقد فزت بالمزاد!",
+    "outbid": "تم تجاوز عرضك"
+  },
+  "settings": {
+    "language": "اللغة",
+    "theme": "المظهر",
+    "currency": "العملة",
+    "notifications": "الإشعارات",
+    "privacy": "الخصوصية",
+    "security": "الأمان"
+  },
+  "common": {
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "delete": "حذف",
+    "edit": "تعديل",
+    "close": "إغلاق",
+    "confirm": "تأكيد",
+    "loading": "جاري التحميل...",
+    "error": "خطأ",
+    "success": "نجاح",
+    "warning": "تحذير",
+    "info": "معلومات",
+    "search": "بحث",
+    "filter": "تصفية",
+    "sort": "ترتيب",
+    "more": "المزيد",
+    "less": "أقل",
+    "yes": "نعم",
+    "no": "لا",
+    "ok": "موافق"
+  },
+  "time": {
+    "justNow": "الآن",
+    "minutesAgo": "منذ {{count}} دقيقة",
+    "hoursAgo": "منذ {{count}} ساعة",
+    "daysAgo": "منذ {{count}} يوم",
+    "weeksAgo": "منذ {{count}} أسبوع",
+    "monthsAgo": "منذ {{count}} شهر"
+  },
+  "errors": {
+    "networkError": "خطأ في الشبكة. يرجى التحقق من اتصالك.",
+    "serverError": "خطأ في الخادم. يرجى المحاولة لاحقاً.",
+    "notFound": "المورد غير موجود",
+    "unauthorized": "وصول غير مصرح به",
+    "forbidden": "وصول محظور",
+    "validationError": "خطأ في التحقق",
+    "unknownError": "حدث خطأ غير معروف"
+  }
+}

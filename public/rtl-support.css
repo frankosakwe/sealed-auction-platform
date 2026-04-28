@@ -1,0 +1,304 @@
+/**
+ * RTL (Right-to-Left) Language Support
+ * Provides styling adjustments for Arabic, Hebrew, Persian, and Urdu
+ */
+
+/* RTL Base Styles */
+[dir="rtl"] {
+    direction: rtl;
+    text-align: right;
+}
+
+/* Flexbox Direction Adjustments */
+[dir="rtl"] .flex {
+    flex-direction: row-reverse;
+}
+
+[dir="rtl"] .flex-row {
+    flex-direction: row-reverse;
+}
+
+[dir="rtl"] .flex-row-reverse {
+    flex-direction: row;
+}
+
+/* Margin and Padding Adjustments */
+[dir="rtl"] .ml-1 { margin-left: 0; margin-right: 0.25rem; }
+[dir="rtl"] .ml-2 { margin-left: 0; margin-right: 0.5rem; }
+[dir="rtl"] .ml-3 { margin-left: 0; margin-right: 0.75rem; }
+[dir="rtl"] .ml-4 { margin-left: 0; margin-right: 1rem; }
+[dir="rtl"] .ml-5 { margin-left: 0; margin-right: 1.25rem; }
+[dir="rtl"] .ml-6 { margin-left: 0; margin-right: 1.5rem; }
+[dir="rtl"] .ml-8 { margin-left: 0; margin-right: 2rem; }
+[dir="rtl"] .ml-auto { margin-left: 0; margin-right: auto; }
+
+[dir="rtl"] .mr-1 { margin-right: 0; margin-left: 0.25rem; }
+[dir="rtl"] .mr-2 { margin-right: 0; margin-left: 0.5rem; }
+[dir="rtl"] .mr-3 { margin-right: 0; margin-left: 0.75rem; }
+[dir="rtl"] .mr-4 { margin-right: 0; margin-left: 1rem; }
+[dir="rtl"] .mr-5 { margin-right: 0; margin-left: 1.25rem; }
+[dir="rtl"] .mr-6 { margin-right: 0; margin-left: 1.5rem; }
+[dir="rtl"] .mr-8 { margin-right: 0; margin-left: 2rem; }
+[dir="rtl"] .mr-auto { margin-right: 0; margin-left: auto; }
+
+[dir="rtl"] .pl-1 { padding-left: 0; padding-right: 0.25rem; }
+[dir="rtl"] .pl-2 { padding-left: 0; padding-right: 0.5rem; }
+[dir="rtl"] .pl-3 { padding-left: 0; padding-right: 0.75rem; }
+[dir="rtl"] .pl-4 { padding-left: 0; padding-right: 1rem; }
+[dir="rtl"] .pl-5 { padding-left: 0; padding-right: 1.25rem; }
+[dir="rtl"] .pl-6 { padding-left: 0; padding-right: 1.5rem; }
+[dir="rtl"] .pl-8 { padding-left: 0; padding-right: 2rem; }
+
+[dir="rtl"] .pr-1 { padding-right: 0; padding-left: 0.25rem; }
+[dir="rtl"] .pr-2 { padding-right: 0; padding-left: 0.5rem; }
+[dir="rtl"] .pr-3 { padding-right: 0; padding-left: 0.75rem; }
+[dir="rtl"] .pr-4 { padding-right: 0; padding-left: 1rem; }
+[dir="rtl"] .pr-5 { padding-right: 0; padding-left: 1.25rem; }
+[dir="rtl"] .pr-6 { padding-right: 0; padding-left: 1.5rem; }
+[dir="rtl"] .pr-8 { padding-right: 0; padding-left: 2rem; }
+
+/* Border Radius Adjustments */
+[dir="rtl"] .rounded-l { border-radius: 0 0.25rem 0.25rem 0; }
+[dir="rtl"] .rounded-r { border-radius: 0.25rem 0 0 0.25rem; }
+[dir="rtl"] .rounded-tl { border-radius: 0 0.25rem 0 0; }
+[dir="rtl"] .rounded-tr { border-radius: 0.25rem 0 0 0; }
+[dir="rtl"] .rounded-bl { border-radius: 0 0 0 0.25rem; }
+[dir="rtl"] .rounded-br { border-radius: 0 0 0.25rem 0; }
+
+/* Text Alignment */
+[dir="rtl"] .text-left { text-align: right; }
+[dir="rtl"] .text-right { text-align: left; }
+
+/* Float Adjustments */
+[dir="rtl"] .float-left { float: right; }
+[dir="rtl"] .float-right { float: left; }
+
+/* Transform Adjustments */
+[dir="rtl"] .transform {
+    transform: scaleX(-1);
+}
+
+[dir="rtl"] .transform-none {
+    transform: none;
+}
+
+/* Icon Adjustments - Don't flip icons that shouldn't be flipped */
+[dir="rtl"] .fa-chevron-left::before { content: "\f054"; } /* chevron-right */
+[dir="rtl"] .fa-chevron-right::before { content: "\f053"; } /* chevron-left */
+[dir="rtl"] .fa-arrow-left::before { content: "\f061"; } /* arrow-right */
+[dir="rtl"] .fa-arrow-right::before { content: "\f060"; } /* arrow-left */
+[dir="rtl"] .fa-angle-left::before { content: "\f105"; } /* angle-right */
+[dir="rtl"] .fa-angle-right::before { content: "\f104"; } /* angle-left */
+
+/* Keep these icons unchanged in RTL */
+[dir="rtl"] .fa-search,
+[dir="rtl"] .fa-user,
+[dir="rtl"] .fa-bell,
+[dir="rtl"] .fa-cog,
+[dir="rtl"] .fa-heart,
+[dir="rtl"] .fa-star,
+[dir="rtl"] .fa-check,
+[dir="rtl"] .fa-times,
+[dir="rtl"] .fa-plus,
+[dir="rtl"] .fa-minus {
+    transform: none;
+}
+
+/* Grid Adjustments */
+[dir="rtl"] .grid {
+    direction: rtl;
+}
+
+/* Form Input Adjustments */
+[dir="rtl"] input[type="text"],
+[dir="rtl"] input[type="email"],
+[dir="rtl"] input[type="password"],
+[dir="rtl"] input[type="number"],
+[dir="rtl"] input[type="search"],
+[dir="rtl"] textarea,
+[dir="rtl"] select {
+    text-align: right;
+    direction: rtl;
+}
+
+/* Dropdown Menu Adjustments */
+[dir="rtl"] .dropdown-menu {
+    left: auto;
+    right: 0;
+}
+
+/* Modal Adjustments */
+[dir="rtl"] .modal-content {
+    text-align: right;
+}
+
+/* Navigation Adjustments */
+[dir="rtl"] .nav-item {
+    margin-left: 0;
+    margin-right: 1rem;
+}
+
+[dir="rtl"] .nav-item:last-child {
+    margin-right: 0;
+}
+
+/* Card Adjustments */
+[dir="rtl"] .auction-card {
+    text-align: right;
+}
+
+/* Button Icon Spacing */
+[dir="rtl"] button i {
+    margin-left: 0.5rem;
+    margin-right: 0;
+}
+
+[dir="rtl"] button i:first-child {
+    margin-left: 0;
+    margin-right: 0.5rem;
+}
+
+/* List Adjustments */
+[dir="rtl"] ul,
+[dir="rtl"] ol {
+    padding-left: 0;
+    padding-right: 2rem;
+}
+
+/* Table Adjustments */
+[dir="rtl"] table {
+    direction: rtl;
+}
+
+[dir="rtl"] th,
+[dir="rtl"] td {
+    text-align: right;
+}
+
+/* Notification Adjustments */
+[dir="rtl"] .notification {
+    left: auto;
+    right: 1rem;
+}
+
+/* Toast Notification Adjustments */
+[dir="rtl"] .toast {
+    left: auto;
+    right: 1rem;
+}
+
+/* Sidebar Adjustments */
+[dir="rtl"] .sidebar {
+    left: auto;
+    right: 0;
+}
+
+/* Badge Adjustments */
+[dir="rtl"] .badge {
+    left: auto;
+    right: -0.5rem;
+}
+
+/* Tooltip Adjustments */
+[dir="rtl"] .tooltip {
+    direction: rtl;
+    text-align: right;
+}
+
+/* Progress Bar Adjustments */
+[dir="rtl"] .progress-bar {
+    left: auto;
+    right: 0;
+}
+
+/* Checkbox and Radio Adjustments */
+[dir="rtl"] input[type="checkbox"],
+[dir="rtl"] input[type="radio"] {
+    margin-left: 0.5rem;
+    margin-right: 0;
+}
+
+/* Language Selector Specific */
+[dir="rtl"] #languageSelector,
+[dir="rtl"] #mobileLanguageSelector {
+    text-align: right;
+    direction: rtl;
+}
+
+/* Auction Grid RTL */
+[dir="rtl"] #auctionsGrid {
+    direction: rtl;
+}
+
+/* Social Share Buttons RTL */
+[dir="rtl"] .social-sharing-container {
+    direction: rtl;
+}
+
+[dir="rtl"] .share-btn {
+    margin-left: 0.5rem;
+    margin-right: 0;
+}
+
+/* Filter Panel RTL */
+[dir="rtl"] .filter-panel {
+    left: auto;
+    right: 0;
+}
+
+/* Animation Adjustments for RTL */
+[dir="rtl"] @keyframes slideInRight {
+    from {
+        transform: translateX(-100%);
+    }
+    to {
+        transform: translateX(0);
+    }
+}
+
+[dir="rtl"] @keyframes slideInLeft {
+    from {
+        transform: translateX(100%);
+    }
+    to {
+        transform: translateX(0);
+    }
+}
+
+/* Responsive RTL Adjustments */
+@media (max-width: 768px) {
+    [dir="rtl"] .mobile-menu {
+        left: auto;
+        right: 0;
+    }
+    
+    [dir="rtl"] .mobile-nav {
+        direction: rtl;
+    }
+}
+
+/* Print Styles for RTL */
+@media print {
+    [dir="rtl"] {
+        direction: rtl;
+        text-align: right;
+    }
+}
+
+/* Accessibility - Focus Indicators for RTL */
+[dir="rtl"] *:focus {
+    outline-offset: -2px;
+}
+
+/* Custom Scrollbar for RTL */
+[dir="rtl"] ::-webkit-scrollbar {
+    left: 0;
+    right: auto;
+}
+
+/* Number Input Adjustments */
+[dir="rtl"] input[type="number"]::-webkit-inner-spin-button,
+[dir="rtl"] input[type="number"]::-webkit-outer-spin-button {
+    left: 0;
+    right: auto;
+}
