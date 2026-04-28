@@ -2956,6 +2956,504 @@ app.get('/api/export-bid-history', authenticateToken, (req, res) => {
   }
 });
 
+// ========== DeFi API Endpoints ==========
+
+const RiskAssessmentEngine = require('./utils/risk-assessment');
+const riskEngine = new RiskAssessmentEngine(db);
+
+// Get user portfolio
+app.get('/api/defi/portfolio', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // Get or create portfolio
+    let portfolio = db.getUserPortfolio(userId);
+    if (!portfolio) {
+      db.createOrUpdatePortfolio(userId);
+      portfolio = db.getUserPortfolio(userId);
+    }
+    
+    // Calculate current portfolio value
+    portfolio = db.calculatePortfolioValue(userId);
+    
+    // Get liquidity positions
+    const liquidityPositions = db.getUserLiquidityPositions(userId);
+    
+    // Get staking positions
+    const stakingPositions = db.getUserStakes(userId);
+    
+    // Get recent events
+    const recentSwaps = db.getUserSwapEvents(userId, 10);
+    const recentRewards = db.getUserRewardEvents(userId, 10);
+    
+    res.json({
+      portfolio,
+      liquidityPositions,
+      stakingPositions,
+      recentSwaps,
+      recentRewards
+    });
+  } catch (error) {
+    logError('Error getting portfolio:', error, { endpoint: '/api/defi/portfolio', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to get portfolio' });
+  }
+});
+
+// Get all liquidity pools
+app.get('/api/defi/pools', async (req, res) => {
+  try {
+    const pools = db.getAllLiquidityPools();
+    
+    // Add token information
+    const poolsWithTokenInfo = pools.map(pool => {
+      const tokenAPrice = db.getTokenPrice(pool.token_a);
+      const tokenBPrice = db.getTokenPrice(pool.token_b);
+      
+      return {
+        ...pool,
+        token_a_price: tokenAPrice?.price_usd || 0,
+        token_b_price: tokenBPrice?.price_usd || 0,
+        total_liquidity_usd: (pool.reserve_a * (tokenAPrice?.price_usd || 0)) + (pool.reserve_b * (tokenBPrice?.price_usd || 0))
+      };
+    });
+    
+    res.json(poolsWithTokenInfo);
+  } catch (error) {
+    logError('Error getting pools:', error, { endpoint: '/api/defi/pools' });
+    res.status(500).json({ error: 'Failed to get pools' });
+  }
+});
+
+// Get all yield farms
+app.get('/api/defi/farms', async (req, res) => {
+  try {
+    const farms = db.getAllYieldFarms();
+    
+    // Add APR calculations and token information
+    const farmsWithInfo = farms.map(farm => {
+      const stakingTokenPrice = db.getTokenPrice(farm.staking_token);
+      const rewardTokenPrice = db.getTokenPrice(farm.reward_token);
+      
+      // Calculate APR (simplified)
+      const apr = farm.reward_rate > 0 && farm.total_staked > 0 
+        ? ((farm.reward_rate * 86400 * 365 * (rewardTokenPrice?.price_usd || 0)) / (farm.total_staked * (stakingTokenPrice?.price_usd || 1))) * 100
+        : 0;
+      
+      return {
+        ...farm,
+        apr,
+        staking_token_price: stakingTokenPrice?.price_usd || 0,
+        reward_token_price: rewardTokenPrice?.price_usd || 0,
+        total_staked_usd: farm.total_staked * (stakingTokenPrice?.price_usd || 0)
+      };
+    });
+    
+    res.json(farmsWithInfo);
+  } catch (error) {
+    logError('Error getting farms:', error, { endpoint: '/api/defi/farms' });
+    res.status(500).json({ error: 'Failed to get farms' });
+  }
+});
+
+// Add liquidity to pool
+app.post('/api/defi/add-liquidity', authenticateToken, async (req, res) => {
+  try {
+    const { poolId, tokenAAmount, tokenBAmount, minLPAmount } = req.body;
+    const userId = req.user.id;
+    
+    if (!poolId || !tokenAAmount || !tokenBAmount || !minLPAmount) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    
+    // Get pool information
+    const pool = db.getLiquidityPool(poolId);
+    if (!pool) {
+      return res.status(404).json({ error: 'Pool not found' });
+    }
+    
+    if (pool.status !== 'active') {
+      return res.status(400).json({ error: 'Pool is not active' });
+    }
+    
+    // In a real implementation, this would interact with the blockchain
+    // For now, we'll simulate the operation
+    
+    // Calculate LP tokens (simplified)
+    const lpTokens = Math.sqrt(tokenAAmount * tokenBAmount);
+    
+    // Create liquidity position
+    const positionData = {
+      positionId: Date.now(),
+      userId,
+      poolId,
+      lpAmount: lpTokens,
+      tokenAAmount,
+      tokenBAmount
+    };
+    
+    db.createLiquidityPosition(positionData);
+    
+    // Update pool reserves
+    db.updateLiquidityPool(poolId, {
+      reserve_a: pool.reserve_a + tokenAAmount,
+      reserve_b: pool.reserve_b + tokenBAmount,
+      lp_token_supply: pool.lp_token_supply + lpTokens
+    });
+    
+    // Record swap event (as liquidity addition)
+    db.createSwapEvent({
+      eventId: Date.now(),
+      userId,
+      poolId,
+      tokenIn: pool.token_a,
+      tokenOut: pool.token_b,
+      amountIn: tokenAAmount,
+      amountOut: tokenBAmount,
+      fee: 0
+    });
+    
+    res.json({ 
+      success: true, 
+      lpTokens: lpTokens,
+      message: 'Liquidity added successfully' 
+    });
+  } catch (error) {
+    logError('Error adding liquidity:', error, { endpoint: '/api/defi/add-liquidity', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to add liquidity' });
+  }
+});
+
+// Remove liquidity from pool
+app.post('/api/defi/remove-liquidity', authenticateToken, async (req, res) => {
+  try {
+    const { positionId, lpAmount, minAmountA, minAmountB } = req.body;
+    const userId = req.user.id;
+    
+    if (!positionId || !lpAmount) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    
+    // Get position information
+    const positions = db.getUserLiquidityPositions(userId);
+    const position = positions.find(p => p.position_id == positionId);
+    
+    if (!position) {
+      return res.status(404).json({ error: 'Position not found' });
+    }
+    
+    if (position.lp_amount < lpAmount) {
+      return res.status(400).json({ error: 'Insufficient LP tokens' });
+    }
+    
+    // Get pool information
+    const pool = db.getLiquidityPool(position.pool_id);
+    if (!pool) {
+      return res.status(404).json({ error: 'Pool not found' });
+    }
+    
+    // Calculate token amounts to return (simplified)
+    const proportion = lpAmount / position.lp_amount;
+    const amountA = position.token_a_amount * proportion;
+    const amountB = position.token_b_amount * proportion;
+    
+    if (amountA < minAmountA || amountB < minAmountB) {
+      return res.status(400).json({ error: 'Amount below minimum' });
+    }
+    
+    // Update position
+    if (position.lp_amount == lpAmount) {
+      // Remove entire position
+      // In a real implementation, you'd delete the position
+    } else {
+      db.updateLiquidityPosition(positionId, {
+        lp_amount: position.lp_amount - lpAmount,
+        token_a_amount: position.token_a_amount - amountA,
+        token_b_amount: position.token_b_amount - amountB
+      });
+    }
+    
+    // Update pool reserves
+    db.updateLiquidityPool(position.pool_id, {
+      reserve_a: pool.reserve_a - amountA,
+      reserve_b: pool.reserve_b - amountB,
+      lp_token_supply: pool.lp_token_supply - lpAmount
+    });
+    
+    res.json({ 
+      success: true, 
+      amountA, 
+      amountB,
+      message: 'Liquidity removed successfully' 
+    });
+  } catch (error) {
+    logError('Error removing liquidity:', error, { endpoint: '/api/defi/remove-liquidity', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to remove liquidity' });
+  }
+});
+
+// Stake tokens in farm
+app.post('/api/defi/stake', authenticateToken, async (req, res) => {
+  try {
+    const { farmId, amount } = req.body;
+    const userId = req.user.id;
+    
+    if (!farmId || !amount) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    
+    // Get farm information
+    const farm = db.getYieldFarm(farmId);
+    if (!farm) {
+      return res.status(404).json({ error: 'Farm not found' });
+    }
+    
+    if (farm.status !== 'active') {
+      return res.status(400).json({ error: 'Farm is not active' });
+    }
+    
+    // Create stake
+    const stakeData = {
+      stakeId: Date.now(),
+      userId,
+      farmId,
+      amount,
+      rewardDebt: 0
+    };
+    
+    db.createUserStake(stakeData);
+    
+    // Update farm
+    db.updateYieldFarm(farmId, {
+      total_staked: farm.total_staked + amount
+    });
+    
+    res.json({ 
+      success: true, 
+      stakeId: stakeData.stakeId,
+      message: 'Tokens staked successfully' 
+    });
+  } catch (error) {
+    logError('Error staking tokens:', error, { endpoint: '/api/defi/stake', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to stake tokens' });
+  }
+});
+
+// Unstake tokens from farm
+app.post('/api/defi/unstake', authenticateToken, async (req, res) => {
+  try {
+    const { stakeId, amount } = req.body;
+    const userId = req.user.id;
+    
+    if (!stakeId || !amount) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    
+    // Get stake information
+    const stakes = db.getUserStakes(userId);
+    const stake = stakes.find(s => s.stake_id == stakeId);
+    
+    if (!stake) {
+      return res.status(404).json({ error: 'Stake not found' });
+    }
+    
+    if (stake.amount < amount) {
+      return res.status(400).json({ error: 'Insufficient staked amount' });
+    }
+    
+    // Get farm information
+    const farm = db.getYieldFarm(stake.farm_id);
+    if (!farm) {
+      return res.status(404).json({ error: 'Farm not found' });
+    }
+    
+    // Calculate pending rewards (simplified)
+    const pendingRewards = amount * 0.01; // Mock calculation
+    
+    // Update stake
+    if (stake.amount == amount) {
+      // Remove entire stake
+      // In a real implementation, you'd delete the stake
+    } else {
+      db.updateUserStake(stakeId, {
+        amount: stake.amount - amount
+      });
+    }
+    
+    // Update farm
+    db.updateYieldFarm(stake.farm_id, {
+      total_staked: farm.total_staked - amount
+    });
+    
+    // Record reward event
+    if (pendingRewards > 0) {
+      db.createRewardEvent({
+        eventId: Date.now(),
+        userId,
+        farmId: stake.farm_id,
+        amount: pendingRewards
+      });
+    }
+    
+    res.json({ 
+      success: true, 
+      amount,
+      pendingRewards,
+      message: 'Tokens unstaked successfully' 
+    });
+  } catch (error) {
+    logError('Error unstaking tokens:', error, { endpoint: '/api/defi/unstake', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to unstake tokens' });
+  }
+});
+
+// Claim rewards
+app.post('/api/defi/claim-rewards', authenticateToken, async (req, res) => {
+  try {
+    const { stakeId } = req.body;
+    const userId = req.user.id;
+    
+    if (!stakeId) {
+      return res.status(400).json({ error: 'Missing stake ID' });
+    }
+    
+    // Get stake information
+    const stakes = db.getUserStakes(userId);
+    const stake = stakes.find(s => s.stake_id == stakeId);
+    
+    if (!stake) {
+      return res.status(404).json({ error: 'Stake not found' });
+    }
+    
+    // Calculate pending rewards (simplified)
+    const pendingRewards = stake.amount * 0.05; // Mock calculation
+    
+    if (pendingRewards <= 0) {
+      return res.status(400).json({ error: 'No rewards to claim' });
+    }
+    
+    // Record reward event
+    db.createRewardEvent({
+      eventId: Date.now(),
+      userId,
+      farmId: stake.farm_id,
+      amount: pendingRewards
+    });
+    
+    // Update last claimed time
+    db.updateUserStake(stakeId, {
+      last_claimed: new Date().toISOString()
+    });
+    
+    res.json({ 
+      success: true, 
+      amount: pendingRewards,
+      message: 'Rewards claimed successfully' 
+    });
+  } catch (error) {
+    logError('Error claiming rewards:', error, { endpoint: '/api/defi/claim-rewards', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to claim rewards' });
+  }
+});
+
+// Get token prices
+app.get('/api/defi/prices', async (req, res) => {
+  try {
+    const prices = db.getAllTokenPrices();
+    res.json(prices);
+  } catch (error) {
+    logError('Error getting prices:', error, { endpoint: '/api/defi/prices' });
+    res.status(500).json({ error: 'Failed to get prices' });
+  }
+});
+
+// Update token prices (would be called by price oracle)
+app.post('/api/defi/update-prices', async (req, res) => {
+  try {
+    const { prices } = req.body;
+    
+    if (!Array.isArray(prices)) {
+      return res.status(400).json({ error: 'Prices must be an array' });
+    }
+    
+    for (const priceData of prices) {
+      db.updateTokenPrice(priceData);
+    }
+    
+    res.json({ success: true, message: 'Prices updated successfully' });
+  } catch (error) {
+    logError('Error updating prices:', error, { endpoint: '/api/defi/update-prices' });
+    res.status(500).json({ error: 'Failed to update prices' });
+  }
+});
+
+// Get risk assessment
+app.get('/api/defi/risk-assessment', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // Get user's positions
+    const liquidityPositions = db.getUserLiquidityPositions(userId);
+    const stakingPositions = db.getUserStakes(userId);
+    
+    const assessments = [];
+    
+    // Assess risk for each pool
+    for (const position of liquidityPositions) {
+      const assessment = await riskEngine.assessPoolRisk(position.pool_id);
+      assessments.push({
+        type: 'liquidity',
+        name: `Pool #${position.pool_id}`,
+        ...assessment
+      });
+    }
+    
+    // Assess risk for each farm
+    for (const stake of stakingPositions) {
+      const assessment = await riskEngine.assessFarmRisk(stake.farm_id);
+      assessments.push({
+        type: 'staking',
+        name: `Farm #${stake.farm_id}`,
+        ...assessment
+      });
+    }
+    
+    res.json({ assessments });
+  } catch (error) {
+    logError('Error getting risk assessment:', error, { endpoint: '/api/defi/risk-assessment', userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to get risk assessment' });
+  }
+});
+
+// Get analytics data
+app.get('/api/defi/analytics', async (req, res) => {
+  try {
+    const { metricType, poolId, farmId, timeRange } = req.query;
+    
+    const metrics = db.getAnalyticsMetrics(
+      metricType, 
+      poolId ? parseInt(poolId) : null, 
+      farmId ? parseInt(farmId) : null, 
+      timeRange ? parseInt(timeRange) : 24
+    );
+    
+    res.json(metrics);
+  } catch (error) {
+    logError('Error getting analytics:', error, { endpoint: '/api/defi/analytics' });
+    res.status(500).json({ error: 'Failed to get analytics' });
+  }
+});
+
+// Generate comprehensive risk report
+app.get('/api/defi/risk-report', async (req, res) => {
+  try {
+    const report = await riskEngine.generateRiskReport();
+    res.json(report);
+  } catch (error) {
+    logError('Error generating risk report:', error, { endpoint: '/api/defi/risk-report' });
+    res.status(500).json({ error: 'Failed to generate risk report' });
+  }
+});
+
 if (sentryEnabled) {
   app.use(Sentry.Handlers.errorHandler());
 }

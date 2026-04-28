@@ -2,6 +2,10 @@
 
 use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String, Vec, Symbol, symbol_short, map, xdr::ToXdr};
 
+// Import DeFi modules
+mod liquidity_pool;
+mod yield_farming;
+
 // Maximum bid amount to prevent overflow (in stroops)
 const MAX_BID_AMOUNT: u64 = u64::MAX / 2; // Use half of u64::MAX for safety
 
@@ -553,3 +557,7 @@ impl SealedBidAuction {
         (commitment, nonce, timestamp)
     }
 }
+
+// Export DeFi contracts
+pub use liquidity_pool::LiquidityPoolContract;
+pub use yield_farming::YieldFarmingContract;

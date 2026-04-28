@@ -276,6 +276,162 @@ class AuctionDatabase {
       )
     `);
 
+    // DeFi Protocol Tables
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS liquidity_pools (
+        id TEXT PRIMARY KEY,
+        pool_id INTEGER UNIQUE NOT NULL,
+        token_a TEXT NOT NULL,
+        token_b TEXT NOT NULL,
+        reserve_a REAL DEFAULT 0,
+        reserve_b REAL DEFAULT 0,
+        lp_token_supply REAL DEFAULT 0,
+        fee_rate INTEGER DEFAULT 30,
+        status TEXT DEFAULT 'active' CHECK(status IN ('inactive', 'active', 'paused')),
+        contract_address TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        last_interaction DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS liquidity_positions (
+        id TEXT PRIMARY KEY,
+        position_id INTEGER UNIQUE NOT NULL,
+        user_id TEXT NOT NULL,
+        pool_id INTEGER NOT NULL,
+        lp_amount REAL DEFAULT 0,
+        token_a_amount REAL DEFAULT 0,
+        token_b_amount REAL DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (pool_id) REFERENCES liquidity_pools(pool_id) ON DELETE CASCADE
+      )
+    `);
+
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS yield_farms (
+        id TEXT PRIMARY KEY,
+        farm_id INTEGER UNIQUE NOT NULL,
+        name TEXT NOT NULL,
+        reward_token TEXT NOT NULL,
+        staking_token TEXT NOT NULL,
+        total_staked REAL DEFAULT 0,
+        reward_rate REAL DEFAULT 0,
+        reward_per_token_stored REAL DEFAULT 0,
+        last_update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+        period_finish DATETIME,
+        status TEXT DEFAULT 'active' CHECK(status IN ('inactive', 'active', 'paused', 'ended')),
+        contract_address TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS user_stakes (
+        id TEXT PRIMARY KEY,
+        stake_id INTEGER UNIQUE NOT NULL,
+        user_id TEXT NOT NULL,
+        farm_id INTEGER NOT NULL,
+        amount REAL DEFAULT 0,
+        reward_debt REAL DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        last_claimed DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (farm_id) REFERENCES yield_farms(farm_id) ON DELETE CASCADE
+      )
+    `);
+
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS reward_events (
+        id TEXT PRIMARY KEY,
+        event_id INTEGER,
+        user_id TEXT NOT NULL,
+        farm_id INTEGER NOT NULL,
+        amount REAL NOT NULL,
+        transaction_hash TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (farm_id) REFERENCES yield_farms(farm_id) ON DELETE CASCADE
+      )
+    `);
+
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS swap_events (
+        id TEXT PRIMARY KEY,
+        event_id INTEGER,
+        user_id TEXT NOT NULL,
+        pool_id INTEGER NOT NULL,
+        token_in TEXT NOT NULL,
+        token_out TEXT NOT NULL,
+        amount_in REAL NOT NULL,
+        amount_out REAL NOT NULL,
+        fee REAL NOT NULL,
+        transaction_hash TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (pool_id) REFERENCES liquidity_pools(pool_id) ON DELETE CASCADE
+      )
+    `);
+
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS defi_portfolios (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL UNIQUE,
+        total_value_usd REAL DEFAULT 0,
+        total_liquidity_usd REAL DEFAULT 0,
+        total_staked_usd REAL DEFAULT 0,
+        total_pending_rewards_usd REAL DEFAULT 0,
+        last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS risk_assessments (
+        id TEXT PRIMARY KEY,
+        pool_id INTEGER,
+        farm_id INTEGER,
+        assessment_type TEXT NOT NULL CHECK(assessment_type IN ('liquidity', 'volatility', 'concentration', 'smart_contract')),
+        risk_score REAL NOT NULL CHECK(risk_score >= 0 AND risk_score <= 10),
+        risk_level TEXT NOT NULL CHECK(risk_level IN ('low', 'medium', 'high', 'critical')),
+        factors TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (pool_id) REFERENCES liquidity_pools(pool_id) ON DELETE CASCADE,
+        FOREIGN KEY (farm_id) REFERENCES yield_farms(farm_id) ON DELETE CASCADE
+      )
+    `);
+
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS token_prices (
+        id TEXT PRIMARY KEY,
+        token_address TEXT NOT NULL UNIQUE,
+        symbol TEXT NOT NULL,
+        price_usd REAL NOT NULL,
+        market_cap_usd REAL,
+        volume_24h_usd REAL,
+        price_change_24h REAL,
+        last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS defi_analytics (
+        id TEXT PRIMARY KEY,
+        metric_type TEXT NOT NULL CHECK(metric_type IN ('tvl', 'volume', 'fees', 'users')),
+        pool_id INTEGER,
+        farm_id INTEGER,
+        value REAL NOT NULL,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (pool_id) REFERENCES liquidity_pools(pool_id) ON DELETE CASCADE,
+        FOREIGN KEY (farm_id) REFERENCES yield_farms(farm_id) ON DELETE CASCADE
+      )
+    `);
+
     // Create indexes for better performance
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_auctions_status ON auctions(status);
@@ -316,6 +472,31 @@ class AuctionDatabase {
       CREATE INDEX IF NOT EXISTS idx_bookmark_sync_user_id ON bookmark_sync(user_id);
       CREATE INDEX IF NOT EXISTS idx_bookmark_sync_device_id ON bookmark_sync(device_id);
       CREATE INDEX IF NOT EXISTS idx_bookmark_sync_synced ON bookmark_sync(synced);
+      
+      -- DeFi-related indexes
+      CREATE INDEX IF NOT EXISTS idx_liquidity_pools_pool_id ON liquidity_pools(pool_id);
+      CREATE INDEX IF NOT EXISTS idx_liquidity_pools_status ON liquidity_pools(status);
+      CREATE INDEX IF NOT EXISTS idx_liquidity_pools_token_a ON liquidity_pools(token_a);
+      CREATE INDEX IF NOT EXISTS idx_liquidity_pools_token_b ON liquidity_pools(token_b);
+      CREATE INDEX IF NOT EXISTS idx_liquidity_positions_user_id ON liquidity_positions(user_id);
+      CREATE INDEX IF NOT EXISTS idx_liquidity_positions_pool_id ON liquidity_positions(pool_id);
+      CREATE INDEX IF NOT EXISTS idx_yield_farms_farm_id ON yield_farms(farm_id);
+      CREATE INDEX IF NOT EXISTS idx_yield_farms_status ON yield_farms(status);
+      CREATE INDEX IF NOT EXISTS idx_yield_farms_staking_token ON yield_farms(staking_token);
+      CREATE INDEX IF NOT EXISTS idx_user_stakes_user_id ON user_stakes(user_id);
+      CREATE INDEX IF NOT EXISTS idx_user_stakes_farm_id ON user_stakes(farm_id);
+      CREATE INDEX IF NOT EXISTS idx_reward_events_user_id ON reward_events(user_id);
+      CREATE INDEX IF NOT EXISTS idx_reward_events_farm_id ON reward_events(farm_id);
+      CREATE INDEX IF NOT EXISTS idx_swap_events_user_id ON swap_events(user_id);
+      CREATE INDEX IF NOT EXISTS idx_swap_events_pool_id ON swap_events(pool_id);
+      CREATE INDEX IF NOT EXISTS idx_defi_portfolios_user_id ON defi_portfolios(user_id);
+      CREATE INDEX IF NOT EXISTS idx_risk_assessments_pool_id ON risk_assessments(pool_id);
+      CREATE INDEX IF NOT EXISTS idx_risk_assessments_farm_id ON risk_assessments(farm_id);
+      CREATE INDEX IF NOT EXISTS idx_risk_assessments_type ON risk_assessments(assessment_type);
+      CREATE INDEX IF NOT EXISTS idx_token_prices_symbol ON token_prices(symbol);
+      CREATE INDEX IF NOT EXISTS idx_token_prices_last_updated ON token_prices(last_updated);
+      CREATE INDEX IF NOT EXISTS idx_defi_analytics_type ON defi_analytics(metric_type);
+      CREATE INDEX IF NOT EXISTS idx_defi_analytics_timestamp ON defi_analytics(timestamp);
     `);
   }
 
@@ -2709,6 +2890,447 @@ class AuctionDatabase {
     `);
     
     return stmt.run(...recordIds);
+  }
+
+  // ========== DeFi Protocol Methods ==========
+
+  // Liquidity Pool Operations
+  createLiquidityPool(poolData) {
+    const stmt = this.securityLayer.prepare(`
+      INSERT INTO liquidity_pools (
+        id, pool_id, token_a, token_b, reserve_a, reserve_b, 
+        lp_token_supply, fee_rate, status, contract_address
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    return stmt.run(
+      this.generateId(),
+      poolData.poolId,
+      poolData.tokenA,
+      poolData.tokenB,
+      poolData.reserveA || 0,
+      poolData.reserveB || 0,
+      poolData.lpTokenSupply || 0,
+      poolData.feeRate || 30,
+      poolData.status || 'active',
+      poolData.contractAddress || null
+    );
+  }
+
+  getLiquidityPool(poolId) {
+    const stmt = this.securityLayer.prepare('SELECT * FROM liquidity_pools WHERE pool_id = ?');
+    return stmt.get(poolId);
+  }
+
+  getAllLiquidityPools() {
+    const stmt = this.securityLayer.prepare('SELECT * FROM liquidity_pools ORDER BY created_at DESC');
+    return stmt.all();
+  }
+
+  updateLiquidityPool(poolId, updates) {
+    const fields = Object.keys(updates).map(key => `${key} = ?`).join(', ');
+    const values = Object.values(updates);
+    
+    const stmt = this.securityLayer.prepare(`
+      UPDATE liquidity_pools 
+      SET ${fields}, updated_at = CURRENT_TIMESTAMP 
+      WHERE pool_id = ?
+    `);
+    return stmt.run(...values, poolId);
+  }
+
+  // Liquidity Position Operations
+  createLiquidityPosition(positionData) {
+    const stmt = this.securityLayer.prepare(`
+      INSERT INTO liquidity_positions (
+        id, position_id, user_id, pool_id, lp_amount, 
+        token_a_amount, token_b_amount
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+    return stmt.run(
+      this.generateId(),
+      positionData.positionId,
+      positionData.userId,
+      positionData.poolId,
+      positionData.lpAmount,
+      positionData.tokenAAmount,
+      positionData.tokenBAmount
+    );
+  }
+
+  getUserLiquidityPositions(userId) {
+    const stmt = this.securityLayer.prepare(`
+      SELECT lp.*, p.token_a, p.token_b, p.fee_rate
+      FROM liquidity_positions lp
+      JOIN liquidity_pools p ON lp.pool_id = p.pool_id
+      WHERE lp.user_id = ?
+      ORDER BY lp.created_at DESC
+    `);
+    return stmt.all(userId);
+  }
+
+  updateLiquidityPosition(positionId, updates) {
+    const fields = Object.keys(updates).map(key => `${key} = ?`).join(', ');
+    const values = Object.values(updates);
+    
+    const stmt = this.securityLayer.prepare(`
+      UPDATE liquidity_positions 
+      SET ${fields}, last_updated = CURRENT_TIMESTAMP 
+      WHERE position_id = ?
+    `);
+    return stmt.run(...values, positionId);
+  }
+
+  // Yield Farm Operations
+  createYieldFarm(farmData) {
+    const stmt = this.securityLayer.prepare(`
+      INSERT INTO yield_farms (
+        id, farm_id, name, reward_token, staking_token, 
+        total_staked, reward_rate, period_finish, status, contract_address
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    return stmt.run(
+      this.generateId(),
+      farmData.farmId,
+      farmData.name,
+      farmData.rewardToken,
+      farmData.stakingToken,
+      farmData.totalStaked || 0,
+      farmData.rewardRate || 0,
+      farmData.periodFinish || null,
+      farmData.status || 'active',
+      farmData.contractAddress || null
+    );
+  }
+
+  getYieldFarm(farmId) {
+    const stmt = this.securityLayer.prepare('SELECT * FROM yield_farms WHERE farm_id = ?');
+    return stmt.get(farmId);
+  }
+
+  getAllYieldFarms() {
+    const stmt = this.securityLayer.prepare('SELECT * FROM yield_farms ORDER BY created_at DESC');
+    return stmt.all();
+  }
+
+  updateYieldFarm(farmId, updates) {
+    const fields = Object.keys(updates).map(key => `${key} = ?`).join(', ');
+    const values = Object.values(updates);
+    
+    const stmt = this.securityLayer.prepare(`
+      UPDATE yield_farms 
+      SET ${fields}, updated_at = CURRENT_TIMESTAMP 
+      WHERE farm_id = ?
+    `);
+    return stmt.run(...values, farmId);
+  }
+
+  // User Stake Operations
+  createUserStake(stakeData) {
+    const stmt = this.securityLayer.prepare(`
+      INSERT INTO user_stakes (
+        id, stake_id, user_id, farm_id, amount, reward_debt
+      ) VALUES (?, ?, ?, ?, ?, ?)
+    `);
+    return stmt.run(
+      this.generateId(),
+      stakeData.stakeId,
+      stakeData.userId,
+      stakeData.farmId,
+      stakeData.amount,
+      stakeData.rewardDebt || 0
+    );
+  }
+
+  getUserStakes(userId) {
+    const stmt = this.securityLayer.prepare(`
+      SELECT us.*, yf.name as farm_name, yf.reward_token, yf.staking_token
+      FROM user_stakes us
+      JOIN yield_farms yf ON us.farm_id = yf.farm_id
+      WHERE us.user_id = ?
+      ORDER BY us.created_at DESC
+    `);
+    return stmt.all(userId);
+  }
+
+  updateUserStake(stakeId, updates) {
+    const fields = Object.keys(updates).map(key => `${key} = ?`).join(', ');
+    const values = Object.values(updates);
+    
+    const stmt = this.securityLayer.prepare(`
+      UPDATE user_stakes 
+      SET ${fields}, last_claimed = CURRENT_TIMESTAMP 
+      WHERE stake_id = ?
+    `);
+    return stmt.run(...values, stakeId);
+  }
+
+  // Reward Event Operations
+  createRewardEvent(eventData) {
+    const stmt = this.securityLayer.prepare(`
+      INSERT INTO reward_events (
+        id, event_id, user_id, farm_id, amount, transaction_hash
+      ) VALUES (?, ?, ?, ?, ?, ?)
+    `);
+    return stmt.run(
+      this.generateId(),
+      eventData.eventId,
+      eventData.userId,
+      eventData.farmId,
+      eventData.amount,
+      eventData.transactionHash || null
+    );
+  }
+
+  getUserRewardEvents(userId, limit = 50) {
+    const stmt = this.securityLayer.prepare(`
+      SELECT re.*, yf.name as farm_name
+      FROM reward_events re
+      JOIN yield_farms yf ON re.farm_id = yf.farm_id
+      WHERE re.user_id = ?
+      ORDER BY re.created_at DESC
+      LIMIT ?
+    `);
+    return stmt.all(userId, limit);
+  }
+
+  // Swap Event Operations
+  createSwapEvent(eventData) {
+    const stmt = this.securityLayer.prepare(`
+      INSERT INTO swap_events (
+        id, event_id, user_id, pool_id, token_in, token_out, 
+        amount_in, amount_out, fee, transaction_hash
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    return stmt.run(
+      this.generateId(),
+      eventData.eventId,
+      eventData.userId,
+      eventData.poolId,
+      eventData.tokenIn,
+      eventData.tokenOut,
+      eventData.amountIn,
+      eventData.amountOut,
+      eventData.fee,
+      eventData.transactionHash || null
+    );
+  }
+
+  getUserSwapEvents(userId, limit = 50) {
+    const stmt = this.securityLayer.prepare(`
+      SELECT se.*, p.token_a, p.token_b
+      FROM swap_events se
+      JOIN liquidity_pools p ON se.pool_id = p.pool_id
+      WHERE se.user_id = ?
+      ORDER BY se.created_at DESC
+      LIMIT ?
+    `);
+    return stmt.all(userId, limit);
+  }
+
+  // Portfolio Management
+  createOrUpdatePortfolio(userId) {
+    const stmt = this.securityLayer.prepare(`
+      INSERT OR REPLACE INTO defi_portfolios (
+        id, user_id, total_value_usd, total_liquidity_usd, 
+        total_staked_usd, total_pending_rewards_usd
+      ) VALUES (?, ?, ?, ?, ?, ?)
+    `);
+    return stmt.run(
+      this.generateId(),
+      userId,
+      0,
+      0,
+      0,
+      0
+    );
+  }
+
+  getUserPortfolio(userId) {
+    const stmt = this.securityLayer.prepare('SELECT * FROM defi_portfolios WHERE user_id = ?');
+    return stmt.get(userId);
+  }
+
+  updatePortfolio(userId, updates) {
+    const fields = Object.keys(updates).map(key => `${key} = ?`).join(', ');
+    const values = Object.values(updates);
+    
+    const stmt = this.securityLayer.prepare(`
+      UPDATE defi_portfolios 
+      SET ${fields}, last_updated = CURRENT_TIMESTAMP 
+      WHERE user_id = ?
+    `);
+    return stmt.run(...values, userId);
+  }
+
+  // Risk Assessment Operations
+  createRiskAssessment(assessmentData) {
+    const stmt = this.securityLayer.prepare(`
+      INSERT INTO risk_assessments (
+        id, pool_id, farm_id, assessment_type, risk_score, 
+        risk_level, factors
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+    return stmt.run(
+      this.generateId(),
+      assessmentData.poolId || null,
+      assessmentData.farmId || null,
+      assessmentData.assessmentType,
+      assessmentData.riskScore,
+      assessmentData.riskLevel,
+      JSON.stringify(assessmentData.factors || {})
+    );
+  }
+
+  getRiskAssessments(poolId = null, farmId = null) {
+    let query = 'SELECT * FROM risk_assessments WHERE 1=1';
+    const params = [];
+    
+    if (poolId) {
+      query += ' AND pool_id = ?';
+      params.push(poolId);
+    }
+    
+    if (farmId) {
+      query += ' AND farm_id = ?';
+      params.push(farmId);
+    }
+    
+    query += ' ORDER BY created_at DESC';
+    
+    const stmt = this.securityLayer.prepare(query);
+    return stmt.all(...params);
+  }
+
+  // Token Price Operations
+  updateTokenPrice(tokenData) {
+    const stmt = this.securityLayer.prepare(`
+      INSERT OR REPLACE INTO token_prices (
+        id, token_address, symbol, price_usd, market_cap_usd, 
+        volume_24h_usd, price_change_24h
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+    return stmt.run(
+      this.generateId(),
+      tokenData.tokenAddress,
+      tokenData.symbol,
+      tokenData.priceUsd,
+      tokenData.marketCapUsd || null,
+      tokenData.volume24hUsd || null,
+      tokenData.priceChange24h || null
+    );
+  }
+
+  getTokenPrice(tokenAddress) {
+    const stmt = this.securityLayer.prepare('SELECT * FROM token_prices WHERE token_address = ?');
+    return stmt.get(tokenAddress);
+  }
+
+  getAllTokenPrices() {
+    const stmt = this.securityLayer.prepare('SELECT * FROM token_prices ORDER BY last_updated DESC');
+    return stmt.all();
+  }
+
+  // Analytics Operations
+  recordAnalyticsMetric(metricData) {
+    const stmt = this.securityLayer.prepare(`
+      INSERT INTO defi_analytics (
+        id, metric_type, pool_id, farm_id, value, timestamp
+      ) VALUES (?, ?, ?, ?, ?, ?)
+    `);
+    return stmt.run(
+      this.generateId(),
+      metricData.metricType,
+      metricData.poolId || null,
+      metricData.farmId || null,
+      metricData.value,
+      metricData.timestamp || new Date().toISOString()
+    );
+  }
+
+  getAnalyticsMetrics(metricType, poolId = null, farmId = null, timeRange = 24) {
+    let query = `
+      SELECT * FROM defi_analytics 
+      WHERE metric_type = ? AND timestamp >= datetime('now', '-${timeRange} hours')
+    `;
+    const params = [metricType];
+    
+    if (poolId) {
+      query += ' AND pool_id = ?';
+      params.push(poolId);
+    }
+    
+    if (farmId) {
+      query += ' AND farm_id = ?';
+      params.push(farmId);
+    }
+    
+    query += ' ORDER BY timestamp DESC';
+    
+    const stmt = this.securityLayer.prepare(query);
+    return stmt.all(...params);
+  }
+
+  // Calculate portfolio value
+  calculatePortfolioValue(userId) {
+    const portfolio = this.getUserPortfolio(userId);
+    if (!portfolio) {
+      this.createOrUpdatePortfolio(userId);
+      return this.getUserPortfolio(userId);
+    }
+
+    let totalLiquidityUSD = 0;
+    let totalStakedUSD = 0;
+    let totalPendingRewardsUSD = 0;
+
+    // Calculate liquidity positions value
+    const positions = this.getUserLiquidityPositions(userId);
+    for (const position of positions) {
+      const tokenAPrice = this.getTokenPrice(position.token_a);
+      const tokenBPrice = this.getTokenPrice(position.token_b);
+      
+      if (tokenAPrice && tokenBPrice) {
+        const positionValueUSD = 
+          (position.token_a_amount * tokenAPrice.price_usd) + 
+          (position.token_b_amount * tokenBPrice.price_usd);
+        totalLiquidityUSD += positionValueUSD;
+      }
+    }
+
+    // Calculate staked positions value
+    const stakes = this.getUserStakes(userId);
+    for (const stake of stakes) {
+      const stakingTokenPrice = this.getTokenPrice(stake.staking_token);
+      if (stakingTokenPrice) {
+        const stakeValueUSD = stake.amount * stakingTokenPrice.price_usd;
+        totalStakedUSD += stakeValueUSD;
+      }
+      
+      const rewardTokenPrice = this.getTokenPrice(stake.reward_token);
+      if (rewardTokenPrice) {
+        // Calculate pending rewards (this would need to be fetched from blockchain)
+        const pendingRewards = this.calculatePendingRewards(stake.stake_id);
+        const rewardsValueUSD = pendingRewards * rewardTokenPrice.price_usd;
+        totalPendingRewardsUSD += rewardsValueUSD;
+      }
+    }
+
+    const totalValueUSD = totalLiquidityUSD + totalStakedUSD + totalPendingRewardsUSD;
+
+    this.updatePortfolio(userId, {
+      total_value_usd: totalValueUSD,
+      total_liquidity_usd: totalLiquidityUSD,
+      total_staked_usd: totalStakedUSD,
+      total_pending_rewards_usd: totalPendingRewardsUSD
+    });
+
+    return this.getUserPortfolio(userId);
+  }
+
+  // Helper method to calculate pending rewards (simplified)
+  calculatePendingRewards(stakeId) {
+    // This would typically involve blockchain queries
+    // For now, return a placeholder value
+    return 0;
   }
 }
 
